@@ -24,5 +24,5 @@
   "publishConfig": {
     "access": "public"
   },
-  "files": ["index.ts", "libduckdb.dylib", "LICENSE"]
+  "files": ["index.ts", "libduckdb.dylib", "libduckdb_bun_shim.dylib", "LICENSE"]
 }
