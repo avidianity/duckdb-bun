@@ -4,15 +4,32 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+    # Conventional Commits: "ci(deps): ..." and "build(deps): ...".
     commit-message:
       prefix: ci
-  - package-ecosystem: npm
+      include: scope
+
+  # The repository uses bun.lock, which Dependabot reads through the `bun` ecosystem, not `npm`.
+  - package-ecosystem: bun
     directory: "/"
     schedule:
       interval: weekly
     commit-message:
-      prefix: deps
-    # DuckDB itself is pinned in src/version.ts and tracked by the upstream-check
-    # workflow, not dependabot — but keep @duckdb/node-api aligned to the pin.
+      prefix: build
+      include: scope
     ignore:
+      # Pinned to the DuckDB in src/version.ts and tracked by the upstream-check workflow.
       - dependency-name: "@duckdb/node-api"
+      # Pinned to the Bun in engines and packageManager; changed together with every workflow.
+      - dependency-name: "@types/bun"
+
+  - package-ecosystem: cargo
+    directory: "/native"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+      include: scope
+    ignore:
+      # libduckdb-sys tracks the DuckDB in src/version.ts (docs/adr/0003); it moves with a DuckDB upgrade.
+      - dependency-name: libduckdb-sys

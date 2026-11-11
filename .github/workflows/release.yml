@@ -1,32 +1,253 @@
 name: Release
 
-# Publishes to npm when you cut a GitHub Release.
-# Requires: an NPM_TOKEN repo secret, and a publishable package name in package.json
-# (npm "duckdb-bun" is taken — use a scoped name like @joshcano/duckdb-bun).
+# Builds both platform packages from the release tag, runs the test suites on each, and publishes to npm
+# through trusted publishing (OIDC): no npm token secret exists. See MAINTENANCE.md for the setup.
 on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: The release tag to build and publish, such as v2.0.0-r.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
 
 jobs:
-  publish:
+  # docs/adr/0003: the linux-x64 shim is built in this image, so it needs glibc 2.36 or newer.
+  build-linux-x64:
+    name: build (linux-x64)
     runs-on: ubuntu-latest
+    container: rust:1.99.1-bookworm@sha256:e6f2cff35d0f309acf8433b4f05878ed77092602c5065cc81801177da0bb3a9c
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    env:
+      PLATFORM: linux-x64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      # rustup installs the toolchain and components that rust-toolchain.toml pins.
+      - name: Install the Rust toolchain
+        run: |
+          rustup toolchain install
+          rustc --version
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # `github.workspace` is the host path in a container job, so the path comes from GITHUB_WORKSPACE.
+      - name: Point the Rust build at this platform's libduckdb
+        run: echo "DUCKDB_LIB_DIR=$GITHUB_WORKSPACE/packages/duckdb-bun-$PLATFORM" >> "$GITHUB_ENV"
+
+      - name: Fetch libduckdb
+        run: bun run fetch-lib "$PLATFORM"
+
+      - name: Build the native shim
+        run: bun run build:native
+
+      - name: Check versions against the tag
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bun run check-version --tag "$RELEASE_TAG"
+
+      - name: cargo test
+        working-directory: native
+        run: cargo test
+
+      - name: Official @duckdb/node-api suite
+        run: bun run test:official
+
+      - name: Official @duckdb/node-bindings suite
+        run: bun run test:bindings
+
+      - name: Parity with @duckdb/node-api
+        run: bun run parity
+
+      # The heavy suites run one at a time, each in its own step.
+      - name: Compile proof
+        run: bun run test:compile
+
+      - name: Leak test
+        run: bun run test:leak
+
+      - name: Event loop stress test
+        run: bun run test:stress
+
+      - name: Crash report test
+        run: bun run test:crash
+
+      - name: Issue 3060 reproduction
+        run: bun run test:issue-3060
+
+      - name: Remaining tests
+        run: bun run test:unit
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: duckdb-bun-linux-x64
+          path: packages/duckdb-bun-linux-x64/
+          if-no-files-found: error
+          retention-days: 7
+
+  build-darwin-arm64:
+    name: build (darwin-arm64)
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      PLATFORM: darwin-arm64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      # rustup installs the toolchain and components that rust-toolchain.toml pins.
+      - name: Install the Rust toolchain
+        run: |
+          rustup toolchain install
+          rustc --version
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Point the Rust build at this platform's libduckdb
+        run: echo "DUCKDB_LIB_DIR=$GITHUB_WORKSPACE/packages/duckdb-bun-$PLATFORM" >> "$GITHUB_ENV"
+
+      - name: Fetch libduckdb
+        run: bun run fetch-lib "$PLATFORM"
+
+      - name: Build the native shim
+        run: bun run build:native
+
+      - name: Check versions against the tag
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bun run check-version --tag "$RELEASE_TAG"
+
+      - name: cargo test
+        working-directory: native
+        run: cargo test
+
+      - name: Official @duckdb/node-api suite
+        run: bun run test:official
+
+      - name: Official @duckdb/node-bindings suite
+        run: bun run test:bindings
+
+      - name: Parity with @duckdb/node-api
+        run: bun run parity
+
+      # The heavy suites run one at a time, each in its own step.
+      - name: Compile proof
+        run: bun run test:compile
+
+      - name: Leak test
+        run: bun run test:leak
+
+      - name: Event loop stress test
+        run: bun run test:stress
+
+      - name: Crash report test
+        run: bun run test:crash
+
+      - name: Issue 3060 reproduction
+        run: bun run test:issue-3060
+
+      - name: Remaining tests
+        run: bun run test:unit
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: duckdb-bun-darwin-arm64
+          path: packages/duckdb-bun-darwin-arm64/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: [build-linux-x64, build-darwin-arm64]
+    # npm trusted publishing does not support self-hosted runners.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: npm
     permissions:
       contents: read
-      id-token: write # npm provenance
+      id-token: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          bun-version: "1.3.14"
-      - run: bun install --frozen-lockfile
-      - run: bun run fetch-lib
-      - run: bunx biome ci src tests scripts examples
-      - run: bun test
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          persist-credentials: false
 
-      - name: Publish to npm
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: duckdb-bun-linux-x64
+          path: packages/duckdb-bun-linux-x64
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: duckdb-bun-darwin-arm64
+          path: packages/duckdb-bun-darwin-arm64
+
+      - name: Check versions and native files against the tag
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bun run check-version --tag "$RELEASE_TAG" --publish
+
+      # The one exception to the Bun-only rule: npm trusted publishing needs the npm CLI (11.5.1 or newer)
+      # and Node 22.14.0 or newer, so this job installs Node only to run `npm publish`.
+      # Node 26.13.1 ships npm 11.20.0.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26.13.1
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      # Platform packages first, so the main package never points at a version that is not on npm yet.
+      # Trusted publishing adds provenance on its own. Every version is a prerelease (`-r.<n>`), and npm 11
+      # requires an explicit dist-tag for one, so `latest` is named, as @duckdb/node-api does.
+      # A version that is already on npm is skipped, so a failed run can be re-run.
+      - name: Publish to npm
         run: |
-          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
-          npm publish --provenance --access public
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          publish() {
+            local dir="$1"
+            local name
+            name="$(bun -p "require('./$dir/package.json').name")"
+            local status
+            status="$(curl --silent --output /dev/null --write-out '%{http_code}' "https://registry.npmjs.org/${name/\//%2f}/$version")"
+            if [ "$status" = "200" ]; then
+              echo "$name@$version is already on npm; skipping."
+              return
+            fi
+            npm publish "./$dir" --access public --tag latest
+          }
+          publish packages/duckdb-bun-linux-x64
+          publish packages/duckdb-bun-darwin-arm64
+          publish .

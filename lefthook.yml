@@ -1,0 +1,43 @@
+# Git hooks, installed by `bun install`: lefthook's postinstall script runs `lefthook install`,
+# and package.json `trustedDependencies` lets Bun run it.
+# Every JavaScript tool runs under Bun (`bun --bun`), never Node.
+# Never skip these hooks; fix what they report.
+
+# Bash-style globs: `**` matches zero or more directories.
+glob_matcher: doublestar
+
+pre-commit:
+  jobs:
+    # The same paths `bun run lint:ci` checks in CI.
+    - name: biome
+      glob:
+        - "{src,tests,scripts,examples}/**/*"
+        - "commitlint.config.ts"
+      run: bun --bun biome check --no-errors-on-unmatched --files-ignore-unknown=true --colors=off {staged_files}
+
+    - name: typecheck
+      glob:
+        - "**/*.ts"
+        - "tsconfig.json"
+        - "package.json"
+      run: bun run typecheck
+
+    - name: cargo-fmt
+      glob:
+        - "native/**/*"
+        - "rust-toolchain.toml"
+      run: cargo fmt --manifest-path native/Cargo.toml --check
+
+    - name: cargo-clippy
+      glob:
+        - "native/**/*"
+        - "rust-toolchain.toml"
+      # libduckdb-sys links the libduckdb that `bun run fetch-lib` put in this platform's package.
+      run: >-
+        DUCKDB_LIB_DIR="$(pwd)/packages/duckdb-bun-$(bun -p 'process.platform + "-" + process.arch')"
+        cargo clippy --manifest-path native/Cargo.toml --all-targets -- -D warnings
+
+commit-msg:
+  jobs:
+    - name: commitlint
+      run: bun --bun commitlint --edit {1}

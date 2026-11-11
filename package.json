@@ -34,17 +34,26 @@
   ],
   "scripts": {
     "fetch-lib": "bun run scripts/fetch-lib.ts",
+    "build:native": "bun run scripts/build-native.ts",
     "spike": "bun run scripts/spike.ts",
     "test": "bun test",
     "test:official": "bun test tests/official/api.test.ts",
+    "test:bindings": "bun test tests/official/bindings.test.ts",
+    "parity": "bun test tests/parity.test.ts",
+    "test:compile": "bun test tests/compile/compile.test.ts",
+    "test:leak": "bun test tests/heavy/leak.test.ts",
+    "test:stress": "bun test tests/heavy/event-loop-stress.test.ts",
+    "test:crash": "bun test tests/heavy/crash-report.test.ts",
+    "test:issue-3060": "bun test tests/heavy/issue-3060.test.ts",
+    "test:unit": "bun test --path-ignore-patterns 'tests/official/**' --path-ignore-patterns 'tests/heavy/**' --path-ignore-patterns 'tests/compile/**' --path-ignore-patterns tests/parity.test.ts",
     "gen:bindings": "bun run scripts/gen-bindings-scaffold.ts",
     "build:neo": "bun run scripts/build-neo-compile.ts",
-    "parity": "bun test tests/parity.test.ts",
     "check-version": "bun run scripts/check-version.ts",
-    "lint": "biome check src tests scripts examples",
-    "format": "biome format --write src tests scripts examples",
-    "check": "biome check --write src tests scripts examples",
-    "ci": "biome check src tests scripts examples && bun test"
+    "lint": "bun --bun biome check src tests scripts examples commitlint.config.ts",
+    "lint:ci": "bun --bun biome ci src tests scripts examples commitlint.config.ts",
+    "format": "bun --bun biome format --write src tests scripts examples commitlint.config.ts",
+    "typecheck": "bun check --no-script",
+    "check": "bun run lint && bun check"
   },
   "keywords": [
     "duckdb",
@@ -59,9 +68,16 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7",
+    "@commitlint/cli": "21.2.4",
+    "@commitlint/config-conventional": "21.2.4",
+    "@commitlint/types": "21.2.3",
     "@duckdb/node-api": "2.0.0-r.1",
-    "@types/bun": "1.4.4"
+    "@types/bun": "1.4.4",
+    "lefthook": "2.2.2"
   },
+  "trustedDependencies": [
+    "lefthook"
+  ],
   "engines": {
     "bun": "1.4.4"
   },
