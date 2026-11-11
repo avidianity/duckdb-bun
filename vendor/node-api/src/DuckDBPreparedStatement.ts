@@ -19,8 +19,10 @@ import {
   TIMESTAMP_NS,
   TIMESTAMP_S,
   TIMESTAMPTZ,
+  TIMESTAMPTZ_NS,
   TIMETZ,
   UUID,
+  VARIANT,
 } from './DuckDBType';
 import { DuckDBTypeId } from './DuckDBTypeId';
 import { StatementType } from './enums';
@@ -39,14 +41,18 @@ import {
   DuckDBTimestampNanosecondsValue,
   DuckDBTimestampSecondsValue,
   DuckDBTimestampTZValue,
+  DuckDBTimestampTZNanosecondsValue,
   DuckDBTimestampValue,
   DuckDBTimeTZValue,
   DuckDBTimeValue,
+  DuckDBTupleValue,
   DuckDBUnionValue,
   DuckDBUUIDValue,
   DuckDBValue,
+  DuckDBVariantValue,
   listValue,
   structValue,
+  tupleValue,
 } from './values';
 
 export class DuckDBPreparedStatement {
@@ -169,6 +175,12 @@ export class DuckDBPreparedStatement {
   ) {
     this.bindValue(parameterIndex, value, TIMESTAMPTZ);
   }
+  public bindTimestampTZNanoseconds(
+    parameterIndex: number,
+    value: DuckDBTimestampTZNanosecondsValue
+  ) {
+    this.bindValue(parameterIndex, value, TIMESTAMPTZ_NS);
+  }
   public bindTimestampSeconds(
     parameterIndex: number,
     value: DuckDBTimestampSecondsValue
@@ -232,6 +244,17 @@ export class DuckDBPreparedStatement {
       type
     );
   }
+  public bindTuple(
+    parameterIndex: number,
+    value: DuckDBTupleValue | readonly DuckDBValue[],
+    type?: DuckDBStructType
+  ) {
+    this.bindValue(
+      parameterIndex,
+      value instanceof DuckDBTupleValue ? value : tupleValue(value),
+      type
+    );
+  }
   public bindMap(
     parameterIndex: number,
     value: DuckDBMapValue,
@@ -251,6 +274,16 @@ export class DuckDBPreparedStatement {
   }
   public bindBit(parameterIndex: number, value: DuckDBBitValue) {
     this.bindValue(parameterIndex, value, BIT);
+  }
+  public bindVariant(
+    parameterIndex: number,
+    value: DuckDBVariantValue | null
+  ) {
+    if (value === null) {
+      this.bindNull(parameterIndex);
+      return;
+    }
+    this.bindValue(parameterIndex, value, VARIANT);
   }
   public bindNull(parameterIndex: number) {
     duckdb.bind_null(this.prepared_statement, parameterIndex);
@@ -288,7 +321,8 @@ export class DuckDBPreparedStatement {
   }
   public async run(): Promise<DuckDBMaterializedResult> {
     return new DuckDBMaterializedResult(
-      await duckdb.execute_prepared(this.prepared_statement)
+      await duckdb.execute_prepared(this.prepared_statement),
+      this.statementType
     );
   }
   public async runAndRead(): Promise<DuckDBResultReader> {
@@ -308,7 +342,8 @@ export class DuckDBPreparedStatement {
   }
   public async stream(): Promise<DuckDBResult> {
     return new DuckDBResult(
-      await duckdb.execute_prepared_streaming(this.prepared_statement)
+      await duckdb.execute_prepared_streaming(this.prepared_statement),
+      this.statementType
     );
   }
   public async streamAndRead(): Promise<DuckDBResultReader> {
@@ -328,12 +363,14 @@ export class DuckDBPreparedStatement {
   }
   public start(): DuckDBPendingResult {
     return new DuckDBPendingResult(
-      duckdb.pending_prepared(this.prepared_statement)
+      duckdb.pending_prepared(this.prepared_statement),
+      this.statementType
     );
   }
   public startStream(): DuckDBPendingResult {
     return new DuckDBPendingResult(
-      duckdb.pending_prepared_streaming(this.prepared_statement)
+      duckdb.pending_prepared_streaming(this.prepared_statement),
+      this.statementType
     );
   }
 }

@@ -1,34 +1,41 @@
 import { createDuckDBValueConverter } from './createDuckDBValueConverter';
 import { DuckDBTypeId } from './DuckDBTypeId';
-import { DuckDBValueConverter } from './DuckDBValueConverter';
+import { DuckDBValueConverterFor } from './DuckDBValueConverter';
 import {
   arrayFromArrayValue,
   arrayFromListValue,
   bigintFromBigIntValue,
+  bigintFromTimeNSValue,
   bigintFromTimeValue,
   booleanFromValue,
   bytesFromBitValue,
   bytesFromBlobValue,
+  bytesFromGeometryValue,
   dateFromDateValue,
   dateFromTimestampMillisecondsValue,
   dateFromTimestampNanosecondsValue,
   dateFromTimestampSecondsValue,
   dateFromTimestampTZValue,
+  dateFromTimestampTZNanosecondsValue,
   dateFromTimestampValue,
   doubleFromDecimalValue,
+  fromVariantValue,
   nullConverter,
   numberFromValue,
   objectArrayFromMapValue,
   objectFromIntervalValue,
-  objectFromStructValue,
+  objectOrArrayFromStructValue,
   objectFromTimeTZValue,
   objectFromUnionValue,
   stringFromValue,
   unsupportedConverter,
 } from './DuckDBValueConverters';
 import { JS } from './JS';
+import { JSTypeForTypeId } from './JSTypeForTypeId';
 
-const JSConvertersByTypeId: Record<DuckDBTypeId, DuckDBValueConverter<JS>> = {
+const JSConvertersByTypeId: {
+  [Id in DuckDBTypeId]: DuckDBValueConverterFor<JSTypeForTypeId[Id], JS>;
+} = {
   [DuckDBTypeId.INVALID]: unsupportedConverter,
   [DuckDBTypeId.BOOLEAN]: booleanFromValue,
   [DuckDBTypeId.TINYINT]: numberFromValue,
@@ -55,7 +62,7 @@ const JSConvertersByTypeId: Record<DuckDBTypeId, DuckDBValueConverter<JS>> = {
   [DuckDBTypeId.TIMESTAMP_NS]: dateFromTimestampNanosecondsValue,
   [DuckDBTypeId.ENUM]: stringFromValue,
   [DuckDBTypeId.LIST]: arrayFromListValue,
-  [DuckDBTypeId.STRUCT]: objectFromStructValue,
+  [DuckDBTypeId.STRUCT]: objectOrArrayFromStructValue,
   [DuckDBTypeId.MAP]: objectArrayFromMapValue,
   [DuckDBTypeId.ARRAY]: arrayFromArrayValue,
   [DuckDBTypeId.UUID]: stringFromValue,
@@ -68,8 +75,11 @@ const JSConvertersByTypeId: Record<DuckDBTypeId, DuckDBValueConverter<JS>> = {
   [DuckDBTypeId.SQLNULL]: nullConverter,
   [DuckDBTypeId.STRING_LITERAL]: unsupportedConverter,
   [DuckDBTypeId.INTEGER_LITERAL]: unsupportedConverter,
-  [DuckDBTypeId.TIME_NS]: bigintFromTimeValue,
+  [DuckDBTypeId.TIME_NS]: bigintFromTimeNSValue,
+  [DuckDBTypeId.GEOMETRY]: bytesFromGeometryValue,
+  [DuckDBTypeId.VARIANT]: fromVariantValue,
+  [DuckDBTypeId.TIMESTAMP_TZ_NS]: dateFromTimestampTZNanosecondsValue,
 };
 
 export const JSDuckDBValueConverter =
-  createDuckDBValueConverter(JSConvertersByTypeId);
+  createDuckDBValueConverter<JS>(JSConvertersByTypeId);

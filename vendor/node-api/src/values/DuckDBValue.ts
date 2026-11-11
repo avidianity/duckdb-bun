@@ -3,6 +3,7 @@ import { DuckDBBitValue } from './DuckDBBitValue';
 import { DuckDBBlobValue } from './DuckDBBlobValue';
 import { DuckDBDateValue } from './DuckDBDateValue';
 import { DuckDBDecimalValue } from './DuckDBDecimalValue';
+import { DuckDBGeometryValue } from './DuckDBGeometryValue';
 import { DuckDBIntervalValue } from './DuckDBIntervalValue';
 import { DuckDBListValue } from './DuckDBListValue';
 import { DuckDBMapValue } from './DuckDBMapValue';
@@ -12,11 +13,14 @@ import { DuckDBTimestampMillisecondsValue } from './DuckDBTimestampMillisecondsV
 import { DuckDBTimestampNanosecondsValue } from './DuckDBTimestampNanosecondsValue';
 import { DuckDBTimestampSecondsValue } from './DuckDBTimestampSecondsValue';
 import { DuckDBTimestampTZValue } from './DuckDBTimestampTZValue';
+import { DuckDBTimestampTZNanosecondsValue } from './DuckDBTimestampTZNanosecondsValue';
 import { DuckDBTimestampValue } from './DuckDBTimestampValue';
 import { DuckDBTimeTZValue } from './DuckDBTimeTZValue';
 import { DuckDBTimeValue } from './DuckDBTimeValue';
+import { DuckDBTupleValue } from './DuckDBTupleValue';
 import { DuckDBUnionValue } from './DuckDBUnionValue';
 import { DuckDBUUIDValue } from './DuckDBUUIDValue';
+import { DuckDBVariantValue } from './DuckDBVariantValue';
 
 export type DuckDBValue =
   | null
@@ -29,6 +33,7 @@ export type DuckDBValue =
   | DuckDBBlobValue
   | DuckDBDateValue
   | DuckDBDecimalValue
+  | DuckDBGeometryValue
   | DuckDBIntervalValue
   | DuckDBListValue
   | DuckDBMapValue
@@ -37,9 +42,12 @@ export type DuckDBValue =
   | DuckDBTimestampNanosecondsValue
   | DuckDBTimestampSecondsValue
   | DuckDBTimestampTZValue
+  | DuckDBTimestampTZNanosecondsValue
   | DuckDBTimestampValue
   | DuckDBTimeTZValue
   | DuckDBTimeValue
   | DuckDBTimeNSValue
+  | DuckDBTupleValue
   | DuckDBUnionValue
-  | DuckDBUUIDValue;
+  | DuckDBUUIDValue
+  | DuckDBVariantValue;

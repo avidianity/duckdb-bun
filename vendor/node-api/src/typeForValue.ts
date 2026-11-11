@@ -1,6 +1,7 @@
 import {
   ANY,
   ARRAY,
+  BIGINT,
   BIT,
   BLOB,
   BOOLEAN,
@@ -22,10 +23,13 @@ import {
   TIMESTAMP_NS,
   TIMESTAMP_S,
   TIMESTAMPTZ,
+  TIMESTAMPTZ_NS,
   TIMETZ,
+  TUPLE,
   UNION,
   UUID,
   VARCHAR,
+  VARIANT,
 } from './DuckDBType';
 import {
   DuckDBArrayValue,
@@ -42,12 +46,15 @@ import {
   DuckDBTimestampNanosecondsValue,
   DuckDBTimestampSecondsValue,
   DuckDBTimestampTZValue,
+  DuckDBTimestampTZNanosecondsValue,
   DuckDBTimestampValue,
   DuckDBTimeTZValue,
   DuckDBTimeValue,
+  DuckDBTupleValue,
   DuckDBUnionValue,
   DuckDBUUIDValue,
   DuckDBValue,
+  DuckDBVariantValue,
 } from './values';
 
 export function typeForValue(value: DuckDBValue): DuckDBType {
@@ -58,8 +65,11 @@ export function typeForValue(value: DuckDBValue): DuckDBType {
       case 'boolean':
         return BOOLEAN;
       case 'number':
-        if (Math.round(value) === value) {
-          return INTEGER;
+        if (Number.isInteger(value)) {
+          if (value >= -2_147_483_648 && value <= 2_147_483_647) {
+            return INTEGER;
+          }
+          return BIGINT;
         } else {
           return DOUBLE;
         }
@@ -83,6 +93,13 @@ export function typeForValue(value: DuckDBValue): DuckDBType {
         } else if (value instanceof DuckDBListValue) {
           return LIST(typeForValue(value.items[0]));
         } else if (value instanceof DuckDBMapValue) {
+          if (value.entries.length === 0) {
+            // An empty map carries no entries to infer key/value types from.
+            // Mirror the empty-list path (LIST(ANY)) so createValue raises the
+            // same "Cannot create maps with key type of ANY" error, instead of
+            // a cryptic "Cannot read properties of undefined (reading 'key')".
+            return MAP(ANY, ANY);
+          }
           return MAP(
             typeForValue(value.entries[0].key),
             typeForValue(value.entries[0].value)
@@ -101,6 +118,8 @@ export function typeForValue(value: DuckDBValue): DuckDBType {
           return TIMESTAMP_S;
         } else if (value instanceof DuckDBTimestampTZValue) {
           return TIMESTAMPTZ;
+        } else if (value instanceof DuckDBTimestampTZNanosecondsValue) {
+          return TIMESTAMPTZ_NS;
         } else if (value instanceof DuckDBTimestampValue) {
           return TIMESTAMP;
         } else if (value instanceof DuckDBTimeTZValue) {
@@ -109,10 +128,14 @@ export function typeForValue(value: DuckDBValue): DuckDBType {
           return TIME;
         } else if (value instanceof DuckDBTimeNSValue) {
           return TIME_NS;
+        } else if (value instanceof DuckDBTupleValue) {
+          return TUPLE(value.items.map(typeForValue));
         } else if (value instanceof DuckDBUnionValue) {
           return UNION({ [value.tag]: typeForValue(value.value) });
         } else if (value instanceof DuckDBUUIDValue) {
           return UUID;
+        } else if (value instanceof DuckDBVariantValue) {
+          return VARIANT;
         }
         break;
     }

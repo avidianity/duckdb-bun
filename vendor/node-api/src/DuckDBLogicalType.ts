@@ -12,6 +12,7 @@ import {
   DuckDBDoubleType,
   DuckDBEnumType,
   DuckDBFloatType,
+  DuckDBGeometryType,
   DuckDBHugeIntType,
   DuckDBIntegerLiteralType,
   DuckDBIntegerType,
@@ -29,6 +30,7 @@ import {
   DuckDBTimestampNanosecondsType,
   DuckDBTimestampSecondsType,
   DuckDBTimestampTZType,
+  DuckDBTimestampTZNanosecondsType,
   DuckDBTimestampType,
   DuckDBTinyIntType,
   DuckDBType,
@@ -40,6 +42,7 @@ import {
   DuckDBUUIDType,
   DuckDBUnionType,
   DuckDBVarCharType,
+  DuckDBVariantType,
 } from './DuckDBType';
 import { DuckDBTypeId } from './DuckDBTypeId';
 
@@ -64,6 +67,8 @@ export class DuckDBLogicalType {
         return new DuckDBArrayLogicalType(logical_type);
       case duckdb.Type.UNION:
         return new DuckDBUnionLogicalType(logical_type);
+      case duckdb.Type.GEOMETRY:
+        return new DuckDBGeometryLogicalType(logical_type);
       default:
         return new DuckDBLogicalType(logical_type);
     }
@@ -232,6 +237,12 @@ export class DuckDBLogicalType {
         return DuckDBIntegerLiteralType.create(alias);
       case DuckDBTypeId.TIME_NS:
         return DuckDBTimeNSType.create(alias);
+      case DuckDBTypeId.GEOMETRY:
+        throw new Error('Expected override');
+      case DuckDBTypeId.VARIANT:
+        return DuckDBVariantType.create(alias);
+      case DuckDBTypeId.TIMESTAMP_TZ_NS:
+        return DuckDBTimestampTZNanosecondsType.create(alias);
       default:
         throw new Error(`Unexpected type id: ${this.typeId}`);
     }
@@ -422,5 +433,14 @@ export class DuckDBUnionLogicalType extends DuckDBLogicalType {
       this.memberTypes(),
       this.alias
     );
+  }
+}
+
+export class DuckDBGeometryLogicalType extends DuckDBLogicalType {
+  public get crs(): string | undefined {
+    return duckdb.geometry_type_get_crs(this.logical_type) || undefined;
+  }
+  public override asType(): DuckDBGeometryType {
+    return DuckDBGeometryType.create(this.alias, this.crs);
   }
 }

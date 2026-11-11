@@ -1,6 +1,7 @@
 import duckdb from "../../../src/bindings/index.ts";
 import { DuckDBType } from './DuckDBType';
 import { DuckDBValueConverter } from './DuckDBValueConverter';
+import { ToDuckDBValueConverter } from './ToDuckDBValueConverter';
 import { DuckDBVector } from './DuckDBVector';
 import { DuckDBValue } from './values';
 
@@ -14,9 +15,22 @@ export class DuckDBDataChunk {
     types: readonly DuckDBType[],
     rowCount?: number
   ): DuckDBDataChunk {
-    const chunk = new DuckDBDataChunk(
-      duckdb.create_data_chunk(types.map((t) => t.toLogicalType().logical_type))
-    );
+    let chunk: DuckDBDataChunk;
+    try {
+      chunk = new DuckDBDataChunk(
+        duckdb.create_data_chunk(
+          types.map((t) => t.toLogicalType().logical_type)
+        )
+      );
+    } catch (cause) {
+      // The binding knows the chunk was refused but not which type did it, so
+      // name them here. Zero columns is a legitimate chunk, so there is
+      // nothing to check on the way out; only the refusal is an error.
+      throw new Error(
+        `Cannot create a data chunk with these column types: ${types.join(', ')}`,
+        { cause }
+      );
+    }
     if (rowCount != undefined) {
       chunk.rowCount = rowCount;
     }
@@ -37,6 +51,25 @@ export class DuckDBDataChunk {
       throw new Error(`A data chunk cannot have more than ${maxRowCount} rows`);
     }
     duckdb.data_chunk_set_size(this.chunk, count);
+    // Cached vectors were built for the previous row count, so they are the
+    // wrong size now. This matters most for a table function's output chunk,
+    // which arrives empty and is sized by the function on every call.
+    this.vectors.length = 0;
+  }
+  /**
+   * Refuses a column count that does not match the chunk's.
+   *
+   * A short array would leave the remaining vectors never written and never
+   * flushed while the chunk reports a non-zero row count, and reading or
+   * appending it then crashes the process instead of raising.
+   */
+  private assertColumnCount(count: number) {
+    const columnCount = this.columnCount;
+    if (count !== columnCount) {
+      throw new Error(
+        `Provided number of columns (${count}) does not match chunk column count (${columnCount})`
+      );
+    }
   }
   public getColumnVector(columnIndex: number): DuckDBVector {
     if (this.vectors[columnIndex]) {
@@ -92,6 +125,34 @@ export class DuckDBDataChunk {
     }
     vector.flush();
   }
+  /**
+   * `setColumnValues` with each value converted on the way in: the write
+   * counterpart of `convertColumnValues`.
+   *
+   * The column's type comes from its vector, so the converter is the only
+   * thing the caller supplies.
+   */
+  public setColumnValuesConverted<T>(
+    columnIndex: number,
+    values: readonly (T | null)[],
+    converter: ToDuckDBValueConverter<T>
+  ) {
+    const vector = this.getColumnVector(columnIndex);
+    if (vector.itemCount !== values.length) {
+      throw new Error(`number of values must equal chunk row count`);
+    }
+    const { type } = vector;
+    try {
+      for (let i = 0; i < values.length; i++) {
+        vector.setItem(i, converter(values[i] as T, type, converter));
+      }
+    } catch (cause) {
+      throw new Error(`Failed to set column ${columnIndex} (${type})`, {
+        cause,
+      });
+    }
+    vector.flush();
+  }
   public visitColumns(
     visitColumn: (
       column: DuckDBValue[],
@@ -133,11 +194,32 @@ export class DuckDBDataChunk {
     return convertedColumns;
   }
   public setColumns(columns: readonly (readonly DuckDBValue[])[]) {
+    this.assertColumnCount(columns.length);
     if (columns.length > 0) {
       this.rowCount = columns[0].length;
     }
     for (let columnIndex = 0; columnIndex < columns.length; columnIndex++) {
       this.setColumnValues(columnIndex, columns[columnIndex]);
+    }
+  }
+  /**
+   * `setColumns` with each value converted on the way in: the write
+   * counterpart of `convertColumns`.
+   */
+  public setColumnsConverted<T>(
+    columns: readonly (readonly (T | null)[])[],
+    converter: ToDuckDBValueConverter<T>
+  ) {
+    this.assertColumnCount(columns.length);
+    if (columns.length > 0) {
+      this.rowCount = columns[0].length;
+    }
+    for (let columnIndex = 0; columnIndex < columns.length; columnIndex++) {
+      this.setColumnValuesConverted(
+        columnIndex,
+        columns[columnIndex],
+        converter
+      );
     }
   }
   public appendToColumnsObject(
@@ -244,6 +326,39 @@ export class DuckDBDataChunk {
       const vector = this.getColumnVector(columnIndex);
       for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
         vector.setItem(rowIndex, rows[rowIndex][columnIndex]);
+      }
+      vector.flush();
+    }
+  }
+  /**
+   * `setRows` with each value converted on the way in: the write counterpart
+   * of `convertRows`.
+   *
+   * Each column's type comes from its vector, so the converter is the only
+   * thing the caller supplies.
+   */
+  public setRowsConverted<T>(
+    rows: readonly (readonly (T | null)[])[],
+    converter: ToDuckDBValueConverter<T>
+  ) {
+    this.rowCount = rows.length;
+    const columnCount = this.columnCount;
+    for (let columnIndex = 0; columnIndex < columnCount; columnIndex++) {
+      const vector = this.getColumnVector(columnIndex);
+      const { type } = vector;
+      // Wrapped per column rather than per value: a conversion failure names
+      // the column it came from without a try/catch in the inner loop.
+      try {
+        for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+          vector.setItem(
+            rowIndex,
+            converter(rows[rowIndex][columnIndex] as T, type, converter)
+          );
+        }
+      } catch (cause) {
+        throw new Error(`Failed to set column ${columnIndex} (${type})`, {
+          cause,
+        });
       }
       vector.flush();
     }

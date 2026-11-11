@@ -1,5 +1,6 @@
 import duckdb from "../../../src/bindings/index.ts";
 import { createValue } from './createValue';
+import { DuckDBConnection } from './DuckDBConnection';
 import { DuckDBDataChunk } from './DuckDBDataChunk';
 import { DuckDBLogicalType } from './DuckDBLogicalType';
 import {
@@ -17,8 +18,10 @@ import {
   TIMESTAMP_NS,
   TIMESTAMP_S,
   TIMESTAMPTZ,
+  TIMESTAMPTZ_NS,
   TIMETZ,
   UUID,
+  VARIANT,
 } from './DuckDBType';
 import { typeForValue } from './typeForValue';
 import {
@@ -35,19 +38,25 @@ import {
   DuckDBTimestampNanosecondsValue,
   DuckDBTimestampSecondsValue,
   DuckDBTimestampTZValue,
+  DuckDBTimestampTZNanosecondsValue,
   DuckDBTimestampValue,
   DuckDBTimeTZValue,
   DuckDBTimeValue,
+  DuckDBTupleValue,
   DuckDBUnionValue,
   DuckDBUUIDValue,
   DuckDBValue,
+  DuckDBVariantValue,
   listValue,
   structValue,
+  tupleValue,
 } from './values';
 
 export class DuckDBAppender {
+  public readonly connection: DuckDBConnection;
   private readonly appender: duckdb.Appender;
-  constructor(appender: duckdb.Appender) {
+  constructor(connection: DuckDBConnection, appender: duckdb.Appender) {
+    this.connection = connection;
     this.appender = appender;
   }
   public closeSync() {
@@ -55,6 +64,9 @@ export class DuckDBAppender {
   }
   public flushSync() {
     duckdb.appender_flush_sync(this.appender);
+  }
+  public clear() {
+    duckdb.appender_clear(this.appender);
   }
   public get columnCount(): number {
     return duckdb.appender_column_count(this.appender);
@@ -128,6 +140,9 @@ export class DuckDBAppender {
   public appendTimestampTZ(value: DuckDBTimestampTZValue) {
     this.appendValue(value, TIMESTAMPTZ);
   }
+  public appendTimestampTZNanoseconds(value: DuckDBTimestampTZNanosecondsValue) {
+    this.appendValue(value, TIMESTAMPTZ_NS);
+  }
   public appendTimestampSeconds(value: DuckDBTimestampSecondsValue) {
     this.appendValue(value, TIMESTAMP_S);
   }
@@ -167,6 +182,15 @@ export class DuckDBAppender {
       type
     );
   }
+  public appendTuple(
+    value: DuckDBTupleValue | readonly DuckDBValue[],
+    type?: DuckDBStructType
+  ) {
+    this.appendValue(
+      value instanceof DuckDBTupleValue ? value : tupleValue(value),
+      type
+    );
+  }
   public appendMap(value: DuckDBMapValue, type?: DuckDBMapType) {
     this.appendValue(value, type);
   }
@@ -190,6 +214,13 @@ export class DuckDBAppender {
   }
   public appendBigNum(value: bigint) {
     this.appendValue(value, BIGNUM);
+  }
+  public appendVariant(value: DuckDBVariantValue | null) {
+    if (value === null) {
+      this.appendNull();
+      return;
+    }
+    this.appendValue(value, VARIANT);
   }
   public appendNull() {
     duckdb.append_null(this.appender);

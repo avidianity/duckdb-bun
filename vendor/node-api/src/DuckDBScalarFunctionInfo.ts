@@ -1,8 +1,8 @@
 import duckdb from "../../../src/bindings/index.ts";
 
-export class DuckDBFunctionInfo {
-  private readonly function_info: duckdb.FunctionInfo;
-  constructor(function_info: duckdb.FunctionInfo) {
+export class DuckDBScalarFunctionInfo {
+  private readonly function_info: duckdb.ScalarFunctionInfo;
+  constructor(function_info: duckdb.ScalarFunctionInfo) {
     this.function_info = function_info;
   }
   public get bindData(): object | undefined {
@@ -17,7 +17,18 @@ export class DuckDBFunctionInfo {
   public getExtraInfo(): object | undefined {
     return duckdb.scalar_function_get_extra_info(this.function_info);
   }
+  public get state(): object | undefined {
+    return this.getState();
+  }
+  public getState(): object | undefined {
+    return duckdb.scalar_function_get_state(this.function_info);
+  }
   public setError(error: string) {
     duckdb.scalar_function_set_error(this.function_info, error);
   }
 }
+
+/** @deprecated Renamed to DuckDBScalarFunctionInfo. */
+export const DuckDBFunctionInfo = DuckDBScalarFunctionInfo;
+/** @deprecated Renamed to DuckDBScalarFunctionInfo. */
+export type DuckDBFunctionInfo = DuckDBScalarFunctionInfo;

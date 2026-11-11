@@ -1,14 +1,19 @@
 import duckdb from "../../../src/bindings/index.ts";
 import { DuckDBDataChunk } from './DuckDBDataChunk';
-import { DuckDBFunctionInfo } from './DuckDBFunctionInfo';
+import { DuckDBScalarFunctionBindInfo } from './DuckDBScalarFunctionBindInfo';
+import { DuckDBScalarFunctionInfo } from './DuckDBScalarFunctionInfo';
+import { DuckDBScalarFunctionInitInfo } from './DuckDBScalarFunctionInitInfo';
 import { DuckDBType } from './DuckDBType';
 import { DuckDBVector } from './DuckDBVector';
-import { DuckDBBindInfo } from './DuckDBBindInfo';
 
-export type DuckDBScalarBindFunction = (bindInfo: DuckDBBindInfo) => void;
+export type DuckDBScalarBindFunction = (bindInfo: DuckDBScalarFunctionBindInfo) => void;
+
+export type DuckDBScalarInitFunction = (
+  initInfo: DuckDBScalarFunctionInitInfo,
+) => void;
 
 export type DuckDBScalarMainFunction = (
-  functionInfo: DuckDBFunctionInfo,
+  functionInfo: DuckDBScalarFunctionInfo,
   inputDataChunk: DuckDBDataChunk,
   outputVector: DuckDBVector,
 ) => void;
@@ -23,6 +28,7 @@ export class DuckDBScalarFunction {
   public static create({
     name,
     bindFunction,
+    initFunction,
     mainFunction,
     returnType,
     parameterTypes,
@@ -33,6 +39,7 @@ export class DuckDBScalarFunction {
   }: {
     name: string;
     bindFunction?: DuckDBScalarBindFunction;
+    initFunction?: DuckDBScalarInitFunction;
     mainFunction: DuckDBScalarMainFunction;
     returnType: DuckDBType;
     parameterTypes?: readonly DuckDBType[];
@@ -45,6 +52,9 @@ export class DuckDBScalarFunction {
     scalarFunction.setName(name);
     if (bindFunction) {
       scalarFunction.setBindFunction(bindFunction);
+    }
+    if (initFunction) {
+      scalarFunction.setInitFunction(initFunction);
     }
     scalarFunction.setMainFunction(mainFunction);
     scalarFunction.setReturnType(returnType);
@@ -78,8 +88,14 @@ export class DuckDBScalarFunction {
 
   public setBindFunction(bindFunction: DuckDBScalarBindFunction) {
     duckdb.scalar_function_set_bind(this.scalar_function, (info) => {
-      const bindInfo = new DuckDBBindInfo(info);
+      const bindInfo = new DuckDBScalarFunctionBindInfo(info);
       bindFunction(bindInfo);
+    });
+  }
+
+  public setInitFunction(initFunction: DuckDBScalarInitFunction) {
+    duckdb.scalar_function_set_init(this.scalar_function, (info) => {
+      initFunction(new DuckDBScalarFunctionInitInfo(info));
     });
   }
 
@@ -87,7 +103,7 @@ export class DuckDBScalarFunction {
     duckdb.scalar_function_set_function(
       this.scalar_function,
       (info, input, output) => {
-        const functionInfo = new DuckDBFunctionInfo(info);
+        const functionInfo = new DuckDBScalarFunctionInfo(info);
         const inputDataChunk = new DuckDBDataChunk(input);
         const outputVector = DuckDBVector.create(
           output,

@@ -6,26 +6,33 @@ import {
   DuckDBType,
   DuckDBUnionType,
 } from './DuckDBType';
+import { DuckDBTypeId } from './DuckDBTypeId';
 import { DuckDBValueConverter } from './DuckDBValueConverter';
+import { typeForValue } from './typeForValue';
 import {
   DuckDBArrayValue,
   DuckDBBitValue,
   DuckDBBlobValue,
   DuckDBDateValue,
   DuckDBDecimalValue,
+  DuckDBGeometryValue,
   DuckDBIntervalValue,
   DuckDBListValue,
   DuckDBMapValue,
   DuckDBStructValue,
   DuckDBTimeTZValue,
+  DuckDBTimeNSValue,
   DuckDBTimeValue,
   DuckDBTimestampMillisecondsValue,
   DuckDBTimestampNanosecondsValue,
   DuckDBTimestampSecondsValue,
   DuckDBTimestampTZValue,
+  DuckDBTimestampTZNanosecondsValue,
   DuckDBTimestampValue,
+  DuckDBTupleValue,
   DuckDBUnionValue,
   DuckDBValue,
+  DuckDBVariantValue,
 } from './values';
 
 const MIN_DATE_DAYS = -100000000;
@@ -33,6 +40,15 @@ const MAX_DATE_DAYS = 100000000;
 //                      -8640000000000
 const MIN_DATE_MILLIS = -8640000000000000;
 const MAX_DATE_MILLIS = 8640000000000000;
+
+/** Whether a TIMESTAMP_NS or TIMESTAMPTZ_NS value is not +/-infinity. */
+function isFiniteNanos(nanos: bigint): boolean {
+  return (
+    nanos !== DuckDBTimestampNanosecondsValue.PosInf.nanos &&
+    nanos !== DuckDBTimestampNanosecondsValue.NegInf.nanos
+  );
+}
+
 const MILLS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export function unsupportedConverter(_: DuckDBValue, type: DuckDBType): null {
@@ -86,6 +102,13 @@ export function bytesFromBitValue(value: DuckDBValue): Uint8Array {
   throw new Error(`Expected DuckDBBitValue`);
 }
 
+export function bytesFromGeometryValue(value: DuckDBValue): Uint8Array {
+  if (value instanceof DuckDBGeometryValue) {
+    return value.bytes;
+  }
+  throw new Error(`Expected DuckDBGeometryValue`);
+}
+
 export function dateFromDateValue(value: DuckDBValue): Date {
   if (value instanceof DuckDBDateValue) {
     if (MIN_DATE_DAYS <= value.days && value.days <= MAX_DATE_DAYS) {
@@ -101,6 +124,13 @@ export function bigintFromTimeValue(value: DuckDBValue): bigint {
     return value.micros;
   }
   throw new Error(`Expected DuckDBTimeValue`);
+}
+
+export function bigintFromTimeNSValue(value: DuckDBValue): bigint {
+  if (value instanceof DuckDBTimeNSValue) {
+    return value.nanos;
+  }
+  throw new Error(`Expected DuckDBTimeNSValue`);
 }
 
 export function dateFromTimestampValue(value: DuckDBValue): Date {
@@ -145,7 +175,11 @@ export function dateFromTimestampMillisecondsValue(value: DuckDBValue): Date {
 export function dateFromTimestampNanosecondsValue(value: DuckDBValue): Date {
   if (value instanceof DuckDBTimestampNanosecondsValue) {
     const millis = value.nanos / 1000000n;
-    if (MIN_DATE_MILLIS <= millis && millis <= MAX_DATE_MILLIS) {
+    if (
+      isFiniteNanos(value.nanos) &&
+      MIN_DATE_MILLIS <= millis &&
+      millis <= MAX_DATE_MILLIS
+    ) {
       return new Date(Number(millis));
     }
     throw new Error(
@@ -179,6 +213,23 @@ export function dateFromTimestampTZValue(value: DuckDBValue): Date {
     );
   }
   throw new Error(`Expected DuckDBTimestampTZValue`);
+}
+
+export function dateFromTimestampTZNanosecondsValue(value: DuckDBValue): Date {
+  if (value instanceof DuckDBTimestampTZNanosecondsValue) {
+    const millis = value.nanos / 1000000n;
+    if (
+      isFiniteNanos(value.nanos) &&
+      MIN_DATE_MILLIS <= millis &&
+      millis <= MAX_DATE_MILLIS
+    ) {
+      return new Date(Number(millis));
+    }
+    throw new Error(
+      `TIMESTAMP_TZ_NS value out of range for JS Date: ${value.nanos} nanos`
+    );
+  }
+  throw new Error(`Expected DuckDBTimestampTZNanosecondsValue`);
 }
 
 export function objectFromIntervalValue(value: DuckDBValue): {
@@ -248,6 +299,38 @@ export function objectFromStructValue<T>(
   throw new Error(`Expected DuckDBStructValue and DuckDBStructType`);
 }
 
+export function arrayFromTupleValue<T>(
+  value: DuckDBValue,
+  type: DuckDBType,
+  converter: DuckDBValueConverter<T>
+): (T | null)[] {
+  if (
+    value instanceof DuckDBTupleValue &&
+    type instanceof DuckDBStructType &&
+    type.isTuple
+  ) {
+    return value.items.map((item, i) =>
+      converter(item, type.entryTypes[i], converter)
+    );
+  }
+  throw new Error(`Expected DuckDBTupleValue and tuple DuckDBStructType`);
+}
+
+/**
+ * Converts a STRUCT value: a tuple (see `DuckDBStructType.isTuple`) to an
+ * array of its items, and a named struct to an object keyed by entry name.
+ */
+export function objectOrArrayFromStructValue<T>(
+  value: DuckDBValue,
+  type: DuckDBType,
+  converter: DuckDBValueConverter<T>
+): { [key: string]: T | null } | (T | null)[] {
+  if (value instanceof DuckDBTupleValue) {
+    return arrayFromTupleValue(value, type, converter);
+  }
+  return objectFromStructValue(value, type, converter);
+}
+
 export function objectArrayFromMapValue<T>(
   value: DuckDBValue,
   type: DuckDBType,
@@ -289,4 +372,90 @@ export function objectFromUnionValue<T>(
     };
   }
   throw new Error(`Expected DuckDBUnionValue and DuckDBUnionType`);
+}
+
+/**
+ * Converter for VARIANT values: unwraps the `DuckDBVariantValue` wrapper
+ * and recursively walks the inner value, re-dispatching each scalar leaf
+ * through the supplied converter.
+ *
+ * A walker is needed (rather than just dispatching through the converter)
+ * because VARIANT containers are *heterogeneous* — items in a list or
+ * fields in a struct can have different types — while
+ * `arrayFromListValue` / `objectFromStructValue` / `objectArrayFromMapValue`
+ * assume a homogeneous element type pulled from the enclosing
+ * `DuckDBListType` / `DuckDBStructType` / `DuckDBMapType`. The walker
+ * emits the same output shape those converters do, and prefers the
+ * `DuckDBVariantValue.type` recorded by the decoder over `typeForValue`
+ * inference whenever a wrapper is encountered.
+ */
+export function fromVariantValue<T>(
+  value: DuckDBValue,
+  _type: DuckDBType,
+  converter: DuckDBValueConverter<T>
+): T | null {
+  if (!(value instanceof DuckDBVariantValue)) {
+    throw new Error(`Expected DuckDBVariantValue`);
+  }
+  return convertVariantInner(value.value, converter, value.type);
+}
+
+function convertVariantInner<T>(
+  value: DuckDBValue,
+  converter: DuckDBValueConverter<T>,
+  typeHint?: DuckDBType
+): T | null {
+  if (value === null) {
+    return null;
+  }
+  if (value instanceof DuckDBVariantValue) {
+    // Variant-of-variant (or a wrapped child inside a LIST(VARIANT)).
+    // Prefer the wrapper's exact type as the hint for further walking.
+    return convertVariantInner(value.value, converter, value.type ?? typeHint);
+  }
+  if (value instanceof DuckDBListValue || value instanceof DuckDBArrayValue) {
+    return value.items.map((item) =>
+      convertVariantInner(item, converter)
+    ) as unknown as T;
+  }
+  if (value instanceof DuckDBStructValue) {
+    const result: { [key: string]: T | null } = {};
+    for (const key in value.entries) {
+      result[key] = convertVariantInner(value.entries[key], converter);
+    }
+    return result as unknown as T;
+  }
+  if (value instanceof DuckDBTupleValue) {
+    return value.items.map((item) =>
+      convertVariantInner(item, converter)
+    ) as unknown as T;
+  }
+  if (value instanceof DuckDBMapValue) {
+    return value.entries.map((entry) => ({
+      key: convertVariantInner(entry.key, converter),
+      value: convertVariantInner(entry.value, converter),
+    })) as unknown as T;
+  }
+  if (value instanceof DuckDBUnionValue) {
+    return {
+      tag: value.tag,
+      value: convertVariantInner(value.value, converter),
+    } as unknown as T;
+  }
+  // Scalar (or non-recursable rich value like DECIMAL, BLOB, DATE, etc.):
+  // dispatch through the regular converter. Use `typeHint` (carried in
+  // from a wrapper) for type fidelity when available; fall back to
+  // `typeForValue` otherwise.
+  const inferredType = typeHint ?? typeForValue(value);
+  // `typeForValue` infers BIGINT for any JS integer number outside INT32
+  // range (e.g. a UINT32 VARIANT payload of 4_294_967_295). The BIGINT
+  // converters expect a `bigint`, not a `number`, and would otherwise
+  // throw. Coerce to bigint so the dispatch lands on a compatible reader.
+  if (
+    typeof value === 'number' &&
+    inferredType.typeId === DuckDBTypeId.BIGINT
+  ) {
+    return converter(BigInt(value), inferredType, converter);
+  }
+  return converter(value, inferredType, converter);
 }

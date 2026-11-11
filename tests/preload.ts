@@ -1,5 +1,6 @@
 // Test preload: rewrites the `vitest` import in the vendored official test files
-// to our bun:test shim.
+// to our bun:test shim, and their direct `@duckdb/node-bindings` imports to our
+// bindings.
 //
 // `bun test` hard-remaps `vitest` -> bun:test (which has no `assert` export)
 // before tsconfig paths or plugin onResolve run, so the only way to redirect it is
@@ -15,14 +16,17 @@ import { join } from "node:path";
 import { plugin } from "bun";
 
 const VITEST_SHIM = join(import.meta.dir, "./vitest-shim.ts");
-const VENDOR_TEST = /\/vendor\/node-api\/test\/.*\.ts$/;
+const BINDINGS = join(import.meta.dir, "../src/bindings/index.ts");
+const VENDOR_TEST = /\/vendor\/node-(api|bindings)\/test\/.*\.ts$/;
 
 plugin({
   name: "duckdb-bun-vitest-alias",
   setup(build) {
     build.onLoad({ filter: VENDOR_TEST }, async (args) => {
       const source = await Bun.file(args.path).text();
-      const contents = source.replace(/from ['"]vitest['"]/g, `from ${JSON.stringify(VITEST_SHIM)}`);
+      const contents = source
+        .replace(/from ['"]vitest['"]/g, `from ${JSON.stringify(VITEST_SHIM)}`)
+        .replace(/from ['"]@duckdb\/node-bindings['"]/g, `from ${JSON.stringify(BINDINGS)}`);
       return { contents, loader: "ts" };
     });
   },

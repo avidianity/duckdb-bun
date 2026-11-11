@@ -1,0 +1,860 @@
+import duckdb from '@duckdb/node-bindings';
+import { expect, suite, test } from 'vitest';
+import { data } from './utils/expectedVectors';
+import { expectResult } from './utils/expectResult';
+import { withConnection } from './utils/withConnection';
+
+suite('scalar functions', () => {
+  test('create', () => {
+    const scalar_function = duckdb.create_scalar_function();
+    expect(scalar_function).toBeTruthy();
+  });
+  test('set name', () => {
+    const scalar_function = duckdb.create_scalar_function();
+    duckdb.scalar_function_set_name(scalar_function, 'my_func');
+  });
+  test('set return type', () => {
+    const scalar_function = duckdb.create_scalar_function();
+    const int_type = duckdb.create_logical_type(duckdb.Type.INTEGER);
+    duckdb.scalar_function_set_return_type(scalar_function, int_type);
+  });
+  test('register & run (no extra info)', async () => {
+    await withConnection(async (connection) => {
+      const scalar_function = duckdb.create_scalar_function();
+      duckdb.scalar_function_set_name(scalar_function, 'my_func');
+      const varchar_type = duckdb.create_logical_type(duckdb.Type.VARCHAR);
+      duckdb.scalar_function_set_return_type(scalar_function, varchar_type);
+      duckdb.scalar_function_set_function(
+        scalar_function,
+        (_info, input, output) => {
+          const rowCount = duckdb.data_chunk_get_size(input);
+          for (let i = 0; i < rowCount; i++) {
+            duckdb.vector_assign_string_element(output, i, `output_${i}`);
+          }
+        },
+      );
+      duckdb.register_scalar_function(connection, scalar_function);
+      duckdb.destroy_scalar_function_sync(scalar_function);
+
+      const result = await duckdb.query(connection, 'select my_func()');
+      await expectResult(result, {
+        chunkCount: 1,
+        rowCount: 1,
+        columns: [
+          { name: 'my_func()', logicalType: { typeId: duckdb.Type.VARCHAR } },
+        ],
+        chunks: [{ rowCount: 1, vectors: [data(16, [true], ['output_0'])] }],
+      });
+    });
+  });
+  test('register & run (extra info)', async () => {
+    await withConnection(async (connection) => {
+      const scalar_function = duckdb.create_scalar_function();
+      duckdb.scalar_function_set_name(scalar_function, 'my_func');
+      const varchar_type = duckdb.create_logical_type(duckdb.Type.VARCHAR);
+      duckdb.scalar_function_set_return_type(scalar_function, varchar_type);
+      duckdb.scalar_function_set_function(
+        scalar_function,
+        (info, input, output) => {
+          const extra_info = duckdb.scalar_function_get_extra_info(info);
+          const rowCount = duckdb.data_chunk_get_size(input);
+          for (let i = 0; i < rowCount; i++) {
+            duckdb.vector_assign_string_element(
+              output,
+              i,
+              `output_${i}_${JSON.stringify(extra_info)}`,
+            );
+          }
+        },
+      );
+      duckdb.scalar_function_set_extra_info(scalar_function, {
+        'my_extra_info_key': 'my_extra_info_value',
+      });
+      duckdb.register_scalar_function(connection, scalar_function);
+      duckdb.destroy_scalar_function_sync(scalar_function);
+
+      const result = await duckdb.query(connection, 'select my_func()');
+      await expectResult(result, {
+        chunkCount: 1,
+        rowCount: 1,
+        columns: [
+          { name: 'my_func()', logicalType: { typeId: duckdb.Type.VARCHAR } },
+        ],
+        chunks: [
+          {
+            rowCount: 1,
+            vectors: [
+              data(
+                16,
+                [true],
+                ['output_0_{"my_extra_info_key":"my_extra_info_value"}'],
+              ),
+            ],
+          },
+        ],
+      });
+    });
+  });
+  test('register & run (bind fn w/ bind data)', async () => {
+    await withConnection(async (connection) => {
+      const scalar_function = duckdb.create_scalar_function();
+      duckdb.scalar_function_set_name(scalar_function, 'my_func');
+      const varchar_type = duckdb.create_logical_type(duckdb.Type.VARCHAR);
+      duckdb.scalar_function_set_return_type(scalar_function, varchar_type);
+      duckdb.scalar_function_set_bind(scalar_function, (info) => {
+        duckdb.scalar_function_set_bind_data(info, {
+          'my_bind_data_key': 'my_bind_data_value',
+        });
+      });
+      duckdb.scalar_function_set_function(
+        scalar_function,
+        (info, input, output) => {
+          const bind_data = duckdb.scalar_function_get_bind_data(info);
+          const rowCount = duckdb.data_chunk_get_size(input);
+          for (let i = 0; i < rowCount; i++) {
+            duckdb.vector_assign_string_element(
+              output,
+              i,
+              `output_${i}_${JSON.stringify(bind_data)}`,
+            );
+          }
+        },
+      );
+      duckdb.register_scalar_function(connection, scalar_function);
+      duckdb.destroy_scalar_function_sync(scalar_function);
+
+      const result = await duckdb.query(connection, 'select my_func()');
+      await expectResult(result, {
+        chunkCount: 1,
+        rowCount: 1,
+        columns: [
+          { name: 'my_func()', logicalType: { typeId: duckdb.Type.VARCHAR } },
+        ],
+        chunks: [
+          {
+            rowCount: 1,
+            vectors: [
+              data(
+                16,
+                [true],
+                ['output_0_{"my_bind_data_key":"my_bind_data_value"}'],
+              ),
+            ],
+          },
+        ],
+      });
+    });
+  });
+  test('register & run (extra info & bind fn w/ bind data)', async () => {
+    await withConnection(async (connection) => {
+      const scalar_function = duckdb.create_scalar_function();
+      duckdb.scalar_function_set_name(scalar_function, 'my_func');
+      const varchar_type = duckdb.create_logical_type(duckdb.Type.VARCHAR);
+      duckdb.scalar_function_set_return_type(scalar_function, varchar_type);
+      duckdb.scalar_function_set_extra_info(scalar_function, {
+        'my_extra_info_key': 'my_extra_info_value',
+      });
+      duckdb.scalar_function_set_bind(scalar_function, (info) => {
+        const extra_info = duckdb.scalar_function_bind_get_extra_info(info);
+        const client_context = duckdb.scalar_function_get_client_context(info);
+        const connection_id =
+          duckdb.client_context_get_connection_id(client_context);
+        duckdb.scalar_function_set_bind_data(info, {
+          'my_bind_data_key': 'my_bind_data_value',
+          'extra_info': extra_info,
+          'valid_connection_id': connection_id > 0 ? true : false,
+        });
+      });
+      duckdb.scalar_function_set_function(
+        scalar_function,
+        (info, input, output) => {
+          const bind_data = duckdb.scalar_function_get_bind_data(info);
+          const rowCount = duckdb.data_chunk_get_size(input);
+          for (let i = 0; i < rowCount; i++) {
+            duckdb.vector_assign_string_element(
+              output,
+              i,
+              `output_${i}_${JSON.stringify(bind_data)}`,
+            );
+          }
+        },
+      );
+      duckdb.register_scalar_function(connection, scalar_function);
+      duckdb.destroy_scalar_function_sync(scalar_function);
+
+      const result = await duckdb.query(connection, 'select my_func()');
+      await expectResult(result, {
+        chunkCount: 1,
+        rowCount: 1,
+        columns: [
+          { name: 'my_func()', logicalType: { typeId: duckdb.Type.VARCHAR } },
+        ],
+        chunks: [
+          {
+            rowCount: 1,
+            vectors: [
+              data(
+                16,
+                [true],
+                [
+                  `output_0_${JSON.stringify({
+                    'my_bind_data_key': 'my_bind_data_value',
+                    'extra_info': {
+                      'my_extra_info_key': 'my_extra_info_value',
+                    },
+                    'valid_connection_id': true,
+                  })}`,
+                ],
+              ),
+            ],
+          },
+        ],
+      });
+    });
+  });
+  test('init state, bind data, extra info, and client context', async () => {
+    await withConnection(async (connection) => {
+      await duckdb.query(connection, 'set threads = 1');
+
+      const scalar_function = duckdb.create_scalar_function();
+      duckdb.scalar_function_set_name(scalar_function, 'my_counter');
+      const bigint_type = duckdb.create_logical_type(duckdb.Type.BIGINT);
+      duckdb.scalar_function_add_parameter(scalar_function, bigint_type);
+      duckdb.scalar_function_set_return_type(scalar_function, bigint_type);
+      duckdb.scalar_function_set_volatile(scalar_function);
+
+      const extra_info = { start: 5n };
+      const bind_data = { limit: 5005n };
+      duckdb.scalar_function_set_extra_info(scalar_function, extra_info);
+      duckdb.scalar_function_set_bind(scalar_function, (info) => {
+        duckdb.scalar_function_set_bind_data(info, bind_data);
+      });
+
+      let init_calls = 0;
+      let init_extra_info: object | undefined;
+      let init_bind_data: object | undefined;
+      let init_context_is_valid = false;
+      let wrong_function_family_error: string | undefined;
+      duckdb.scalar_function_set_init(scalar_function, (info) => {
+        init_calls++;
+        init_extra_info = duckdb.scalar_function_init_get_extra_info(info);
+        init_bind_data = duckdb.scalar_function_init_get_bind_data(info);
+        try {
+          // Same underlying C type, different family: this must throw rather
+          // than reinterpret scalar init info as table function init info.
+          duckdb.init_get_extra_info(info as never);
+        } catch (e) {
+          wrong_function_family_error = String((e as Error).message);
+        }
+        const client_context =
+          duckdb.scalar_function_init_get_client_context(info);
+        init_context_is_valid =
+          duckdb.client_context_get_connection_id(client_context) > 0;
+        duckdb.scalar_function_init_set_state(info, {
+          next: extra_info.start,
+        });
+      });
+
+      let main_calls = 0;
+      const seen_states = new Set<object>();
+      duckdb.scalar_function_set_function(
+        scalar_function,
+        (info, input, output) => {
+          main_calls++;
+          const state = duckdb.scalar_function_get_state(info) as {
+            next: bigint;
+          };
+          seen_states.add(state);
+          const row_count = duckdb.data_chunk_get_size(input);
+          const output_buffer = new ArrayBuffer(row_count * 8);
+          const output_view = new DataView(output_buffer);
+          for (let i = 0; i < row_count; i++) {
+            output_view.setBigInt64(i * 8, state.next, true);
+            state.next++;
+          }
+          duckdb.copy_data_to_vector(
+            output,
+            0,
+            output_buffer,
+            0,
+            output_buffer.byteLength,
+          );
+        },
+      );
+      duckdb.register_scalar_function(connection, scalar_function);
+      duckdb.destroy_scalar_function_sync(scalar_function);
+
+      const result = await duckdb.query(
+        connection,
+        `
+          select count(*) as row_count, min(value) as min_value, max(value) as max_value
+          from (select my_counter(i) as value from range(5000) r(i))
+        `,
+      );
+      const chunk = await duckdb.fetch_chunk(result);
+      expect(chunk).toBeTruthy();
+      expect(duckdb.data_chunk_get_size(chunk!)).toBe(1);
+      const row_count_data = duckdb.vector_get_data(
+        duckdb.data_chunk_get_vector(chunk!, 0),
+        8,
+      );
+      const min_data = duckdb.vector_get_data(
+        duckdb.data_chunk_get_vector(chunk!, 1),
+        8,
+      );
+      const max_data = duckdb.vector_get_data(
+        duckdb.data_chunk_get_vector(chunk!, 2),
+        8,
+      );
+      expect(
+        new DataView(
+          row_count_data.buffer,
+          row_count_data.byteOffset,
+          row_count_data.byteLength,
+        ).getBigInt64(0, true),
+      ).toBe(5000n);
+      expect(
+        new DataView(
+          min_data.buffer,
+          min_data.byteOffset,
+          min_data.byteLength,
+        ).getBigInt64(0, true),
+      ).toBe(5n);
+      expect(
+        new DataView(
+          max_data.buffer,
+          max_data.byteOffset,
+          max_data.byteLength,
+        ).getBigInt64(0, true),
+      ).toBe(5004n);
+      expect(init_calls).toBe(1);
+      expect(init_extra_info).toBe(extra_info);
+      expect(init_bind_data).toBe(bind_data);
+      expect(init_context_is_valid).toBe(true);
+      expect(wrong_function_family_error).toBe(
+        'Invalid table function init info argument',
+      );
+      expect(main_calls).toBeGreaterThan(1);
+      expect(seen_states.size).toBe(1);
+    });
+  });
+  test('init runs once per worker thread', async () => {
+    await withConnection(async (connection) => {
+      const row_group_size = 122_880;
+      const thread_count = 4;
+      const row_group_margin = 2;
+      const rows = row_group_size * thread_count * row_group_margin;
+      await duckdb.query(connection, `set threads = ${thread_count}`);
+      await duckdb.query(
+        connection,
+        `create table parallel_input as select i from range(${rows}) r(i)`,
+      );
+
+      const scalar_function = duckdb.create_scalar_function();
+      duckdb.scalar_function_set_name(scalar_function, 'my_parallel_func');
+      const bigint_type = duckdb.create_logical_type(duckdb.Type.BIGINT);
+      duckdb.scalar_function_add_parameter(scalar_function, bigint_type);
+      duckdb.scalar_function_set_return_type(scalar_function, bigint_type);
+      duckdb.scalar_function_set_volatile(scalar_function);
+
+      let init_calls = 0;
+      duckdb.scalar_function_set_init(scalar_function, (info) => {
+        init_calls++;
+        duckdb.scalar_function_init_set_state(info, { id: init_calls });
+      });
+
+      const seen_states = new Set<object>();
+      duckdb.scalar_function_set_function(
+        scalar_function,
+        (info, input, output) => {
+          const state = duckdb.scalar_function_get_state(info);
+          if (!state) {
+            throw new Error('missing scalar function init state');
+          }
+          seen_states.add(state);
+          const row_count = duckdb.data_chunk_get_size(input);
+          const output_buffer = new BigInt64Array(row_count);
+          output_buffer.fill(1n);
+          duckdb.copy_data_to_vector(
+            output,
+            0,
+            output_buffer.buffer,
+            0,
+            output_buffer.byteLength,
+          );
+        },
+      );
+      duckdb.register_scalar_function(connection, scalar_function);
+      duckdb.destroy_scalar_function_sync(scalar_function);
+
+      await duckdb.query(
+        connection,
+        'select sum(my_parallel_func(i)) from parallel_input',
+      );
+
+      expect(init_calls).toBe(thread_count);
+      expect(seen_states.size).toBe(thread_count);
+    });
+  });
+  test('error handling (exception in init func)', async () => {
+    await withConnection(async (connection) => {
+      const scalar_function = duckdb.create_scalar_function();
+      duckdb.scalar_function_set_name(scalar_function, 'my_func');
+      const varchar_type = duckdb.create_logical_type(duckdb.Type.VARCHAR);
+      duckdb.scalar_function_set_return_type(scalar_function, varchar_type);
+      duckdb.scalar_function_set_init(scalar_function, () => {
+        throw new Error('my_init_error');
+      });
+      duckdb.scalar_function_set_function(
+        scalar_function,
+        (_info, _input, _output) => {},
+      );
+      duckdb.register_scalar_function(connection, scalar_function);
+      duckdb.destroy_scalar_function_sync(scalar_function);
+
+      await expect(
+        duckdb.query(connection, 'select my_func()'),
+      ).rejects.toThrow('my_init_error');
+    });
+  });
+  test('error handling (set error in init func)', async () => {
+    await withConnection(async (connection) => {
+      const scalar_function = duckdb.create_scalar_function();
+      duckdb.scalar_function_set_name(scalar_function, 'my_func');
+      const varchar_type = duckdb.create_logical_type(duckdb.Type.VARCHAR);
+      duckdb.scalar_function_set_return_type(scalar_function, varchar_type);
+      duckdb.scalar_function_set_init(scalar_function, (info) => {
+        duckdb.scalar_function_init_set_error(info, 'my_init_error');
+      });
+      duckdb.scalar_function_set_function(
+        scalar_function,
+        (_info, _input, _output) => {},
+      );
+      duckdb.register_scalar_function(connection, scalar_function);
+      duckdb.destroy_scalar_function_sync(scalar_function);
+
+      await expect(
+        duckdb.query(connection, 'select my_func()'),
+      ).rejects.toThrow('my_init_error');
+    });
+  });
+  test('error handling (exception in main func)', async () => {
+    await withConnection(async (connection) => {
+      const scalar_function = duckdb.create_scalar_function();
+      duckdb.scalar_function_set_name(scalar_function, 'my_func');
+      const varchar_type = duckdb.create_logical_type(duckdb.Type.VARCHAR);
+      duckdb.scalar_function_set_return_type(scalar_function, varchar_type);
+      duckdb.scalar_function_set_function(
+        scalar_function,
+        (_info, _input, _output) => {
+          throw new Error('my_error');
+        },
+      );
+      duckdb.register_scalar_function(connection, scalar_function);
+      duckdb.destroy_scalar_function_sync(scalar_function);
+
+      await expect(
+        duckdb.query(connection, 'select my_func()'),
+      ).rejects.toThrow('my_error');
+    });
+  });
+  test('error handling (set error in main func)', async () => {
+    await withConnection(async (connection) => {
+      const scalar_function = duckdb.create_scalar_function();
+      duckdb.scalar_function_set_name(scalar_function, 'my_func');
+      const varchar_type = duckdb.create_logical_type(duckdb.Type.VARCHAR);
+      duckdb.scalar_function_set_return_type(scalar_function, varchar_type);
+      duckdb.scalar_function_set_function(
+        scalar_function,
+        (info, _input, _output) => {
+          duckdb.scalar_function_set_error(info, 'my_error');
+        },
+      );
+      duckdb.register_scalar_function(connection, scalar_function);
+      duckdb.destroy_scalar_function_sync(scalar_function);
+
+      await expect(
+        duckdb.query(connection, 'select my_func()'),
+      ).rejects.toThrow('my_error');
+    });
+  });
+  test('error handling (exception in bind func)', async () => {
+    await withConnection(async (connection) => {
+      const scalar_function = duckdb.create_scalar_function();
+      duckdb.scalar_function_set_name(scalar_function, 'my_func');
+      const varchar_type = duckdb.create_logical_type(duckdb.Type.VARCHAR);
+      duckdb.scalar_function_set_return_type(scalar_function, varchar_type);
+      duckdb.scalar_function_set_bind(scalar_function, (_info) => {
+        throw new Error('my_bind_error');
+      });
+      duckdb.scalar_function_set_function(
+        scalar_function,
+        (_info, _input, _output) => {
+          throw new Error('my_error');
+        },
+      );
+      duckdb.register_scalar_function(connection, scalar_function);
+      duckdb.destroy_scalar_function_sync(scalar_function);
+
+      await expect(
+        duckdb.query(connection, 'select my_func()'),
+      ).rejects.toThrow('my_bind_error');
+    });
+  });
+  test('error handling (set error in bind func)', async () => {
+    await withConnection(async (connection) => {
+      const scalar_function = duckdb.create_scalar_function();
+      duckdb.scalar_function_set_name(scalar_function, 'my_func');
+      const varchar_type = duckdb.create_logical_type(duckdb.Type.VARCHAR);
+      duckdb.scalar_function_set_return_type(scalar_function, varchar_type);
+      duckdb.scalar_function_set_bind(scalar_function, (info) => {
+        duckdb.scalar_function_bind_set_error(info, 'my_bind_error');
+      });
+      duckdb.scalar_function_set_function(
+        scalar_function,
+        (_info, _input, _output) => {
+          throw new Error('my_error');
+        },
+      );
+      duckdb.register_scalar_function(connection, scalar_function);
+      duckdb.destroy_scalar_function_sync(scalar_function);
+
+      await expect(
+        duckdb.query(connection, 'select my_func()'),
+      ).rejects.toThrow('my_bind_error');
+    });
+  });
+  test('parameters (fixed, volatile)', async () => {
+    await withConnection(async (connection) => {
+      const scalar_function = duckdb.create_scalar_function();
+      duckdb.scalar_function_set_name(scalar_function, 'my_func');
+      const int_type = duckdb.create_logical_type(duckdb.Type.INTEGER);
+      const varchar_type = duckdb.create_logical_type(duckdb.Type.VARCHAR);
+      duckdb.scalar_function_add_parameter(scalar_function, int_type);
+      duckdb.scalar_function_add_parameter(scalar_function, varchar_type);
+      duckdb.scalar_function_set_return_type(scalar_function, varchar_type);
+      duckdb.scalar_function_set_volatile(scalar_function);
+      duckdb.scalar_function_set_function(
+        scalar_function,
+        (_info, input, output) => {
+          const rowCount = duckdb.data_chunk_get_size(input);
+          const vec0 = duckdb.data_chunk_get_vector(input, 0);
+          const data0 = duckdb.vector_get_data(vec0, rowCount * 4);
+          const dv0 = new DataView(data0.buffer);
+          const vec1 = duckdb.data_chunk_get_vector(input, 1);
+          const data1 = duckdb.vector_get_data(vec1, rowCount * 16);
+          const dv1 = new DataView(data1.buffer);
+          for (let i = 0; i < rowCount; i++) {
+            duckdb.vector_assign_string_element(
+              output,
+              i,
+              `output_${i}_${dv0.getInt32(i * 4, true)}_${dv1.getUint32(
+                i * 16,
+                true,
+              )}`,
+            );
+          }
+        },
+      );
+      duckdb.register_scalar_function(connection, scalar_function);
+      duckdb.destroy_scalar_function_sync(scalar_function);
+
+      const result = await duckdb.query(
+        connection,
+        "select my_func(42, 'duck') as my_func_result from range(3)",
+      );
+      await expectResult(result, {
+        chunkCount: 1,
+        rowCount: 3,
+        columns: [
+          {
+            name: 'my_func_result',
+            logicalType: { typeId: duckdb.Type.VARCHAR },
+          },
+        ],
+        chunks: [
+          {
+            rowCount: 3,
+            vectors: [
+              data(
+                16,
+                [true, true, true],
+                ['output_0_42_4', 'output_1_42_4', 'output_2_42_4'],
+              ),
+            ],
+          },
+        ],
+      });
+    });
+  });
+  test('parameters (varargs, volatile)', async () => {
+    await withConnection(async (connection) => {
+      const scalar_function = duckdb.create_scalar_function();
+      duckdb.scalar_function_set_name(scalar_function, 'my_func');
+      const int_type = duckdb.create_logical_type(duckdb.Type.INTEGER);
+      const varchar_type = duckdb.create_logical_type(duckdb.Type.VARCHAR);
+      duckdb.scalar_function_set_varargs(scalar_function, int_type);
+      duckdb.scalar_function_set_return_type(scalar_function, varchar_type);
+      duckdb.scalar_function_set_volatile(scalar_function);
+      duckdb.scalar_function_set_function(
+        scalar_function,
+        (_info, input, output) => {
+          const rowCount = duckdb.data_chunk_get_size(input);
+          const paramCount = duckdb.data_chunk_get_column_count(input);
+
+          for (let r = 0; r < rowCount; r++) {
+            const params: number[] = [];
+            for (let p = 0; p < paramCount; p++) {
+              const vec = duckdb.data_chunk_get_vector(input, p);
+              const data = duckdb.vector_get_data(vec, rowCount * 4);
+              const dv = new DataView(data.buffer);
+              params.push(dv.getInt32(r * 4, true));
+            }
+            duckdb.vector_assign_string_element(
+              output,
+              r,
+              `output_${r}_${params.join('_')}`,
+            );
+          }
+        },
+      );
+      duckdb.register_scalar_function(connection, scalar_function);
+      duckdb.destroy_scalar_function_sync(scalar_function);
+
+      const result = await duckdb.query(
+        connection,
+        'select my_func(11, 13, 17) as my_func_result from range(3)',
+      );
+      await expectResult(result, {
+        chunkCount: 1,
+        rowCount: 3,
+        columns: [
+          {
+            name: 'my_func_result',
+            logicalType: { typeId: duckdb.Type.VARCHAR },
+          },
+        ],
+        chunks: [
+          {
+            rowCount: 3,
+            vectors: [
+              data(
+                16,
+                [true, true, true],
+                ['output_0_11_13_17', 'output_1_11_13_17', 'output_2_11_13_17'],
+              ),
+            ],
+          },
+        ],
+      });
+    });
+  });
+  test('special handling', async () => {
+    await withConnection(async (connection) => {
+      const scalar_function = duckdb.create_scalar_function();
+      duckdb.scalar_function_set_name(scalar_function, 'my_func');
+      const int_type = duckdb.create_logical_type(duckdb.Type.INTEGER);
+      duckdb.scalar_function_add_parameter(scalar_function, int_type);
+      const varchar_type = duckdb.create_logical_type(duckdb.Type.VARCHAR);
+      duckdb.scalar_function_set_return_type(scalar_function, varchar_type);
+      duckdb.scalar_function_set_special_handling(scalar_function);
+      duckdb.scalar_function_set_function(
+        scalar_function,
+        (_info, input, output) => {
+          const rowCount = duckdb.data_chunk_get_size(input);
+          for (let i = 0; i < rowCount; i++) {
+            duckdb.vector_assign_string_element(
+              output,
+              i,
+              `output_is_not_null`,
+            );
+          }
+        },
+      );
+      duckdb.register_scalar_function(connection, scalar_function);
+      duckdb.destroy_scalar_function_sync(scalar_function);
+
+      const result = await duckdb.query(connection, 'select my_func(NULL)');
+      await expectResult(result, {
+        chunkCount: 1,
+        rowCount: 1,
+        columns: [
+          {
+            name: 'my_func(NULL)',
+            logicalType: { typeId: duckdb.Type.VARCHAR },
+          },
+        ],
+        // Without special handling, this would be NULL
+        chunks: [
+          { rowCount: 1, vectors: [data(16, [true], ['output_is_not_null'])] },
+        ],
+      });
+    });
+  });
+  test('bind data identity is preserved across calls', async () => {
+    await withConnection(async (connection) => {
+      const scalar_function = duckdb.create_scalar_function();
+      duckdb.scalar_function_set_name(scalar_function, 'my_func');
+      const varchar_type = duckdb.create_logical_type(duckdb.Type.VARCHAR);
+      duckdb.scalar_function_set_return_type(scalar_function, varchar_type);
+      duckdb.scalar_function_set_volatile(scalar_function);
+      const bind_data_object = { 'my_bind_data_key': 'my_bind_data_value' };
+      duckdb.scalar_function_set_bind(scalar_function, (info) => {
+        duckdb.scalar_function_set_bind_data(info, bind_data_object);
+      });
+      const seen_bind_data: (object | undefined)[] = [];
+      duckdb.scalar_function_set_function(
+        scalar_function,
+        (info, input, output) => {
+          seen_bind_data.push(duckdb.scalar_function_get_bind_data(info));
+          const rowCount = duckdb.data_chunk_get_size(input);
+          for (let i = 0; i < rowCount; i++) {
+            duckdb.vector_assign_string_element(output, i, 'output');
+          }
+        },
+      );
+      duckdb.register_scalar_function(connection, scalar_function);
+      duckdb.destroy_scalar_function_sync(scalar_function);
+
+      // More than one vector's worth of rows, so the main function runs repeatedly.
+      await duckdb.query(connection, 'select my_func() from range(5000)');
+
+      expect(seen_bind_data.length).toBeGreaterThan(1);
+      for (const bind_data of seen_bind_data) {
+        // The very same JS object, not a copy: the binding holds a live reference to it.
+        expect(bind_data).toBe(bind_data_object);
+      }
+    });
+  });
+  test('bind data survives repeated execution of a prepared statement', async () => {
+    await withConnection(async (connection) => {
+      const scalar_function = duckdb.create_scalar_function();
+      duckdb.scalar_function_set_name(scalar_function, 'my_func');
+      const varchar_type = duckdb.create_logical_type(duckdb.Type.VARCHAR);
+      duckdb.scalar_function_set_return_type(scalar_function, varchar_type);
+      duckdb.scalar_function_set_bind(scalar_function, (info) => {
+        duckdb.scalar_function_set_bind_data(info, { 'suffix': 'bind_data' });
+      });
+      duckdb.scalar_function_set_function(
+        scalar_function,
+        (info, input, output) => {
+          const bind_data = duckdb.scalar_function_get_bind_data(info) as {
+            suffix: string;
+          };
+          const rowCount = duckdb.data_chunk_get_size(input);
+          for (let i = 0; i < rowCount; i++) {
+            duckdb.vector_assign_string_element(
+              output,
+              i,
+              `output_${i}_${bind_data.suffix}`,
+            );
+          }
+        },
+      );
+      duckdb.register_scalar_function(connection, scalar_function);
+      duckdb.destroy_scalar_function_sync(scalar_function);
+
+      const prepared = await duckdb.prepare(connection, 'select my_func()');
+      for (let i = 0; i < 3; i++) {
+        const result = await duckdb.execute_prepared(prepared);
+        await expectResult(result, {
+          chunkCount: 1,
+          rowCount: 1,
+          columns: [
+            { name: 'my_func()', logicalType: { typeId: duckdb.Type.VARCHAR } },
+          ],
+          chunks: [
+            {
+              rowCount: 1,
+              vectors: [data(16, [true], ['output_0_bind_data'])],
+            },
+          ],
+        }, prepared);
+      }
+    });
+  });
+  test('bind data can hold values that would not survive serialization', async () => {
+    await withConnection(async (connection) => {
+      const scalar_function = duckdb.create_scalar_function();
+      duckdb.scalar_function_set_name(scalar_function, 'my_func');
+      const varchar_type = duckdb.create_logical_type(duckdb.Type.VARCHAR);
+      duckdb.scalar_function_set_return_type(scalar_function, varchar_type);
+      duckdb.scalar_function_set_bind(scalar_function, (info) => {
+        duckdb.scalar_function_set_bind_data(info, {
+          'lookup': new Map([[0, 'zero']]),
+          'describe': (i: number) => `row${i}`,
+        });
+      });
+      duckdb.scalar_function_set_function(
+        scalar_function,
+        (info, input, output) => {
+          const bind_data = duckdb.scalar_function_get_bind_data(info) as {
+            lookup: Map<number, string>;
+            describe: (i: number) => string;
+          };
+          const rowCount = duckdb.data_chunk_get_size(input);
+          for (let i = 0; i < rowCount; i++) {
+            duckdb.vector_assign_string_element(
+              output,
+              i,
+              `${bind_data.lookup.get(i)}_${bind_data.describe(i)}`,
+            );
+          }
+        },
+      );
+      duckdb.register_scalar_function(connection, scalar_function);
+      duckdb.destroy_scalar_function_sync(scalar_function);
+
+      const result = await duckdb.query(connection, 'select my_func()');
+      await expectResult(result, {
+        chunkCount: 1,
+        rowCount: 1,
+        columns: [
+          { name: 'my_func()', logicalType: { typeId: duckdb.Type.VARCHAR } },
+        ],
+        chunks: [{ rowCount: 1, vectors: [data(16, [true], ['zero_row0'])] }],
+      });
+    });
+  });
+  test('extra info can hold values that would not survive serialization', async () => {
+    await withConnection(async (connection) => {
+      const scalar_function = duckdb.create_scalar_function();
+      duckdb.scalar_function_set_name(scalar_function, 'my_func');
+      const varchar_type = duckdb.create_logical_type(duckdb.Type.VARCHAR);
+      duckdb.scalar_function_set_return_type(scalar_function, varchar_type);
+      duckdb.scalar_function_set_extra_info(scalar_function, {
+        'prefix': () => 'from_extra_info',
+      });
+      duckdb.scalar_function_set_function(
+        scalar_function,
+        (info, input, output) => {
+          const extra_info = duckdb.scalar_function_get_extra_info(info) as {
+            prefix: () => string;
+          };
+          const rowCount = duckdb.data_chunk_get_size(input);
+          for (let i = 0; i < rowCount; i++) {
+            duckdb.vector_assign_string_element(
+              output,
+              i,
+              `${extra_info.prefix()}_${i}`,
+            );
+          }
+        },
+      );
+      duckdb.register_scalar_function(connection, scalar_function);
+      duckdb.destroy_scalar_function_sync(scalar_function);
+
+      const result = await duckdb.query(connection, 'select my_func()');
+      await expectResult(result, {
+        chunkCount: 1,
+        rowCount: 1,
+        columns: [
+          { name: 'my_func()', logicalType: { typeId: duckdb.Type.VARCHAR } },
+        ],
+        chunks: [
+          { rowCount: 1, vectors: [data(16, [true], ['from_extra_info_0'])] },
+        ],
+      });
+    });
+  });
+});

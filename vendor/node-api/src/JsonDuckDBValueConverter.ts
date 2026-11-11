@@ -1,26 +1,27 @@
 import { createDuckDBValueConverter } from './createDuckDBValueConverter';
 import { DuckDBTypeId } from './DuckDBTypeId';
-import { DuckDBValueConverter } from './DuckDBValueConverter';
+import { DuckDBValueConverterFor } from './DuckDBValueConverter';
 import {
   arrayFromArrayValue,
   arrayFromListValue,
   booleanFromValue,
+  fromVariantValue,
   jsonNumberFromValue,
   jsonObjectFromIntervalValue,
   nullConverter,
   numberFromValue,
   objectArrayFromMapValue,
-  objectFromStructValue,
+  objectOrArrayFromStructValue,
   objectFromUnionValue,
   stringFromValue,
   unsupportedConverter,
 } from './DuckDBValueConverters';
 import { Json } from './Json';
+import { JsonTypeForTypeId } from './JsonTypeForTypeId';
 
-const JsonConvertersByTypeId: Record<
-  DuckDBTypeId,
-  DuckDBValueConverter<Json>
-> = {
+const JsonConvertersByTypeId: {
+  [Id in DuckDBTypeId]: DuckDBValueConverterFor<JsonTypeForTypeId[Id], Json>;
+} = {
   [DuckDBTypeId.INVALID]: unsupportedConverter,
   [DuckDBTypeId.BOOLEAN]: booleanFromValue,
   [DuckDBTypeId.TINYINT]: numberFromValue,
@@ -47,7 +48,7 @@ const JsonConvertersByTypeId: Record<
   [DuckDBTypeId.TIMESTAMP_NS]: stringFromValue,
   [DuckDBTypeId.ENUM]: stringFromValue,
   [DuckDBTypeId.LIST]: arrayFromListValue,
-  [DuckDBTypeId.STRUCT]: objectFromStructValue,
+  [DuckDBTypeId.STRUCT]: objectOrArrayFromStructValue,
   [DuckDBTypeId.MAP]: objectArrayFromMapValue,
   [DuckDBTypeId.ARRAY]: arrayFromArrayValue,
   [DuckDBTypeId.UUID]: stringFromValue,
@@ -61,8 +62,11 @@ const JsonConvertersByTypeId: Record<
   [DuckDBTypeId.STRING_LITERAL]: unsupportedConverter,
   [DuckDBTypeId.INTEGER_LITERAL]: unsupportedConverter,
   [DuckDBTypeId.TIME_NS]: stringFromValue,
+  [DuckDBTypeId.GEOMETRY]: stringFromValue,
+  [DuckDBTypeId.VARIANT]: fromVariantValue,
+  [DuckDBTypeId.TIMESTAMP_TZ_NS]: stringFromValue,
 };
 
-export const JsonDuckDBValueConverter = createDuckDBValueConverter(
+export const JsonDuckDBValueConverter = createDuckDBValueConverter<Json>(
   JsonConvertersByTypeId
 );
