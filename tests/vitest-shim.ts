@@ -23,11 +23,13 @@ export const expect = new Proxy(bunExpect, {
     const matchers = Reflect.apply(target, thisArg, args) as object;
     if (typeof actual !== "function") return matchers;
     return new Proxy(matchers, {
-      get(object, property, receiver) {
+      get(object, property) {
         if (SETTLE_MATCHERS.has(property)) {
           return Reflect.get(Reflect.apply(target, thisArg, [actual(), ...rest]) as object, property);
         }
-        return Reflect.get(object, property, receiver);
+        // Matchers check `this` is the real Expect object, not this proxy.
+        const value = Reflect.get(object, property, object);
+        return typeof value === "function" ? value.bind(object) : value;
       },
     });
   },
