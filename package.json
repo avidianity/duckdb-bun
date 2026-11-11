@@ -37,6 +37,7 @@
     "spike": "bun run scripts/spike.ts",
     "test": "bun test",
     "test:official": "bun test tests/official/api.test.ts",
+    "test:bindings": "bun test tests/official/bindings.test.ts",
     "gen:bindings": "bun run scripts/gen-bindings-scaffold.ts",
     "build:neo": "bun run scripts/build-neo-compile.ts",
     "parity": "bun test tests/parity.test.ts",
@@ -62,7 +63,9 @@
   "devDependencies": {
     "@biomejs/biome": "2.6.7",
     "@duckdb/node-api": "2.0.0-r.1",
-    "@types/bun": "1.4.4"
+    "@types/bun": "1.4.4",
+    "@types/chai": "5.2.3",
+    "chai": "6.3.0"
   },
   "engines": {
     "bun": "1.4.4"
