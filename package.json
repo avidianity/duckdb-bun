@@ -48,7 +48,8 @@
     "check": "biome check --write src tests scripts examples",
     "ci": "biome check src tests scripts examples && bun test",
     "gen:ffi": "bun run scripts/gen-ffi.ts",
-    "vendor:api-spec": "bun run scripts/vendor-api-spec.ts"
+    "vendor:api-spec": "bun run scripts/vendor-api-spec.ts",
+    "gen:contract": "bun run scripts/gen-contract.ts"
   },
   "keywords": [
     "duckdb",
