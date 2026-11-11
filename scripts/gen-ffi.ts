@@ -288,5 +288,5 @@ await Bun.write(
   ].join("\n"),
 );
 await Bun.$`rustfmt --edition 2024 ${RS_OUT}`;
-await Bun.$`${join(ROOT, "node_modules", ".bin", "biome")} format --write ${TS_OUT}`.quiet();
+await Bun.$`${join(ROOT, "node_modules", ".bin", "biome")} check --write ${TS_OUT}`.quiet();
 console.log(`capi: ${direct.length} direct, ${wrapped.length} wrapped, ${layouts.size} struct layouts`);

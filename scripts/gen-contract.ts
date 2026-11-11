@@ -44,5 +44,5 @@ await Bun.write(
     "",
   ].join("\n"),
 );
-await Bun.$`${join(ROOT, "node_modules", ".bin", "biome")} format --write ${OUT}`.quiet();
+await Bun.$`${join(ROOT, "node_modules", ".bin", "biome")} check --write ${OUT}`.quiet();
 console.log(`contract: ${enums.length} enums, ${constants.length} constants, ${types.length} types`);
