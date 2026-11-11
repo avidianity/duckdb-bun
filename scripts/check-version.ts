@@ -1,68 +1,183 @@
-// Reports whether our pinned DuckDB version is behind the latest release, and
-// whether the vendored lib / @duckdb/node-api reference match the pin.
-// Run: `bun run check-version`. Exits non-zero on drift (so CI can gate on it).
+// Checks that every version in this repository agrees with the DuckDB pin, and reports newer upstream releases.
+//
+//   bun run check-version                    consistency, then the upstream report; exits 1 on an inconsistency
+//   bun run check-version --tag v2.0.0-r.0   also: every package version equals the release tag
+//   bun run check-version --publish          also: every platform package holds its native files and lists
+//                                            them in "files", so npm publishes them (release workflow)
+//   bun run check-version --upstream-json    only the upstream report, as JSON (upstream-check workflow);
+//                                            exits 1 when upstream cannot be reached
+//
+// A newer upstream release is informational; it never fails the default mode.
 import { existsSync } from "node:fs";
-import pkg from "../package.json" with { type: "json" };
+import { extname, join } from "node:path";
+import { parseArgs } from "node:util";
 import { DUCKDB_VERSION, DUCKDB_VERSION_TAG } from "../src/version.ts";
+import { TARGETS } from "./fetch-lib.ts";
 
-function cmp(a: string, b: string): number {
-  const pa = a.split(".").map(Number);
-  const pb = b.split(".").map(Number);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
-    if (d !== 0) return Math.sign(d);
+const ROOT = join(import.meta.dir, "..");
+const NODE_API = "@duckdb/node-api";
+const SHIM_BASENAME = "libduckdb_bun_shim";
+
+type PackageJson = {
+  name?: string;
+  version?: string;
+  files?: string[];
+  optionalDependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+};
+
+type Upstream = { pinned: string; latest: string; newer: boolean; url: string };
+type UpstreamReport = { duckdb: Upstream; nodeApi: Upstream };
+
+const { values } = parseArgs({
+  args: Bun.argv.slice(2),
+  options: {
+    tag: { type: "string" },
+    publish: { type: "boolean", default: false },
+    "upstream-json": { type: "boolean", default: false },
+  },
+  strict: true,
+});
+
+async function readPackage(dir: string): Promise<PackageJson> {
+  return (await Bun.file(join(ROOT, dir, "package.json")).json()) as PackageJson;
+}
+
+/** The base DuckDB version of a `<duckdb>-r.<n>` version, or undefined when it has another shape. */
+function duckdbBase(version: string | undefined): string | undefined {
+  return /^(\d+\.\d+\.\d+)-r\.\d+$/.exec(version ?? "")?.[1];
+}
+
+/** The native files a platform package ships: libduckdb and the shim built from native/. */
+function nativeFiles(platform: string): string[] {
+  const target = TARGETS[platform];
+  if (!target) throw new Error(`Unknown platform ${platform}`);
+  return [target.lib, `${SHIM_BASENAME}${extname(target.lib)}`];
+}
+
+async function getJson(url: string, headers: Record<string, string> = {}): Promise<unknown> {
+  const response = await fetch(url, { headers: { Accept: "application/json", ...headers } });
+  if (!response.ok) throw new Error(`GET ${url} answered ${response.status} ${response.statusText}`);
+  return response.json();
+}
+
+async function latestDuckDB(): Promise<string> {
+  // GITHUB_TOKEN lifts the unauthenticated rate limit that shared CI runners hit.
+  const token = process.env.GITHUB_TOKEN;
+  const json = (await getJson("https://api.github.com/repos/duckdb/duckdb/releases/latest", {
+    "User-Agent": "duckdb-bun-check-version",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  })) as { tag_name?: string };
+  if (!json.tag_name) throw new Error("The latest DuckDB release has no tag_name");
+  return json.tag_name.replace(/^v/, "");
+}
+
+async function latestNodeApi(): Promise<string> {
+  const json = (await getJson(`https://registry.npmjs.org/${NODE_API.replace("/", "%2f")}`)) as {
+    "dist-tags"?: { latest?: string };
+  };
+  const latest = json["dist-tags"]?.latest;
+  if (!latest) throw new Error(`${NODE_API} has no latest dist-tag`);
+  return latest;
+}
+
+async function upstreamReport(nodeApiPin: string): Promise<UpstreamReport> {
+  const [duckdb, nodeApi] = await Promise.all([latestDuckDB(), latestNodeApi()]);
+  return {
+    duckdb: {
+      pinned: DUCKDB_VERSION,
+      latest: duckdb,
+      newer: Bun.semver.order(duckdb, DUCKDB_VERSION) > 0,
+      url: `https://github.com/duckdb/duckdb/releases/tag/v${duckdb}`,
+    },
+    nodeApi: {
+      pinned: nodeApiPin,
+      latest: nodeApi,
+      newer: Bun.semver.order(nodeApi, nodeApiPin) > 0,
+      url: `https://www.npmjs.com/package/${NODE_API}/v/${nodeApi}`,
+    },
+  };
+}
+
+const root = await readPackage(".");
+const nodeApiPin = root.devDependencies?.[NODE_API] ?? "";
+
+if (values["upstream-json"]) {
+  console.log(JSON.stringify(await upstreamReport(nodeApiPin), null, 2));
+  process.exit(0);
+}
+
+const problems: string[] = [];
+const platforms = Object.keys(TARGETS);
+const host = `${process.platform}-${process.arch}`;
+
+console.log(`DuckDB pin (src/version.ts):     ${DUCKDB_VERSION_TAG}`);
+console.log(`package version (package.json): ${root.version}`);
+console.log(`${NODE_API} devDependency:   ${nodeApiPin || "missing"}`);
+
+if (duckdbBase(root.version) !== DUCKDB_VERSION) {
+  problems.push(`package.json version ${root.version} is not ${DUCKDB_VERSION}-r.<n>; it must wrap the DuckDB pin.`);
+}
+if (duckdbBase(nodeApiPin) !== DUCKDB_VERSION) {
+  problems.push(
+    `${NODE_API} ${nodeApiPin || "(missing)"} is not ${DUCKDB_VERSION}-r.<n>; the parity test would compare against another DuckDB.`,
+  );
+}
+
+for (const platform of platforms) {
+  const dir = join("packages", `duckdb-bun-${platform}`);
+  const name = `@avidian/duckdb-bun-${platform}`;
+  const pkg = await readPackage(dir);
+  if (pkg.name !== name) problems.push(`${dir}/package.json is named ${pkg.name}, expected ${name}.`);
+  if (pkg.version !== root.version) {
+    problems.push(`${dir}/package.json version ${pkg.version} differs from package.json ${root.version}.`);
   }
-  return 0;
-}
+  const pinned = root.optionalDependencies?.[name];
+  if (pinned !== root.version) {
+    problems.push(`package.json optionalDependencies pins ${name} at ${pinned}, expected ${root.version}.`);
+  }
 
-async function latestDuckDBRelease(): Promise<string | null> {
-  try {
-    const res = await fetch("https://api.github.com/repos/duckdb/duckdb/releases/latest", {
-      headers: { "User-Agent": "duckdb-bun-check" },
-    });
-    if (!res.ok) return null;
-    const json = (await res.json()) as { tag_name?: string };
-    return json.tag_name?.replace(/^v/, "") ?? null;
-  } catch {
-    return null;
+  const files = nativeFiles(platform);
+  const present = files.filter((file) => existsSync(join(ROOT, dir, file)));
+  console.log(`${dir}: ${files.map((file) => `${file} ${present.includes(file) ? "present" : "missing"}`).join(", ")}`);
+  // The host platform needs its native files for the tests; publishing needs them for every platform.
+  if (values.publish || platform === host) {
+    for (const file of files.filter((file) => !present.includes(file))) {
+      const fix = file.startsWith(SHIM_BASENAME) ? "bun run build:native" : `bun run fetch-lib ${platform}`;
+      problems.push(`${dir}/${file} is missing; run \`${fix}\`.`);
+    }
+  }
+  if (values.publish) {
+    for (const file of files.filter((file) => !pkg.files?.includes(file))) {
+      problems.push(`${dir}/package.json "files" does not list ${file}, so npm would not publish it.`);
+    }
   }
 }
+if (!platforms.includes(host)) console.log(`No platform package for this host (${host}).`);
 
-const nodeApiPin = (pkg.devDependencies?.["@duckdb/node-api"] ?? "").replace(/^[^0-9]*/, "").replace(/-r.*$/, "");
-const vendored = existsSync(new URL("../vendor/linux-x64/libduckdb.so", import.meta.url).pathname);
-const latest = await latestDuckDBRelease();
-
-// Hard failures (exit 1) mean the repo is in a broken/misleading state. A newer
-// upstream release is informational only — it must not turn CI red on its own.
-let hardDrift = false;
-const pkgBase = (pkg.version ?? "").replace(/-r\.\d+$/, "");
-console.log(`package version (package.json):     ${pkg.version}`);
-console.log(`duckdb-bun pin (src/version.ts):   ${DUCKDB_VERSION_TAG}`);
-console.log(`@duckdb/node-api devDep:            ${nodeApiPin || "unknown"}`);
-console.log(`vendored libduckdb present:         ${vendored ? "yes (linux-x64)" : "NO — run `bun run fetch-lib`"}`);
-console.log(`latest DuckDB release:              ${latest ? `v${latest}` : "unavailable (network?)"}`);
-
-if (!vendored) {
-  console.log("\n❌ vendored libduckdb missing — run `bun run fetch-lib` before testing.");
-  hardDrift = true;
-}
-if (pkgBase !== DUCKDB_VERSION) {
-  console.log(
-    `\n❌ package version (${pkg.version}) base does not match the DuckDB pin (${DUCKDB_VERSION}). Use <duckdb>-r.<n>.`,
-  );
-  hardDrift = true;
-}
-if (nodeApiPin && nodeApiPin !== DUCKDB_VERSION) {
-  console.log(
-    `\n❌ @duckdb/node-api (${nodeApiPin}) differs from the pin (${DUCKDB_VERSION}) — the parity test would compare against a different DuckDB. Align them.`,
-  );
-  hardDrift = true;
-}
-if (latest && cmp(latest, DUCKDB_VERSION) > 0) {
-  console.log(
-    `\n⬆️  DuckDB v${latest} is newer than the pin ${DUCKDB_VERSION_TAG} (informational). See MAINTENANCE.md to upgrade.`,
-  );
+if (values.tag !== undefined) {
+  const version = values.tag.replace(/^v/, "");
+  console.log(`release tag:                     ${values.tag}`);
+  if (root.version !== version)
+    problems.push(`package.json version ${root.version} differs from the tag ${values.tag}.`);
 }
 
-console.log(hardDrift ? "\n⚠️  action needed (see above)." : "\n✅ consistent.");
-process.exit(hardDrift ? 1 : 0);
+try {
+  const upstream = await upstreamReport(nodeApiPin);
+  console.log(`latest DuckDB release:           v${upstream.duckdb.latest}`);
+  console.log(`latest ${NODE_API}:         ${upstream.nodeApi.latest}`);
+  if (upstream.duckdb.newer)
+    console.log(`DuckDB v${upstream.duckdb.latest} is newer than the pin; see MAINTENANCE.md.`);
+  if (upstream.nodeApi.newer) {
+    console.log(`${NODE_API} ${upstream.nodeApi.latest} is newer than ${nodeApiPin}; see MAINTENANCE.md.`);
+  }
+} catch (error) {
+  console.log(`upstream releases:               unavailable (${error instanceof Error ? error.message : error})`);
+}
+
+if (problems.length > 0) {
+  console.error(`\n${problems.length} problem(s):`);
+  for (const problem of problems) console.error(`- ${problem}`);
+  process.exit(1);
+}
+console.log("\nConsistent.");
