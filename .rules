@@ -1,0 +1,107 @@
+# Agent guidance
+
+`AGENTS.md` and `CLAUDE.md` are symlinks to `.rules`; edit `.rules` only.
+duckdb-bun is a Bun-native, drop-in reimplementation of `@duckdb/node-api` over the libduckdb C API through `bun:ffi`.
+It is a public MIT library published to npm as `@avidian/duckdb-bun`, with one optional package per platform that ships libduckdb.
+`CONTRIBUTING.md` holds the same rules for human contributors.
+
+## Authority and reading
+
+**Mandatory** instructions must be followed, including their explicit exceptions.
+**Defaults** apply unless a concrete reason justifies a departure; explain that reason.
+Unlabelled requirements below are mandatory.
+
+Apply higher-priority harness instructions first.
+If code and documentation disagree, establish which is stale; do not silently copy the code or choose the convenient rule.
+Surface unresolved conflicts rather than inventing policy.
+
+Read these when you are about to take the action that triggers them, not before:
+
+| Before you                                            | Read                                     |
+| ----------------------------------------------------- | ---------------------------------------- |
+| Bump DuckDB, re-vendor `duckdb-node-neo`, add a platform | `MAINTENANCE.md`                       |
+| Contradict or change a recorded decision              | the matching file in `docs/adr/`         |
+| Change the vendored upstream code                     | `vendor/node-api/PROVENANCE.md`          |
+
+ADRs are not pre-reading: list `docs/adr/` and open only the files whose slug matches the task.
+Discover runnable commands from `package.json` and hook commands from `lefthook.yml`.
+
+## Mandatory: external facts
+
+Treat training data as stale for every version-specific fact outside this repository: Bun and `bun:ffi` behavior, the DuckDB C API, npm and GitHub Actions behavior, CLI flags, and config keys.
+Verify each such fact before writing code on it or recommending it; one check per fact per session is enough.
+Take the installed version from `bun.lock`, `package.json` `engines`, `src/version.ts`, or `<tool> --version`.
+Then read, in this order:
+
+1. The docs shipped with that version, such as `node_modules/bun-types/docs/` for Bun and `vendor/duckdb.h` for the DuckDB C API.
+2. The official docs for that version, preferring a Markdown or `llms.txt` endpoint (`bun.com/llms.txt`, `duckdb.org/docs`).
+3. The installed type definitions or upstream source for what remains open, such as `bun-types/*.d.ts`, Bun's source at the installed tag, and DuckDB's source at the pinned tag.
+
+Blogs and forum answers are leads, confirmed against those sources.
+Name the source in one line of the reply when a decision rests on such a fact.
+When a repository document contradicts the current docs, report it and correct the stale claim in the same change.
+
+## Mandatory: engineering
+
+- Runtime is Bun only, pinned in `package.json` `engines` and `packageManager`, `@types/bun`, and every CI workflow; change all of them together.
+  Never start `npm`, `npx`, `pnpm`, `yarn`, or `node`, except `npm publish` in the release workflow, which npm trusted publishing requires.
+- The public contract is `@duckdb/node-api` at the version in `devDependencies`.
+  `vendor/node-api/src` is upstream code used unmodified except for the import rewrite `scripts/vendor-rewrite-bindings.ts` makes; fix behavior in `src/bindings/`, never in vendored files.
+- `src/bindings/` reimplements the `@duckdb/node-bindings` contract in `vendor/node-api/node-bindings.d.ts`.
+  The official C++ binding at the vendored tag is the reference for every function's semantics, error text, and handle lifetime.
+- Error objects match the N-API binding: a plain `Error` with DuckDB's exact message.
+  Every `catch` binds its error; unexpected errors are rethrown or wrapped with `{ cause: original }`.
+- Never block the JS thread for the length of a query.
+  Every contract function that returns a Promise runs on a native thread started by the C shim.
+- Every native pointer is owned by a typed handle object that a `FinalizationRegistry` frees, and a native thread never touches memory the JS heap owns.
+  A handle that a native call is using is not freed until that call completes.
+- Prefer a battle-tested library or the platform API over hand-rolled code; add a dependency only with a stated reason, pinned to an exact version.
+- A diagnostic is an error or it is off; no `warn` severity, and no source suppression directives.
+- Record a hard-to-reverse choice, such as a threading model, a handle ownership rule, or a published package layout, as an ADR in `docs/adr/` in the same change.
+
+## Mandatory: testing
+
+- Every behavior change ships with an automated test in the same change.
+- Bug fixes start by reproducing the failure the way a user of the package meets it, through the public `@duckdb/node-api` surface, and include a regression test.
+- The bar for parity is the vendored official suites: `bun run test:official` (the `@duckdb/node-api` suite) and `bun run test:bindings` (the `@duckdb/node-bindings` suite).
+  Do not edit a vendored test to make it pass.
+- `bun run parity` compares results against the real `@duckdb/node-api` side by side; add a query there for every new type or behavior.
+- Automated tests perform no non-loopback network I/O, except tests that install DuckDB extensions, which skip when `DUCKDB_BUN_OFFLINE=1`.
+- Run heavy suites (the crash reproduction, the stress tests, the bench) one at a time.
+
+Classify every failure before attempting a fix:
+
+- **Introduced**: absent before this change and reachable from it. In scope.
+- **Pre-existing**: present before this change. Record and report it, never repair it inline.
+- **Environmental**: infrastructure-shaped, such as a missing libduckdb download or no network. Record and report it.
+
+An attempt is one edit made with intent to fix, followed by a re-run.
+Stop after two failed attempts on one root cause; record it, report it, and continue the task without waiting for an answer.
+A flaky test, one whose result changes across runs of the same commit, is a bug to fix, never a test to retry.
+
+## Mandatory: git
+
+- Use Conventional Commits, with scopes such as `bindings`, `shim`, `vendor`, `deps`, `ci`, `docs`, and `bench`.
+- Never add `Co-Authored-By`, "Generated with", or any other agent attribution to commits, pull requests, issues, or release notes.
+- Never skip Git hooks, including through flags, environment variables, or configuration bypasses; fix hook failures.
+- Inspect `git status` and `git diff` before committing, and stage only intended files.
+- Commit or push only when asked.
+- Use the `gh` CLI for every GitHub operation.
+
+## Mandatory: documentation
+
+- Never use the em dash; use a plain dash.
+- In Markdown, put each full sentence on its own line.
+- Update the owning document in the same change as the behavior it describes: `README.md` for the public surface, flags, and `diagnostics()`, `MAINTENANCE.md` for upgrade procedures, an ADR for a decision.
+- Each fact lives in one document; others link to it.
+- Do not edit a generated file, including a generated changelog.
+
+## Project notes
+
+- DuckDB is pinned in `src/version.ts` (`DUCKDB_VERSION`); the package version is `<duckdb>-r.<n>`, the scheme `@duckdb/node-api` uses.
+- `scripts/fetch-lib.ts` downloads libduckdb into `packages/duckdb-bun-<platform>/` and `duckdb.h` into `vendor/`.
+  The platform packages are Bun workspaces, so development and the published package load libduckdb the same way.
+- `native/` holds the C shim, compiled at load time by `bun:ffi` `cc` (TinyCC).
+  It wraps the C functions that take or return structs by value, runs blocking calls on native threads, and installs the crash handler.
+- `bun build --compile` embeds libduckdb, the shim source, and `duckdb.h`; `src/library.ts` copies them out of `/$bunfs/` at start-up, because TinyCC and `dlopen` cannot read Bun's virtual file system.
+- `src/index.ts` (`@avidian/duckdb-bun/native-js`) is the older narrow API; it shares the native loader with the main export.
