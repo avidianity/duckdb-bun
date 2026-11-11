@@ -1,0 +1,22 @@
+[package]
+name = "duckdb-bun-shim"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99.1"
+license = "MIT"
+description = "Native shim for @avidian/duckdb-bun: by-value wrappers, native job threads and function callback trampolines over the libduckdb C API."
+publish = false
+
+[lib]
+name = "duckdb_bun_shim"
+# cdylib is what bun:ffi loads; rlib lets the integration tests call the exports.
+crate-type = ["cdylib", "rlib"]
+# All tests live in tests/, whose binaries get an rpath to libduckdb from
+# build.rs (`rustc-link-arg-tests` does not reach the lib's unit test binary).
+test = false
+doctest = false
+
+[dependencies]
+# 1.20000.1 encodes DuckDB 2.0.0. Without the `bundled` and `download-lib`
+# features it links dynamically to the libduckdb in DUCKDB_LIB_DIR.
+libduckdb-sys = { version = "=1.20000.1", default-features = false, features = ["capi-v1"] }

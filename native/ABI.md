@@ -20,12 +20,13 @@ This file is the contract between `native/` and `src/bindings/`; change both sid
 
 | Export | Signature | Meaning |
 | --- | --- | --- |
-| `dbs_init` | `(on_complete: extern "C" fn(*mut Job), on_call: extern "C" fn(*mut Call), on_release: extern "C" fn(u64)) -> i32` | Records the calling thread as the JS thread and stores three callbacks: `on_complete` and `on_release` are thread-safe JSCallbacks, `on_call` is the thread-safe dispatcher for function callbacks. Returns 0. Call once. |
-| `dbs_set_sync_call` | `(on_call_sync: extern "C" fn(*mut Call))` | The non-thread-safe dispatcher, used when DuckDB calls a function callback on the JS thread itself. |
+| `dbs_init` | `(on_complete: extern "C" fn(*mut Job), on_call: extern "C" fn(*mut Call), on_release: extern "C" fn(u64)) -> i32` | Records the calling thread as the JS thread and stores three callbacks: `on_complete` and `on_release` are thread-safe JSCallbacks, `on_call` is the thread-safe dispatcher for function callbacks. Returns 0, 1 when the shim was already initialized (the first callbacks stay), or 2 when a callback is null. Call once. |
+| `dbs_set_sync_call` | `(on_call_sync: extern "C" fn(*mut Call))` | The non-thread-safe dispatcher, used when DuckDB calls a function callback on the JS thread itself. Null clears it. |
 | `dbs_counters` | `() -> *const u64` | Pointer to the static counter block below, read by JavaScript through a view. |
 | `dbs_version` | `() -> *const c_char` | The shim's crate version, static. |
 
-Counter block, `u64` each, updated with atomics (relaxed is enough):
+Counter block, `u64` each, updated with atomics (relaxed is enough).
+A job thread counts its job as completed and itself as no longer running before it calls `on_complete`, so the counters are settled when JavaScript sees the completion.
 
 | Index | Counter |
 | --- | --- |
@@ -41,25 +42,28 @@ Counter block, `u64` each, updated with atomics (relaxed is enough):
 ## Jobs: blocking calls on native threads
 
 Each job export copies its inputs, starts one `std::thread` named `duckdb-bun:<op>` with an 8 MiB stack and an alternate signal stack, runs the C call, stores the outcome in the job, and calls `on_complete(job)`.
-It returns the job pointer, or null when the thread could not start (JavaScript then rejects with "Failed to start a native thread").
+It returns the job pointer, or null when the thread could not start or `dbs_init` has not been called (JavaScript then rejects with "Failed to start a native thread").
 JavaScript reads the outcome with the accessors and then frees the job.
 
 | Export | Inputs | Outputs |
 | --- | --- | --- |
-| `dbs_job_open` | `path: *const u8, path_len: usize, has_path: bool, config: duckdb_config` | `out0` database |
+| `dbs_job_open` | `path: *const u8, path_len: usize, has_path: bool, config: duckdb_config` (null for none) | `out0` database |
 | `dbs_job_get_or_create_from_cache` | `cache, path, path_len, has_path, config` | `out0` database |
 | `dbs_job_connect` | `database` | `out0` connection |
 | `dbs_job_query` | `connection, sql: *const u8, sql_len: usize` | `out0` `duckdb_result *` (allocated with `duckdb_malloc`, owned by JavaScript once read) |
 | `dbs_job_prepare` | `connection, sql, sql_len` | `out0` prepared statement |
 | `dbs_job_execute_prepared` | `prepared` | `out0` `duckdb_result *` |
 | `dbs_job_execute_prepared_streaming` | `prepared` | `out0` `duckdb_result *` |
-| `dbs_job_extract_statements` | `connection, sql, sql_len` | `out0` extracted statements, `out1` statement count |
+| `dbs_job_extract_statements` | `connection, sql, sql_len` | `out0` extracted statements, `out1` statement count (0 means failure) |
 | `dbs_job_prepare_extracted_statement` | `connection, extracted, index: u64` | `out0` prepared statement |
 | `dbs_job_execute_pending` | `pending` | `out0` `duckdb_result *` |
 | `dbs_job_fetch_chunk` | `result: *mut duckdb_result` | `out0` data chunk or 0 |
 
 Error rules match the official C++ binding's workers (`bindings/src/promise_workers.h` at the vendored tag): the job takes DuckDB's error text (`duckdb_open_ext`'s error out string, `duckdb_result_error`, `duckdb_prepare_error`, `duckdb_extract_statements_error` is left to JavaScript), and on failure destroys whatever partial handle the C call returned, so JavaScript never sees it.
 The fallback messages are the official ones, such as "Failed to query" and "Failed to prepare".
+A null connection or database fails with the official message, such as "Failed to query: connection disconnected" and "Failed to connect: instance closed".
+When `config` is null, `open` and `get_or_create_from_cache` create a config with `duckdb_api` set to `node-neo-bindings`, as the official workers do, and destroy it after the call.
+Jobs record their start and end in the ring with the job's first input handle as `handle` and 0 as `connection_id`, since the shim does not know JavaScript's connection ids.
 
 | Accessor | Signature |
 | --- | --- |
@@ -90,14 +94,20 @@ JavaScript reports a thrown error through the C API's set-error functions on `in
 
 | Export | Meaning |
 | --- | --- |
-| `dbs_scalar_function_set_callbacks(sf, function_id: u64, has_bind: bool, has_init: bool)` | Sets the shim's main trampoline, and its bind and init trampolines when asked, with extra info holding `function_id`. When DuckDB destroys that extra info, the shim posts `on_release(function_id)`. |
+| `dbs_scalar_function_set_callbacks(sf, function_id: u64, has_bind: bool, has_init: bool)` | Sets the shim's main trampoline, and its bind and init trampolines when asked, with extra info holding `function_id`. When DuckDB destroys that extra info, the shim posts `on_release(function_id)`. Call it once per function object, after JavaScript knows all its callbacks, because DuckDB has a single extra info slot. |
 | `dbs_table_function_set_callbacks(tf, function_id, has_bind, has_init, has_local_init)` | The same for table functions; the main trampoline is always set. |
-| `dbs_set_bind_data(info, kind: u32, data_id: u64)`, `dbs_get_bind_data(info, kind) -> u64` | Bind data as an id; the destroy callback posts `on_release(data_id)`. `kind` picks the scalar or table C API family. |
+| `dbs_set_bind_data(info, kind: u32, data_id: u64)`, `dbs_get_bind_data(info, kind) -> u64` | Bind data as an id; the destroy callback posts `on_release(data_id)`. `kind` is the `Call` kind of the callback that received `info`, which picks the C API family and info type: set takes 1 (scalar bind) or 4 (table bind); get takes 2 or 3 (scalar init or main) or 5, 6 or 7 (table init, local init or main). Other kinds are ignored and read as 0. |
 | `dbs_set_init_data(info, data_id)`, `dbs_get_init_data(info) -> u64`, `dbs_get_local_init_data(info) -> u64` | Table function init data, the same way. |
 | `dbs_scalar_init_set_state(info, state_id)`, `dbs_scalar_get_state(info) -> u64` | Scalar function state, the same way. |
 | `dbs_call_done(call)` | Releases a blocked DuckDB thread. |
 
 Ids are allocated by JavaScript and never 0; 0 means none.
+
+`on_release(id)` fires exactly once per id, and it can arrive on any thread, so it is a thread-safe JSCallback.
+Scalar function bind data registers `duckdb_scalar_function_set_bind_data_copy`, as the official binding does: the id sits behind a shared reference count, each copy shares it, and the release fires when the last copy is destroyed.
+Table function bind data has no copy callback, and table init data, local init data and scalar state are each owned by one box.
+
+If a function callback runs before `dbs_init`, or on the JS thread before `dbs_set_sync_call`, the shim reports an error on `info` through the C API's set-error function instead of calling JavaScript.
 
 ## Diagnostics: ring buffer and crash report
 
