@@ -1,94 +1,125 @@
 # Maintaining duckdb-bun
 
-This binding tracks DuckDB's stable **C API**, which is versioned and rarely breaks.
-Day-to-day maintenance is mostly: watch for new DuckDB releases, bump the pin, and let the
-parity + test suite confirm nothing drifted.
+This document holds the procedures for upgrading DuckDB, releasing, publishing to npm, and adding a platform.
+`CONTRIBUTING.md` holds the rules for every change, and `docs/adr/` holds the decisions behind the layout.
 
-## Versioning
+## Packages and versions
 
-The package version **mirrors the DuckDB version it wraps**, using the same scheme as
-`@duckdb/node-api`: **`<duckdb-version>-r.<n>`**. So `1.5.2-r.0` wraps DuckDB `1.5.2`; a fix that
-doesn't change DuckDB bumps to `1.5.2-r.1`, and the next DuckDB (say 1.5.4) resets to `1.5.4-r.0`.
+The repository publishes three npm packages:
 
-`tests/package-version.test.ts` enforces that `package.json` version's base equals
-`DUCKDB_VERSION` in `src/version.ts`, and `bun run check-version` flags a mismatch — so the two
-can't silently drift.
+| Package                            | Directory                          | Contents                                         |
+| ---------------------------------- | ---------------------------------- | ------------------------------------------------ |
+| `@avidian/duckdb-bun`              | `.`                                | the TypeScript API and bindings                  |
+| `@avidian/duckdb-bun-linux-x64`    | `packages/duckdb-bun-linux-x64`    | `libduckdb.so` and `libduckdb_bun_shim.so`       |
+| `@avidian/duckdb-bun-darwin-arm64` | `packages/duckdb-bun-darwin-arm64` | `libduckdb.dylib` and `libduckdb_bun_shim.dylib` |
 
-## The one command to know if you're behind
+The main package lists each platform package in `optionalDependencies`, the way `@duckdb/node-api` ships its native addon.
+
+Every package version is `<duckdb>-r.<n>`, the scheme `@duckdb/node-api` uses.
+`2.0.0-r.0` wraps DuckDB 2.0.0, a release that keeps DuckDB bumps `<n>`, and a new DuckDB resets `<n>` to 0.
+These versions must agree:
+
+- `DUCKDB_VERSION` in `src/version.ts`, the one DuckDB pin.
+- `version` in `package.json` and in each `packages/*/package.json`.
+- Each platform package's entry in `optionalDependencies` in `package.json`.
+- The `@duckdb/node-api` entry in `devDependencies`, which must wrap the same DuckDB, so that `bun run parity` compares like with like.
+- The `libduckdb-sys` dependency in `native/Cargo.toml`, which must declare the same DuckDB C API.
+
+## Checking versions
 
 ```sh
 bun run check-version
 ```
 
-Reports our pinned version (`src/version.ts`), the `@duckdb/node-api` reference version, whether
-the native lib is vendored, and the latest DuckDB release. Exit code:
-- **0** — consistent (a newer upstream release is shown as *informational* only).
-- **1** — action needed: the vendored lib is missing, or `@duckdb/node-api` no longer matches our
-  pin (which would make the parity comparison lie).
+It exits with status 1 when a version above disagrees, or when this platform's package lacks `libduckdb` or the shim.
+It also prints the latest DuckDB release and the latest `@duckdb/node-api` on npm; a newer upstream release never fails it.
+`bun run check-version --tag v2.0.0-r.0` also requires every package version to equal the tag.
+`bun run check-version --publish` also requires every platform package to hold its native files and to list them in `files`.
+CI runs the plain form, and the release workflow runs the other two.
 
-## Comparing against the "live" version
+The `upstream-check` workflow runs every Monday.
+It opens one issue for each newer DuckDB release and each newer `@duckdb/node-api`, and never opens a second issue with the same title, even after the first is closed.
+Close the issue in the change that upgrades.
 
-`tests/parity.test.ts` is a **differential test**: it runs a matrix of queries through **both** the
-official `@duckdb/node-api` (the reference) and `duckdb-bun`, canonicalizes both sides to a common
-shape, and asserts they agree. Run it any time:
+## Upgrading DuckDB
 
-```sh
-bun run parity
-```
+1. Set `DUCKDB_VERSION` in `src/version.ts`.
+2. Set the version to `<new>-r.0` in `package.json`, in each `packages/*/package.json`, and in `optionalDependencies`.
+3. Pin the reference with `bun add --dev --exact @duckdb/node-api@<new>-r.<n>`.
+4. Re-vendor `duckdb-node-neo` at the tag of that release, as `vendor/node-api/PROVENANCE.md` describes, and run `bun run gen:bindings` when `node-bindings.d.ts` changed.
+5. Set `libduckdb-sys` in `native/Cargo.toml` to the release built from the new `duckdb.h`.
+   Dependabot ignores that crate for this reason.
+6. Run `bun run fetch-lib all`, then read `git diff vendor/duckdb.h` for changes to functions that `src/bindings/` or `native/` call.
+   Update both sides and `native/ABI.md` together.
+7. Run `bun run build:native` and every check from the CI workflow, in its order.
+8. Commit with a message such as `build(deps): upgrade DuckDB to v2.1.0`.
 
-If parity passes, our decoding matches the official binding for every covered type. When you add a
-feature or bump DuckDB, **add a query to the `QUERIES` array** so it's covered. `@duckdb/node-api`
-is a devDependency pinned to the same DuckDB version as our `src/version.ts` — keep them equal.
+## Releasing
 
-## Upgrading DuckDB (e.g. 1.5.2 → 1.5.4)
+1. Set the new version in every `package.json` and in `optionalDependencies`, and run `bun run check-version`.
+2. Merge to `main` with CI green.
+3. Publish a GitHub release whose tag is `v` followed by the version, such as `gh release create v2.0.0-r.1 --generate-notes`.
 
-1. **Bump the pin** in `src/version.ts` (`DUCKDB_VERSION`) **and** set `package.json` version to
-   `<new-duckdb>-r.0` (the version test enforces they match).
-2. **Bump the reference**: `bun add -d @duckdb/node-api@<new>-r.<n>` so parity compares against the
-   matching DuckDB. (`bun run check-version` will flag a mismatch.)
-3. **Re-fetch the native lib**: `bun run fetch-lib` (downloads the new `libduckdb.so` + `duckdb.h`).
-4. **Diff the C header for API drift** — this is where breaking changes would show up:
-   ```sh
-   git diff --stat vendor/duckdb.h
-   # inspect any change to a symbol we bind (see the dlopen table in src/ffi.ts) or the
-   # DUCKDB_TYPE enum (mirrored in src/types.ts) or the duckdb_result struct size (48 bytes).
-   ```
-   If a bound signature or an enum value changed, update `src/ffi.ts` / `src/types.ts` to match.
-5. **Verify**: `bun run ci` (Biome + full suite, incl. parity + the compile proof) and
-   `bun run check-version` (should print ✅).
-6. Commit the bumped `src/version.ts`, `package.json`/`bun.lock`, and `vendor/duckdb.h`.
+The `Release` workflow (`.github/workflows/release.yml`) then:
 
-The `tests/version.test.ts` check (`libraryVersion() === DUCKDB_VERSION_TAG`) fails loudly if the
-vendored `.so` doesn't match the pin — so a forgotten step 3 can't slip through.
+1. Builds the linux-x64 shim in the `rust:1.99.1-bookworm` image and the darwin-arm64 shim on `macos-latest`, runs every test suite on each, and uploads each platform package directory.
+2. Checks that every version equals the tag and that each platform package holds and lists its native files.
+3. Publishes the two platform packages, then the main package, with the `latest` dist-tag.
 
-## What can break, and where to look
+A version that is already on npm is skipped, so a failed run can be re-run.
+To rebuild a tag without a new release, run the workflow by hand with `gh workflow run release.yml -f tag=v2.0.0-r.1`.
 
-| Symptom | Likely cause | Fix location |
-|---|---|---|
-| `version.test.ts` fails | vendored `.so` ≠ pin | re-run `bun run fetch-lib` |
-| A parity query diverges | decoding changed / new type shape | `src/decode.ts` (+ `canonical()` in the parity test if the reference wrapper changed) |
-| dlopen throws "undefined symbol" | a bound C function was renamed/removed | `src/ffi.ts` symbol table vs `vendor/duckdb.h` |
-| Segfault on a `cstring` arg | a JS string passed where a `Buffer` is required | wrap with `cstr()` from `src/ffi.ts` |
-| `bun build --compile` binary can't load the lib | embedding/materialization path | `src/library.ts` (the `/$bunfs/` copy-out) |
-| Wrong number for a big value | HUGEINT / DECIMAL / string_t offset | `src/decode.ts` |
+## Publishing to npm
 
-## Adding a platform (e.g. linux-arm64, macOS, musl)
+The release workflow publishes through npm trusted publishing: npm trusts an OIDC token from the workflow run, so no npm token is stored in the repository.
+Trusted publishing also attaches a provenance statement to each version.
+The workflow uses `npm publish` because trusted publishing needs the npm CLI; it is the only place the project runs npm or Node.
 
-1. `bun run fetch-lib <target>` (targets: `linux-x64`, `linux-x64-musl`, `linux-arm64`,
-   `darwin-x64`, `darwin-arm64`, `win32-x64`) — populates `vendor/<dir>/`.
-2. Add a `with { type: "file" }` import + a `selectLib()` case for it in `src/library.ts`.
-3. For `bun build --compile`, build with the matching `--target` and vendor the matching libc
-   (glibc vs musl). v1 embeds the host platform only; cross-compiling needs the target's lib present.
+Configure each of the three packages once, on npmjs.com, under the package's settings, in the Trusted Publisher section:
 
-## Architecture recap for maintainers
+- Publisher: GitHub Actions.
+- Organization or user: `avidianity`.
+- Repository: `duckdb-bun`.
+- Workflow filename: `release.yml`.
+- Environment name: `npm`, the GitHub environment the publish job uses; add required reviewers to it to gate releases.
 
-- **Pointer-based C API** → bound directly via `bun:ffi` `dlopen` (`src/ffi.ts`).
-- **By-value functions** (`duckdb_query`, `duckdb_fetch_chunk` take `duckdb_result` by value, which
-  `bun:ffi` dlopen can't pass) → wrapped in `native/shim.c`, compiled at runtime with `bun:ffi`'s
-  `cc` (bundled TinyCC). The shim `dlsym`s the real symbols and calls through function pointers, so
-  it needs no link-time libduckdb.
-- **Standalone binaries**: `src/library.ts` embeds `libduckdb.so` + `shim.c` + `duckdb.h` as Bun
-  file assets and, inside a compiled binary, copies them out of the `/$bunfs/` VFS to a temp dir
-  (TinyCC and the C `dlopen` can't read the VFS).
-- **`duckdb_result`** is a fixed 48-byte struct — allocated as `new Uint8Array(48)` and passed by
-  pointer to `shim_query`.
+`repository.url` in each `package.json` must match the GitHub repository exactly, so keep it when you edit a package.
+npm requires a new trusted publisher configuration to complete its first successful publish within 2 days.
+
+Trusted publishing can only be configured for a package that already exists on npm.
+To publish the first version of a new package:
+
+1. Publish the GitHub release; the publish job fails, but the build jobs upload the platform packages.
+2. Download them over the checked-out tag with `gh run download <run-id> --name duckdb-bun-<platform> --dir packages/duckdb-bun-<platform>`.
+3. Create a short-lived granular access token on npmjs.com, and run `NPM_CONFIG_TOKEN=<token> bun publish --access public --tag latest` in each new package's directory, platform packages first.
+4. Revoke the token, and configure the trusted publisher as above.
+
+That first version has no provenance statement, because `bun publish` cannot generate one.
+
+## Adding a platform
+
+1. Add the platform to `TARGETS` in `scripts/fetch-lib.ts`.
+2. Copy a platform package directory to `packages/duckdb-bun-<platform>/`, and set `name`, `os`, `cpu`, `libc` and `files` for the new libraries.
+3. Add the package to `optionalDependencies` and to `PLATFORM_PACKAGES` and the imports in `src/library.ts`.
+4. Add the platform to the CI matrix, add a build job to the release workflow, and publish the package before the main package.
+5. Record the change in an ADR, because the published package layout is hard to reverse.
+
+## Dependency updates
+
+Dependabot proposes weekly updates for GitHub Actions, the Bun dependencies, and the Rust crate in `native/`.
+It ignores `@duckdb/node-api` and `libduckdb-sys`, which move with a DuckDB upgrade, and `@types/bun`, which moves with the Bun pin.
+Bun is pinned in `package.json` (`engines`, `packageManager`, and `@types/bun`); every workflow reads it from `packageManager` through `setup-bun`'s `bun-version-file`.
+Change the Bun pin, the `oven/bun` image digest in `.github/workflows/ci.yml`, and `@types/bun` together.
+Rust is pinned in `rust-toolchain.toml`, and the `rust` image tag and digest in the workflows must match it.
+
+## When something breaks
+
+| Symptom                                                    | Likely cause                                                   | Where to look                                                |
+| ---------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------ |
+| `tests/version.test.ts` fails                              | the fetched `libduckdb` is not the pinned version              | run `bun run fetch-lib`                                      |
+| `bun run check-version` reports a disagreement             | a version was bumped in one place only                         | the list in [Packages and versions](#packages-and-versions)  |
+| a query diverges in `bun run parity`                       | a value or error differs from the official binding             | `src/bindings/`                                              |
+| `dlopen` reports an undefined symbol                       | a C function the shim or the bindings call changed             | `vendor/duckdb.h`, `native/ABI.md`, `src/bindings/ffi.ts`    |
+| a process prints `[duckdb-bun] fatal signal`               | a native crash; the report lists the last binding events       | `native/ABI.md`, then the ring entries in the report         |
+| the docker smoke job fails while the test job passes       | a file missing from a package's `files`, or a glibc mismatch   | `packages/*/package.json`, the `rust` image in the workflows |
+| the release publish job fails with an authentication error | the trusted publisher on npmjs.com does not match the workflow | [Publishing to npm](#publishing-to-npm)                      |
