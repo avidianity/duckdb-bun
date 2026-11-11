@@ -20,3 +20,5 @@ doctest = false
 # 1.20000.1 encodes DuckDB 2.0.0. Without the `bundled` and `download-lib`
 # features it links dynamically to the libduckdb in DUCKDB_LIB_DIR.
 libduckdb-sys = { version = "=1.20000.1", default-features = false, features = ["capi-v1"] }
+# Signals, sigaltstack and backtrace for the crash handler (src/diag.rs).
+libc = "=0.2.191"

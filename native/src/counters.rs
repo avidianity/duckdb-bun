@@ -26,6 +26,11 @@ pub const COUNT: usize = 8;
 // read the block as a `BigUint64Array`.
 static COUNTERS: [AtomicU64; COUNT] = [const { AtomicU64::new(0) }; COUNT];
 
+/// The whole block, for the crash report (`diag::set_counter_block`).
+pub fn block() -> &'static [AtomicU64; COUNT] {
+    &COUNTERS
+}
+
 /// Adds `n` to the counter at `index`.
 pub fn add(index: usize, n: u64) {
     COUNTERS[index].fetch_add(n, Ordering::Relaxed);

@@ -1,0 +1,13 @@
+[package]
+name = "duckdb-bun-diag-tests"
+version = "0.0.0"
+edition = "2024"
+publish = false
+description = "Standalone harness that crash-tests native/src/diag.rs in a child process."
+
+[dependencies]
+libc = "=0.2.191"
+
+[[bin]]
+name = "diag-crash"
+path = "src/main.rs"

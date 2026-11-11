@@ -54,7 +54,10 @@ pub extern "C" fn dbs_init(
         on_release,
     };
     match RUNTIME.set(runtime) {
-        Ok(()) => 0,
+        Ok(()) => {
+            crate::diag::set_counter_block(crate::counters::block());
+            0
+        }
         Err(_) => 1,
     }
 }

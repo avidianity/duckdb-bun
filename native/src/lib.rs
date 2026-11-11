@@ -7,6 +7,7 @@
 
 use std::ffi::{CStr, c_char};
 
+pub mod by_value;
 pub mod callbacks;
 pub mod counters;
 pub mod diag;

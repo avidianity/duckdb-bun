@@ -114,8 +114,8 @@ If a function callback runs before `dbs_init`, or on the JS thread before `dbs_s
 | Export | Meaning |
 | --- | --- |
 | `dbs_ring_record(op: u32, state: u32, handle: u64, connection_id: u64, text: *const u8, text_len: usize)` | Appends one entry. Jobs record their own start and end; JavaScript records close, disconnect, destroy, interrupt, register, appender flush and close, and pending tasks. `text` is optional SQL already redacted by JavaScript, truncated to 120 bytes. |
-| `dbs_install_crash_handler(header: *const u8, header_len: usize) -> i32` | Installs handlers for SIGSEGV, SIGBUS, SIGILL, SIGFPE and SIGABRT with `SA_ONSTACK`, after an alternate signal stack is set for the JS thread, and warms up `backtrace` once. `header` is a line JavaScript builds with the versions. |
-| `dbs_crash_for_test(kind: u32)` | 1 dereferences null, 2 aborts. Test use only. |
+| `dbs_install_crash_handler(header: *const u8, header_len: usize) -> i32` | Installs handlers for SIGSEGV, SIGBUS, SIGILL, SIGFPE and SIGABRT with `SA_ONSTACK`, after an alternate signal stack is set for the JS thread, and warms up `backtrace` once. `header` is a line JavaScript builds with the versions, capped at 512 bytes. Returns 0 on success (and when `DUCKDB_BUN_CRASH_HANDLER=0` disables it), 1 when the alternate stack failed, 2 when `sigaction` failed (handlers already installed are rolled back). A second call changes nothing. |
+| `dbs_crash_for_test(kind: u32)` | 1 dereferences null, 2 aborts, 3 overflows the stack of a new native thread (proves its alternate signal stack). Test use only. |
 
 The ring holds the last 256 entries: sequence number, monotonic time in nanoseconds, op, state (1 start, 2 end ok, 3 end error, 4 event), thread id, handle, connection id, and text.
 Op codes are the job ops in table order starting at 1, then 32 close, 33 disconnect, 34 destroy result, 35 destroy pending, 36 destroy prepared, 37 interrupt, 38 register scalar function, 39 register table function, 40 appender flush, 41 appender close, 42 pending execute task.
@@ -128,9 +128,14 @@ On a fatal signal the handler writes to fd 2, with async-signal-safe calls only:
 [duckdb-bun] in flight: 2 native calls, 2 threads
 [duckdb-bun] last binding events, oldest first:
 [duckdb-bun]   #812 +0.004s query start conn=3 handle=0x... thread=0x...
+[duckdb-bun]   #813 +0.005s close event conn=3 handle=0x... thread=0x... text="..."
 ...
 [duckdb-bun] native backtrace:
 <backtrace_symbols_fd output>
 ```
+
+The `in flight` line is absent before `dbs_init`, which registers the counter block.
+An entry prints ` text="..."` only when it has text, with control and non-ASCII bytes shown as `?`.
+A thread without a registered name prints as its id; the JS thread is `js`.
 
 Then it restores the previous handler and re-raises the signal, so Bun's own crash report and the exit status stay as they are.
