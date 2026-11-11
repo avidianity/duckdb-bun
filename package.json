@@ -1,15 +1,16 @@
 {
-  "name": "@joshcano/duckdb-bun",
-  "version": "1.5.2-r.1",
+  "name": "@avidian/duckdb-bun",
+  "version": "2.0.0-r.0",
   "description": "Bun-native, drop-in reimplementation of @duckdb/node-api via bun:ffi over the libduckdb C API. Embeds libduckdb so `bun build --compile` yields a self-contained binary.",
-  "author": "Josh Cano (https://github.com/joshcano)",
-  "homepage": "https://github.com/joshcano/duckdb-bun#readme",
+  "author": "John Michael Manlupig",
+  "license": "MIT",
+  "homepage": "https://github.com/avidianity/duckdb-bun#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/joshcano/duckdb-bun.git"
+    "url": "git+https://github.com/avidianity/duckdb-bun.git"
   },
   "bugs": {
-    "url": "https://github.com/joshcano/duckdb-bun/issues"
+    "url": "https://github.com/avidianity/duckdb-bun/issues"
   },
   "type": "module",
   "module": "src/neo.ts",
@@ -23,13 +24,13 @@
   },
   "files": [
     "src",
-    "native",
-    "scripts/fetch-lib.ts",
     "vendor/duckdb.h",
-    "vendor/linux-x64",
     "vendor/node-api/src",
     "vendor/node-api/LICENSE",
     "vendor/node-api/PROVENANCE.md"
+  ],
+  "workspaces": [
+    "packages/*"
   ],
   "scripts": {
     "fetch-lib": "bun run scripts/fetch-lib.ts",
@@ -45,11 +46,24 @@
     "check": "biome check --write src tests scripts examples",
     "ci": "biome check src tests scripts examples && bun test"
   },
-  "keywords": ["duckdb", "bun", "ffi", "sql", "analytics"],
-  "license": "MIT",
+  "keywords": [
+    "duckdb",
+    "bun",
+    "ffi",
+    "sql",
+    "analytics"
+  ],
+  "optionalDependencies": {
+    "@avidian/duckdb-bun-darwin-arm64": "2.0.0-r.0",
+    "@avidian/duckdb-bun-linux-x64": "2.0.0-r.0"
+  },
   "devDependencies": {
-    "@biomejs/biome": "^2",
-    "@duckdb/node-api": "1.5.2-r.1",
-    "@types/bun": "latest"
-  }
+    "@biomejs/biome": "2.6.7",
+    "@duckdb/node-api": "2.0.0-r.1",
+    "@types/bun": "1.4.4"
+  },
+  "engines": {
+    "bun": "1.4.4"
+  },
+  "packageManager": "bun@1.4.4"
 }

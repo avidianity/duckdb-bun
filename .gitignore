@@ -1,9 +1,8 @@
-# Native libduckdb binaries are fetched via `bun run fetch-lib`, not committed.
-vendor/**/*.so
-vendor/**/*.dylib
-vendor/**/*.dll
-vendor/**/*.a
-vendor/*.zip
+# Native libraries are fetched (`bun run fetch-lib`) or built (`bun run build:native`), never committed.
+*.so
+*.dylib
+*.dll
+*.a
 
 node_modules/
 *.log
@@ -17,3 +16,6 @@ tests/compile/*.out
 # compiled proof binaries
 dd
 dd-neo
+
+# Rust build output
+/native/target/
