@@ -19,3 +19,6 @@ dd-neo
 
 # Rust build output
 /native/target/
+
+# Claude Code worktrees and local state
+/.claude/
