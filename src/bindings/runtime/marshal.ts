@@ -5,7 +5,7 @@ import { CString, type Pointer, read, toArrayBuffer } from "bun:ffi";
 import { layouts } from "../generated/capi.ts";
 import { duckdb } from "./native.ts";
 
-type LayoutName = keyof typeof layouts;
+export type LayoutName = keyof typeof layouts;
 type FieldType = string;
 
 const encoder = new TextEncoder();
