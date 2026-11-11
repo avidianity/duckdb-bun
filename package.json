@@ -37,6 +37,7 @@
     "spike": "bun run scripts/spike.ts",
     "test": "bun test",
     "test:official": "bun test tests/official/api.test.ts",
+    "test:bindings": "bun test tests/official/bindings.test.ts",
     "gen:bindings": "bun run scripts/gen-bindings-scaffold.ts",
     "build:neo": "bun run scripts/build-neo-compile.ts",
     "parity": "bun test tests/parity.test.ts",
