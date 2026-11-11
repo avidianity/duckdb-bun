@@ -101,7 +101,8 @@ A flaky test, one whose result changes across runs of the same commit, is a bug 
 - DuckDB is pinned in `src/version.ts` (`DUCKDB_VERSION`); the package version is `<duckdb>-r.<n>`, the scheme `@duckdb/node-api` uses.
 - `scripts/fetch-lib.ts` downloads libduckdb into `packages/duckdb-bun-<platform>/` and `duckdb.h` into `vendor/`.
   The platform packages are Bun workspaces, so development and the published package load libduckdb the same way.
-- `native/` holds the C shim, compiled at load time by `bun:ffi` `cc` (TinyCC).
+- `native/` holds the shim, a Rust cdylib built per platform by `bun run build:native` and shipped in the platform packages (ADR 0003, contract in `native/ABI.md`).
   It wraps the C functions that take or return structs by value, runs blocking calls on native threads, and installs the crash handler.
-- `bun build --compile` embeds libduckdb, the shim source, and `duckdb.h`; `src/library.ts` copies them out of `/$bunfs/` at start-up, because TinyCC and `dlopen` cannot read Bun's virtual file system.
+- `bun run gen:ffi` generates the bun:ffi tables, struct layouts, and the shim's by-value wrappers from DuckDB's C API spec in `vendor/duckdb-api-spec/`.
+- `bun build --compile` embeds libduckdb and the shim; `src/library.ts` copies both out of `/$bunfs/` at start-up, because `dlopen` cannot read Bun's virtual file system.
 - `src/index.ts` (`@avidian/duckdb-bun/native-js`) is the older narrow API; it shares the native loader with the main export.
