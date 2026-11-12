@@ -11,7 +11,7 @@ import { cpus, tmpdir, totalmem } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { writeDataFiles } from "./data.ts";
-import { DEFAULT_LIMITS, type GateLimits, gateTable, judge, noise, type Verdict } from "./gate.ts";
+import { DEFAULT_LIMITS, type GateInput, type GateLimits, gateTable, judge, median, type Verdict } from "./gate.ts";
 import { type ChildResult, IMPLEMENTATIONS, type Implementation } from "./runner.ts";
 import { type MetricSpec, SCENARIO_NAMES, SCENARIOS, type Scenario } from "./scenarios.ts";
 
@@ -32,20 +32,8 @@ interface Summary {
   maxRssMiB: number;
   /** Median over the measured runs of each run's peak RSS; the gate compares this. */
   runPeakRssMiB?: number;
-  /** The lowest run peak RSS. */
-  minRunPeakRssMiB?: number;
-  /** Spread between the medians of this implementation's two ABBA children, in percent. */
-  noisePct?: number;
-  /** Spread between the peak RSS of those two children, in percent. */
-  memoryNoisePct?: number;
   error?: string;
   raw: ChildResult;
-}
-
-function median(values: number[]): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 1 ? (sorted[mid] ?? 0) : ((sorted[mid - 1] ?? 0) + (sorted[mid] ?? 0)) / 2;
 }
 
 function aggregate(spec: MetricSpec, values: number[]): number {
@@ -141,16 +129,22 @@ function summarize(scenario: Scenario, raw: ChildResult): Summary {
     summary.medianMs = median(raw.runsMs);
     summary.minMs = Math.min(...raw.runsMs);
     summary.maxMs = Math.max(...raw.runsMs);
-    if (raw.runPeakRssBytes.length > 0) {
-      summary.runPeakRssMiB = median(raw.runPeakRssBytes) / MIB;
-      summary.minRunPeakRssMiB = Math.min(...raw.runPeakRssBytes) / MIB;
-    }
+    if (raw.runPeakRssBytes.length > 0) summary.runPeakRssMiB = median(raw.runPeakRssBytes) / MIB;
     for (const spec of scenario.metrics) {
       const values = raw.metrics[spec.key] ?? [];
       if (values.length > 0) summary.metrics[spec.key] = aggregate(spec, values);
     }
   }
   return summary;
+}
+
+function gateInput(summary: Summary): GateInput {
+  return {
+    runsMs: summary.raw.runsMs,
+    runPeaksMiB: summary.raw.runPeakRssBytes.map((bytes) => bytes / MIB),
+    metrics: summary.metrics,
+    error: summary.error,
+  };
 }
 
 function cell(value: number | undefined, digits = 1): string {
@@ -254,21 +248,14 @@ async function main(): Promise<void> {
         const raw = await runChild(impl, scenario, { data, root }, { runs: values.runs, rows, lagRows });
         raws.get(impl)?.push(raw);
       }
-      const summaries = impls.map((impl) => {
-        const children = raws.get(impl) ?? [];
-        const summary = summarize(scenario, merge(children));
-        const measured = children.filter((c) => c.runsMs.length > 0);
-        summary.noisePct = noise(measured.map((c) => median(c.runsMs)));
-        summary.memoryNoisePct = noise(measured.map((c) => median(c.runPeakRssBytes)));
-        return summary;
-      });
+      const summaries = impls.map((impl) => summarize(scenario, merge(raws.get(impl) ?? [])));
       results[scenario.name] = summaries;
       const rendered = table(scenario, summaries);
       tables.push(rendered);
       console.log(rendered);
       const official = summaries.find((s) => s.impl === "official");
       const ours = summaries.find((s) => s.impl === "ours");
-      if (official && ours) verdicts.push(judge(scenario.name, official, ours, limits));
+      if (official && ours) verdicts.push(judge(scenario.name, gateInput(official), gateInput(ours), limits));
     }
   } finally {
     await rm(root, { recursive: true, force: true });

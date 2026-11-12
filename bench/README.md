@@ -77,26 +77,23 @@ Pick `--lag-rows` so the lag query takes about 5 seconds on the machine; the def
 
 `bun run bench --gate` fails, with exit status 1, when ours does worse than official on any scenario:
 
-- Ours is more than 10% slower (`--max-slower`) on both the median run and the fastest run, and the medians differ by more than 5 ms.
-- The run peak RSS is more than 10% higher (`--max-memory`) on both the median run and the lowest run, and the medians differ by more than 16 MiB, which covers the baseline difference between the two packages at start-up.
+- The runs show ours more than 10% slower (`--max-slower`) at 99% confidence, and the medians differ by more than 5 ms.
+- The run peaks show ours using more than 10% more RSS (`--max-memory`) at 99% confidence, and the medians differ by more than 16 MiB, which covers the baseline difference between the two packages at start-up.
 - In `event-loop-lag`, ours lets the event loop stall for 50 ms or more.
 - Either implementation fails or returns a wrong result.
 
-When a scenario's measured noise is larger than a limit, the noise is the limit for that scenario.
-The noise is the spread between the two ABBA children of one implementation, which run the same code, as a percent of their mean; the gate takes the larger of the two implementations'.
-A difference inside that spread is no evidence either way, so a fixed limit below it would fail at random.
-The fastest-run condition exists because some scenarios fall into two speed modes: on the Linux runner, `parquet-write` runs took either about 115 ms or about 140 ms for both packages, and the median moved by which mode each child happened to hit.
-A real slowdown moves both the median and the fastest run.
-Memory has the same rule for the same reason: RSS does not fall back after a garbage collection, so pages the allocator kept from one run add to the next run's peak, and on the macOS runner the median `read-all` run peak swung by 17% between two children of the same package.
-The lowest run peak only grows with what a run needs.
+The confidence comes from a one-sided Mann-Whitney U test, a rank test that assumes no particular distribution, of ours against official scaled up by the limit.
+It uses every measured run of both ABBA children, so it reads the runner's noise from the runs themselves.
+The gate table prints each p-value; a scenario fails below 0.01.
 
-Time noise CI measured on 2026-11-12:
+A fixed limit on two medians failed at random on CI, because the runners are noisy in different ways:
 
-- Linux x64 (4 vCPU): 0.4% to 3% time for most scenarios, but 17% for `parquet-write` and 20% for `ingest-csv`.
-  The 10% limits hold for most scenarios there.
-- macOS arm64 (3 vCPU, virtualized): 11% to 61% time.
-  There the gate catches only large regressions; the Linux job is the sharp one.
+- On the Linux runner (4 vCPU), most scenarios spread by under 3%, but `parquet-write` runs took either about 115 ms or about 140 ms for both packages, so the median moved by which speed each child happened to hit.
+- On the macOS runner (3 vCPU, virtualized), runs of one scenario spread by up to 60%: `ingest-csv` ran between 144 and 265 ms for the official package alone.
+- RSS does not fall after a garbage collection, so pages kept from one run add to the next run's peak at random.
 
+With low noise, the test fails a real excess of a few percent over the limit; with the macOS runner's noise it fails only a large one, so the Linux job is the sharp gate.
+`tests/bench-gate.test.ts` replays CI runs from 2026-11-12 through it.
 CI runs the gate on both platforms on every push, and the release workflow runs it before it publishes.
 Each run uploads `bench/results/` as the `bench-<platform>` artifact.
 

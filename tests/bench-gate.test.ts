@@ -1,59 +1,77 @@
-// The bench release gate (bench/gate.ts): limits, noise, floors and the event-loop gap.
+// The bench release gate (bench/gate.ts): the significance test, the floors and the event-loop gap.
+// The run lists marked "CI" are real runs from GitHub-hosted runners on 2026-11-12.
 import { expect, test } from "bun:test";
-import { DEFAULT_LIMITS, judge, noise } from "../bench/gate.ts";
+import { DEFAULT_LIMITS, type GateInput, judge, mannWhitneyGreater } from "../bench/gate.ts";
 
-const base = { medianMs: 100, minMs: 90, runPeakRssMiB: 500, minRunPeakRssMiB: 450, metrics: {} };
+function input(runsMs: number[], runPeaksMiB: number[] = runsMs.map(() => 500)): GateInput {
+  return { runsMs, runPeaksMiB, metrics: {} };
+}
 
-test("ours within the limits passes", () => {
-  const ours = { ...base, medianMs: 109, minMs: 98, runPeakRssMiB: 549 };
-  expect(judge("s", base, ours, DEFAULT_LIMITS).failures).toEqual([]);
+const steady = [100, 101, 99, 100, 102, 98, 100, 101, 99, 100];
+const times = (factor: number) => steady.map((value) => value * factor);
+
+test("the Mann-Whitney test separates shifted samples and not equal ones", () => {
+  expect(mannWhitneyGreater(times(1.5), steady)).toBeLessThan(0.001);
+  expect(mannWhitneyGreater(steady, steady)).toBeGreaterThan(0.4);
+  expect(mannWhitneyGreater(steady, times(1.5))).toBeGreaterThan(0.999);
 });
 
-test("more than 10% slower on the median and the fastest run fails", () => {
-  const verdict = judge("s", base, { ...base, medianMs: 111, minMs: 100 }, DEFAULT_LIMITS);
-  expect(verdict.failures).toEqual(["11.0% slower (111.0 vs 100.0 ms), fastest run 11.1% slower, limit 10.0%"]);
+test("within the limit passes, and 20% slower with low noise fails", () => {
+  expect(judge("s", input(steady), input(times(1.05)), DEFAULT_LIMITS).failures).toEqual([]);
+  const verdict = judge("s", input(steady), input(times(1.2)), DEFAULT_LIMITS);
+  expect(verdict.failures).toHaveLength(1);
+  expect(verdict.failures[0]).toStartWith("20.0% slower (120.0 vs 100.0 ms), more than 10% at p = ");
 });
 
-test("a slower median with an equal fastest run passes: the runs fell into a slower mode", () => {
-  expect(judge("s", base, { ...base, medianMs: 118, minMs: 91 }, DEFAULT_LIMITS).failures).toEqual([]);
+test("20% more peak RSS per run with low noise fails", () => {
+  const peaks = [500, 505, 498, 502, 500, 499, 501, 503, 497, 500];
+  const verdict = judge(
+    "s",
+    input(steady, peaks),
+    input(
+      steady,
+      peaks.map((v) => v * 1.2),
+    ),
+    DEFAULT_LIMITS,
+  );
+  expect(verdict.failures).toHaveLength(1);
+  expect(verdict.failures[0]).toStartWith("20.0% more peak RSS per run (600 vs 500 MiB), more than 10% at p = ");
 });
 
-test("more than 10% more peak RSS per run, on the median and the lowest run, fails", () => {
-  const verdict = judge("s", base, { ...base, runPeakRssMiB: 600, minRunPeakRssMiB: 540 }, DEFAULT_LIMITS);
-  expect(verdict.failures).toEqual([
-    "20.0% more peak RSS per run (600 vs 500 MiB), lowest run 20.0% more, limit 10.0%",
-  ]);
+test("CI Linux parquet-write: runs in two speed modes for both packages pass", () => {
+  const official = [116, 116, 138, 113, 119, 111, 141, 112, 138, 138];
+  const ours = [145, 133, 138, 111, 139, 120, 137, 139, 143, 139];
+  expect(judge("parquet-write", input(official), input(ours), DEFAULT_LIMITS).failures).toEqual([]);
 });
 
-test("a higher median run peak with an equal lowest run passes: the allocator kept pages", () => {
-  expect(judge("s", base, { ...base, runPeakRssMiB: 600, minRunPeakRssMiB: 455 }, DEFAULT_LIMITS).failures).toEqual([]);
+test("CI macOS ingest-csv: a 17% median gap inside a 144 to 265 ms spread passes", () => {
+  const official = [186, 200, 201, 179, 199, 265, 177, 180, 196, 144];
+  const ours = [248, 222, 238, 226, 265, 220, 239, 169, 183, 202];
+  expect(judge("ingest-csv", input(official), input(ours), DEFAULT_LIMITS).failures).toEqual([]);
 });
 
 test("differences under the floors never fail", () => {
-  const small = { medianMs: 10, minMs: 9, runPeakRssMiB: 25, metrics: {} };
-  const ours = { ...small, medianMs: 14, minMs: 13, runPeakRssMiB: 40 };
-  expect(judge("s", small, ours, DEFAULT_LIMITS).failures).toEqual([]);
+  const small = [10, 10.1, 9.9, 10, 10.2, 9.8, 10, 10.1, 9.9, 10];
+  const verdict = judge(
+    "s",
+    input(
+      small,
+      small.map(() => 25),
+    ),
+    input(
+      small.map((v) => v * 1.4),
+      small.map(() => 40),
+    ),
+    DEFAULT_LIMITS,
+  );
+  expect(verdict.failures).toEqual([]);
 });
 
 test("an event loop gap at the limit fails, and a child error fails", () => {
-  expect(judge("s", base, { ...base, metrics: { maxGapMs: 50 } }, DEFAULT_LIMITS).failures).toEqual([
+  expect(judge("s", input(steady), { ...input(steady), metrics: { maxGapMs: 50 } }, DEFAULT_LIMITS).failures).toEqual([
     "event loop gap 50.0 ms, limit 50 ms",
   ]);
-  expect(judge("s", base, { ...base, medianMs: undefined, error: "boom" }, DEFAULT_LIMITS).failures).toEqual([
+  expect(judge("s", input(steady), { ...input([]), error: "boom" }, DEFAULT_LIMITS).failures).toEqual([
     "ours failed: boom",
   ]);
-});
-
-test("a limit below the measured noise rises to the noise", () => {
-  const noisy = { ...base, noisePct: 20, memoryNoisePct: 15 };
-  const within = { ...noisy, medianMs: 118, minMs: 106, runPeakRssMiB: 570 };
-  expect(judge("s", noisy, within, DEFAULT_LIMITS).failures).toEqual([]);
-  expect(judge("s", noisy, { ...noisy, medianMs: 125, minMs: 113 }, DEFAULT_LIMITS).failures).toEqual([
-    "25.0% slower (125.0 vs 100.0 ms), fastest run 25.6% slower, limit 20.0%",
-  ]);
-});
-
-test("noise is the spread of the per-child numbers over their mean", () => {
-  expect(noise([90, 110])).toBe(20);
-  expect(noise([100])).toBeUndefined();
 });
