@@ -1,5 +1,5 @@
 // The decisions behind a DuckDB upgrade, as pure functions that tests/upgrade-plan.test.ts covers:
-// which upstream pair to upgrade to (scripts/check-version.ts), and the edits scripts/upgrade-duckdb.ts makes.
+// what to upgrade to (scripts/check-version.ts), and the edits scripts/upgrade-duckdb.ts makes.
 
 export type CrateVersion = { num: string; yanked: boolean };
 
@@ -8,18 +8,34 @@ export function nodeApiBase(version: string): string | undefined {
   return /^(\d+\.\d+\.\d+)-r\.\d+$/.exec(version)?.[1];
 }
 
+/** The Versions table and the upgrade use this in place of a `@duckdb/node-api` version when none is built on the DuckDB. */
+export const NO_REFERENCE = "none";
+
+/** The newest `@duckdb/node-api` release built on `duckdb`, from npm's list of versions, or undefined. */
+export function referenceFor(versions: readonly string[], duckdb: string): string | undefined {
+  return versions.filter((version) => nodeApiBase(version) === duckdb).sort((a, b) => Bun.semver.order(b, a))[0];
+}
+
 /**
- * The pair to open an upgrade pull request for: the latest @duckdb/node-api when it is newer than the pin
- * and built on the latest DuckDB release. Null while a newer DuckDB waits for its @duckdb/node-api.
+ * What the upstream-check workflow opens an upgrade pull request for (ADR 0009, MAINTENANCE.md "Upgrading DuckDB").
+ * A DuckDB release newer than the pin is an upgrade on its own, with the `@duckdb/node-api` built on it as the
+ * reference when npm has one: it never waits for one. Otherwise a `@duckdb/node-api` built on the pinned DuckDB that
+ * is newer than the reference pin refreshes the reference. Null when nothing is newer.
  */
 export function upgradeTarget(
   latestDuckdb: string,
-  latestNodeApi: string,
+  duckdbPin: string,
+  nodeApiVersions: readonly string[],
   nodeApiPin: string,
-): { duckdb: string; nodeApi: string } | null {
-  if (Bun.semver.order(latestNodeApi, nodeApiPin) <= 0) return null;
-  if (nodeApiBase(latestNodeApi) !== latestDuckdb) return null;
-  return { duckdb: latestDuckdb, nodeApi: latestNodeApi };
+): { duckdb: string; nodeApi: string | null } | null {
+  if (Bun.semver.order(latestDuckdb, duckdbPin) > 0) {
+    return { duckdb: latestDuckdb, nodeApi: referenceFor(nodeApiVersions, latestDuckdb) ?? null };
+  }
+  const reference = referenceFor(nodeApiVersions, duckdbPin);
+  if (reference !== undefined && Bun.semver.order(reference, nodeApiPin) > 0) {
+    return { duckdb: duckdbPin, nodeApi: reference };
+  }
+  return null;
 }
 
 /**
@@ -73,13 +89,20 @@ export function upgradeVersion(current: string, rows: string[][], duckdb: string
   return `${match[1]}.${Number(match[2]) + 1}.0`;
 }
 
-/** README.md naming the release in its opening sentence and in a Versions row, added after the last row or replaced. */
-export function setReadmeRelease(readme: string, version: string, duckdb: string, nodeApi: string): string {
-  const sentence = /^Version \d+\.\d+\.\d+ bundles DuckDB v\d+\.\d+\.\d+ and matches `@duckdb\/node-api` [^;\s]+;/m;
+/**
+ * README.md naming the release in its opening sentence and in a Versions row, added after the last row or replaced.
+ * `reference` is the `@duckdb/node-api` release the parity suite and the bench compare against, or undefined when
+ * npm has none built on `duckdb`.
+ */
+export function setReadmeRelease(
+  readme: string,
+  version: string,
+  duckdb: string,
+  reference: string | undefined,
+): string {
+  const sentence = /^Version \d+\.\d+\.\d+ bundles DuckDB v\d+\.\d+\.\d+[^;\n]*;/m;
   if (!sentence.test(readme)) throw new Error("README.md has no sentence that names the bundled versions");
-  const lines = readme
-    .replace(sentence, `Version ${version} bundles DuckDB v${duckdb} and matches \`@duckdb/node-api\` ${nodeApi};`)
-    .split("\n");
+  const lines = readme.replace(sentence, `Version ${version} bundles DuckDB v${duckdb};`).split("\n");
   const heading = lines.indexOf("## Versions");
   if (heading < 0) throw new Error("README.md has no Versions section");
   const end = lines.findIndex((line, index) => index > heading && line.startsWith("## "));
@@ -88,7 +111,7 @@ export function setReadmeRelease(readme: string, version: string, duckdb: string
     .filter(({ line, index }) => index > heading && (end < 0 || index < end) && /^\|\s*\d/.test(line));
   const last = rows.at(-1);
   if (!last) throw new Error("README.md has no rows in its Versions table");
-  const row = `| ${version} | ${duckdb} | ${nodeApi} |`;
+  const row = `| ${version} | ${duckdb} | ${reference ?? NO_REFERENCE} |`;
   const same = rows.find(({ line }) => line.split("|")[1]?.trim() === version);
   if (same) lines[same.index] = row;
   else lines.splice(last.index + 1, 0, row);

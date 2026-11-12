@@ -5,7 +5,8 @@
 //   bun run check-version --publish          also: every platform package holds its native files and lists
 //                                            them in "files", so npm publishes them (release workflow)
 //   bun run check-version --upstream-json    only the upstream report, as JSON (upstream-check workflow),
-//                                            with the upgrade it should open a pull request for;
+//                                            with the upgrade it should open a pull request for
+//                                            (scripts/upgrade-plan.ts, upgradeTarget);
 //                                            exits 1 when upstream cannot be reached
 //
 // A newer upstream release is informational; it never fails the default mode.
@@ -14,7 +15,7 @@ import { extname, join } from "node:path";
 import { parseArgs } from "node:util";
 import { DUCKDB_VERSION, DUCKDB_VERSION_TAG } from "../src/version.ts";
 import { TARGETS } from "./fetch-lib.ts";
-import { upgradeTarget, versionRows } from "./upgrade-plan.ts";
+import { referenceFor, upgradeTarget, versionRows } from "./upgrade-plan.ts";
 
 const ROOT = join(import.meta.dir, "..");
 const NODE_API = "@duckdb/node-api";
@@ -28,13 +29,17 @@ type PackageJson = {
   devDependencies?: Record<string, string>;
 };
 
-type Upstream = { pinned: string; latest: string; newer: boolean; url: string };
 /**
- * `upgrade` is the pair the upstream-check workflow opens an upgrade pull request for: the latest
- * @duckdb/node-api when it is newer than the pin and built on the latest DuckDB release. It is null
- * while a newer DuckDB waits for its @duckdb/node-api, and when nothing is newer.
+ * `duckdb` compares the pin with the latest DuckDB release. `nodeApi.reference` is the newest @duckdb/node-api
+ * built on the DuckDB that `upgrade` targets, or on the pin when nothing is newer, or null when npm has none.
+ * `upgrade` is what the upstream-check workflow opens an upgrade pull request for: a newer DuckDB release, which
+ * never waits for its @duckdb/node-api, or else a newer reference for the pinned DuckDB; null when neither exists.
  */
-type UpstreamReport = { duckdb: Upstream; nodeApi: Upstream; upgrade: { duckdb: string; nodeApi: string } | null };
+type UpstreamReport = {
+  duckdb: { pinned: string; latest: string; newer: boolean; url: string };
+  nodeApi: { pinned: string; reference: string | null; url: string | null };
+  upgrade: { duckdb: string; nodeApi: string | null } | null;
+};
 
 const { values } = parseArgs({
   args: Bun.argv.slice(2),
@@ -86,19 +91,20 @@ async function latestDuckDB(): Promise<string> {
   return json.tag_name.replace(/^v/, "");
 }
 
-async function latestNodeApi(): Promise<string> {
+/** Every version of @duckdb/node-api on npm. */
+async function nodeApiVersions(): Promise<string[]> {
   const json = (await getJson(`https://registry.npmjs.org/${NODE_API.replace("/", "%2f")}`)) as {
-    "dist-tags"?: { latest?: string };
+    versions?: Record<string, unknown>;
   };
-  const latest = json["dist-tags"]?.latest;
-  if (!latest) throw new Error(`${NODE_API} has no latest dist-tag`);
-  return latest;
+  return Object.keys(json.versions ?? {});
 }
 
 async function upstreamReport(nodeApiPin: string): Promise<UpstreamReport> {
-  const [duckdb, nodeApi] = await Promise.all([latestDuckDB(), latestNodeApi()]);
+  const [duckdb, versions] = await Promise.all([latestDuckDB(), nodeApiVersions()]);
+  const upgrade = upgradeTarget(duckdb, DUCKDB_VERSION, versions, nodeApiPin);
+  const reference = referenceFor(versions, upgrade?.duckdb ?? DUCKDB_VERSION) ?? null;
   return {
-    upgrade: upgradeTarget(duckdb, nodeApi, nodeApiPin),
+    upgrade,
     duckdb: {
       pinned: DUCKDB_VERSION,
       latest: duckdb,
@@ -107,9 +113,8 @@ async function upstreamReport(nodeApiPin: string): Promise<UpstreamReport> {
     },
     nodeApi: {
       pinned: nodeApiPin,
-      latest: nodeApi,
-      newer: Bun.semver.order(nodeApi, nodeApiPin) > 0,
-      url: `https://www.npmjs.com/package/${NODE_API}/v/${nodeApi}`,
+      reference,
+      url: reference ? `https://www.npmjs.com/package/${NODE_API}/v/${reference}` : null,
     },
   };
 }
@@ -188,11 +193,14 @@ if (values.tag !== undefined) {
 try {
   const upstream = await upstreamReport(nodeApiPin);
   console.log(`latest DuckDB release:           v${upstream.duckdb.latest}`);
-  console.log(`latest ${NODE_API}:         ${upstream.nodeApi.latest}`);
-  if (upstream.duckdb.newer)
-    console.log(`DuckDB v${upstream.duckdb.latest} is newer than the pin; see MAINTENANCE.md.`);
-  if (upstream.nodeApi.newer) {
-    console.log(`${NODE_API} ${upstream.nodeApi.latest} is newer than ${nodeApiPin}; see MAINTENANCE.md.`);
+  console.log(`newest ${NODE_API} on it:    ${upstream.nodeApi.reference ?? "none on npm yet"}`);
+  if (upstream.upgrade) {
+    const { duckdb, nodeApi } = upstream.upgrade;
+    console.log(
+      duckdb === DUCKDB_VERSION
+        ? `${NODE_API} ${nodeApi} is a newer reference for DuckDB v${duckdb}; see MAINTENANCE.md.`
+        : `DuckDB v${duckdb} is newer than the pin; see MAINTENANCE.md.`,
+    );
   }
 } catch (error) {
   console.log(`upstream releases:               unavailable (${error instanceof Error ? error.message : error})`);

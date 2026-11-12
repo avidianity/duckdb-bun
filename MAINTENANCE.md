@@ -23,7 +23,7 @@ The packages share one stable semantic version, independent of DuckDB's (ADR 000
 - Major: an API break.
 
 Never publish a prerelease: `^1.0.0` ranges skip one.
-The `Versions` table in `README.md` maps each package version to the DuckDB it bundles and the `@duckdb/node-api` it matches; add a row in every release.
+The `Versions` table in `README.md` maps each package version to the DuckDB it bundles and the `@duckdb/node-api` reference it was compared against, or `none`; add a row in every release.
 These versions must agree:
 
 - `DUCKDB_VERSION` in `src/version.ts`, the one DuckDB pin.
@@ -46,19 +46,21 @@ It also prints the latest DuckDB release and the latest `@duckdb/node-api` on np
 CI runs the plain form, and the release workflow runs the other two.
 
 The `upstream-check` workflow runs every Monday.
-When the latest `@duckdb/node-api` is newer than the pin and built on the latest DuckDB release, it opens an upgrade pull request, as [Upgrading DuckDB](#upgrading-duckdb) describes.
-Otherwise it opens one issue for each newer DuckDB release and each newer `@duckdb/node-api`, so you know that a DuckDB release waits for its `@duckdb/node-api`.
-When an upgrade run fails, it opens one issue for that version instead of a pull request.
-It never opens a second issue with the same title, or a second pull request for the same version, even after the first is closed.
-The upgrade pull request closes the open issue for its DuckDB release; close any other issue in the change that upgrades.
+When the latest DuckDB release is newer than the pin, it opens an upgrade pull request, as [Upgrading DuckDB](#upgrading-duckdb) describes; a DuckDB release never waits for a `@duckdb/node-api` (ADR 0009).
+When DuckDB is current but npm has a `@duckdb/node-api` built on the pinned DuckDB that is newer than the reference pin, it opens a pull request that moves the reference.
+When either run fails, it opens one issue for that target instead of a pull request.
+It never opens a second issue with the same title, or a second pull request for the same target, even after the first is closed.
 
 ## Upgrading DuckDB
 
 ### The upgrade pull request
 
-The `upstream-check` workflow upgrades on its own once a `@duckdb/node-api` built on the new DuckDB is on npm.
-It runs `bun run upgrade-duckdb --duckdb <new> --node-api <new>-r.<n>` with a read-only token, which does steps 1 to 5 of the manual procedure below.
-It then pushes the branch `upgrade/duckdb-<new>-r.<n>`, dispatches `ci.yml` on it, and opens a pull request.
+An upgrade follows DuckDB core alone: the DuckDB release assets for libduckdb and `duckdb.h`, DuckDB's C API spec for the generated FFI code, and our own suites.
+The `upstream-check` workflow upgrades on its own once DuckDB publishes a release newer than the pin.
+It runs `bun run upgrade-duckdb --duckdb <new>` with a read-only token, which does steps 1 to 5 of the manual procedure below.
+When npm already has a `@duckdb/node-api` built on the new DuckDB, the script pins the newest one as the reference; otherwise the reference stays, and the pull request says so.
+It then pushes the branch `upgrade/duckdb-<new>`, dispatches `ci.yml` on it, and opens a pull request.
+A pull request that only moves the reference uses the branch `upgrade/node-api-<version>`.
 GitHub starts no `pull_request` run without approval for a pull request that `GITHUB_TOKEN` opened, but a `workflow_dispatch` event always creates a run, so the dispatched run is the pull request's CI.
 The pull request links that run.
 The workflow needs the repository setting "Allow GitHub Actions to create and approve pull requests", under Settings, Actions, General, Workflow permissions.
@@ -75,12 +77,12 @@ Upgrade by hand when the workflow opened an issue instead, or to try a release b
 `bun run upgrade-duckdb` does steps 1 to 5, and `--dry-run` checks the target and prints its plan without writing anything.
 
 1. Set `DUCKDB_VERSION` in `src/version.ts`.
-2. Pin the reference with `bun add --dev --exact @duckdb/node-api@<new>-r.<n>`.
+2. When npm has a `@duckdb/node-api` built on the new DuckDB, pin the newest one as the reference with `bun add --dev --exact @duckdb/node-api@<new>-r.<n>`; otherwise keep the pin.
 3. Run `bun run fetch-lib all`, `bun run vendor:api-spec` and `bun run gen:ffi`.
 4. Set `libduckdb-sys` in `native/Cargo.toml` to the newest `1.<MAJOR><MINOR><PATCH>.x` release, the duckdb-rs scheme in which DuckDB 2.0.1 is `1.20001.x`, and run `cargo update --manifest-path native/Cargo.toml --package libduckdb-sys --precise <version>`.
    When crates.io has no such release yet, keep the old one and repeat this step once duckdb-rs publishes it.
    Dependabot ignores that crate for this reason.
-5. Release as the next minor version (ADR 0004): set it in every `package.json` and in `optionalDependencies`, run `bun install`, and add its row to the `README.md` `Versions` table and its opening sentence.
+5. Release as the next minor version (ADR 0004): set it in every `package.json` and in `optionalDependencies`, run `bun install`, and add its row to the `README.md` `Versions` table, with the reference or `none`, and its opening sentence.
    When the table already has a row for the new DuckDB, keep that row's version.
 6. Read `git diff vendor/duckdb.h` for changes to functions that `src/bindings/` or `native/` call.
    Update both sides and `native/ABI.md` together.

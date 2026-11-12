@@ -13,7 +13,7 @@ It loads libduckdb as a plain shared library, so `bun build --compile` produces 
 import { DuckDBInstance } from "@avidian/duckdb-bun"; // was "@duckdb/node-api"
 ```
 
-Version 1.0.0 bundles DuckDB v2.0.0 and matches `@duckdb/node-api` 2.0.0-r.1; [Versions](#versions) maps every release.
+Version 1.0.1 bundles DuckDB v2.0.0; [Versions](#versions) maps every release.
 
 ## Install
 
@@ -44,10 +44,13 @@ The package has its own semantic version, independent of DuckDB's:
 
 Every release is a stable version, so a range such as `^1.0.0` takes every compatible release.
 
-| `@avidian/duckdb-bun` | DuckDB | `@duckdb/node-api` it matches |
+| `@avidian/duckdb-bun` | DuckDB | `@duckdb/node-api` reference |
 | --- | --- | --- |
 | 1.0.0 | 2.0.0 | 2.0.0-r.1 |
 | 1.0.1 | 2.0.0 | 2.0.0-r.1 |
+
+A release follows a DuckDB release without waiting for `@duckdb/node-api`.
+The last column names the `@duckdb/node-api` release that parity, fuzz and the bench compared it against, built on the same DuckDB, or `none` when npm had none yet.
 
 At run time, `DUCKDB_VERSION` holds the bundled DuckDB version, and `diagnostics().versions` holds all of them:
 
