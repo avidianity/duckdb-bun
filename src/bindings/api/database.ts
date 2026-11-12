@@ -16,7 +16,7 @@ import type {
   QueryProgress,
   Value,
 } from "../generated/contract.ts";
-import { expectString, integerFromNumber } from "../runtime/convert.ts";
+import { expectBoolean, expectString, integerFromNumber, uint32FromNumber } from "../runtime/convert.ts";
 import { jobOut0, runJob } from "../runtime/dispatch.ts";
 import { type Handle, handleOf, unwrap } from "../runtime/handle.ts";
 import { own } from "../runtime/kinds.ts";
@@ -103,14 +103,17 @@ export function config_count(): number {
 }
 
 export function get_config_flag(index: number): ConfigFlag {
+  // Read as Number::Uint32Value, as the official binding does.
+  const flag = uint32FromNumber(index);
   const name = slot();
   const description = slot();
-  if (duckdb.duckdb_get_config_flag(index, name, description)) throw new Error("Config option not found");
+  if (duckdb.duckdb_get_config_flag(flag, name, description)) throw new Error("Config option not found");
   return { name: readCString(slotValue(name)) ?? "", description: readCString(slotValue(description)) ?? "" };
 }
 
 export function set_config(config: Config, name: string, option: string): void {
-  if (duckdb.duckdb_set_config(unwrap(config, "config"), cstr(name), cstr(option))) {
+  const ptr = unwrap(config, "config");
+  if (duckdb.duckdb_set_config(ptr, cstr(expectString(name)), cstr(expectString(option)))) {
     throw new Error("Failed to set config");
   }
 }
@@ -158,7 +161,9 @@ export function client_context_get_connection_id(client_context: ClientContext):
 }
 
 export function get_table_names(connection: Connection, query: string, qualified: boolean): Value {
-  const value = duckdb.duckdb_get_table_names(unwrap(connection, "connection"), cstr(query), qualified) as Pointer;
+  const ptr = unwrap(connection, "connection");
+  const text = cstr(expectString(query));
+  const value = duckdb.duckdb_get_table_names(ptr, text, expectBoolean(qualified)) as Pointer;
   return asHandle(own("value", value));
 }
 
@@ -176,10 +181,8 @@ const UNSUPPORTED_DUCKDB_CATALOG_ENTRY_TYPES: Readonly<Record<number, string>> =
 };
 
 export function client_context_get_catalog(context: ClientContext, catalog_name: string): Catalog | null {
-  const catalog = duckdb.duckdb_client_context_get_catalog(
-    unwrap(context, "client context"),
-    cstr(catalog_name),
-  ) as Pointer | null;
+  const ptr = unwrap(context, "client context");
+  const catalog = duckdb.duckdb_client_context_get_catalog(ptr, cstr(expectString(catalog_name))) as Pointer | null;
   return catalog === null ? null : asHandle(own("catalog", catalog));
 }
 

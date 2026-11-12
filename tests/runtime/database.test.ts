@@ -43,3 +43,21 @@ test("close_sync while connect is in flight waits for it", async () => {
   expect(connection).toBeDefined();
   db.disconnect_sync(connection);
 });
+
+test("config, table name, and catalog arguments take the official JavaScript types", async () => {
+  const config = db.create_config();
+  expect(() => db.set_config(config, 1 as never, "1")).toThrow(new TypeError("A string was expected"));
+  expect(() => db.set_config(config, "threads", 1 as never)).toThrow(new TypeError("A string was expected"));
+  expect(() => db.set_config(config, "threads", null as never)).toThrow(new TypeError("A string was expected"));
+  // The index is read as Number::Uint32Value, so 2^32 wraps to the first flag.
+  expect(db.get_config_flag(2 ** 32)).toEqual(db.get_config_flag(0));
+  expect(() => db.get_config_flag("0" as never)).toThrow(new TypeError("A number was expected"));
+  const database = await db.open();
+  const connection = await db.connect(database);
+  expect(() => db.get_table_names(connection, 1 as never, true)).toThrow(new TypeError("A string was expected"));
+  expect(() => db.get_table_names(connection, "SELECT 1", 1 as never)).toThrow(new TypeError("A boolean was expected"));
+  const context = db.connection_get_client_context(connection);
+  expect(() => db.client_context_get_catalog(context, 1 as never)).toThrow(new TypeError("A string was expected"));
+  db.disconnect_sync(connection);
+  db.close_sync(database);
+});
