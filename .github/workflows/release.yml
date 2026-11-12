@@ -1,6 +1,6 @@
 name: Release
 
-# Builds both platform packages from the release tag, runs the test suites on each, and publishes to npm
+# Builds every platform package from the release tag, runs the test suites on each, and publishes to npm
 # through trusted publishing (OIDC): no npm token secret exists. See MAINTENANCE.md for the setup.
 on:
   release:
@@ -28,17 +28,26 @@ env:
   RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
 
 jobs:
-  # docs/adr/0003: the linux-x64 shim is built in this image, so it needs glibc 2.36 or newer.
-  build-linux-x64:
-    name: build (linux-x64)
-    runs-on: ubuntu-latest
+  # docs/adr/0003, 0005: the Linux shims are built in this image, so they need glibc 2.36 or newer.
+  # The digest pins a multi-platform image index, so each runner pulls its own architecture's image.
+  build-linux:
+    name: build (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
     container: rust:1.99.1-bookworm@sha256:e6f2cff35d0f309acf8433b4f05878ed77092602c5065cc81801177da0bb3a9c
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-x64
+          - os: ubuntu-24.04-arm
+            platform: linux-arm64
     defaults:
       run:
         shell: bash
     env:
-      PLATFORM: linux-x64
+      PLATFORM: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -113,15 +122,15 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: bench-linux-x64
+          name: bench-${{ matrix.platform }}
           path: bench/results/
           if-no-files-found: warn
           retention-days: 90
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: duckdb-bun-linux-x64
-          path: packages/duckdb-bun-linux-x64/
+          name: duckdb-bun-${{ matrix.platform }}
+          path: packages/duckdb-bun-${{ matrix.platform }}/
           if-no-files-found: error
           retention-days: 7
 
@@ -217,7 +226,7 @@ jobs:
           retention-days: 7
 
   publish:
-    needs: [build-linux-x64, build-darwin-arm64]
+    needs: [build-linux, build-darwin-arm64]
     if: github.event_name == 'release' || inputs.publish
     # npm trusted publishing does not support self-hosted runners.
     runs-on: ubuntu-latest
@@ -240,6 +249,11 @@ jobs:
         with:
           name: duckdb-bun-linux-x64
           path: packages/duckdb-bun-linux-x64
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: duckdb-bun-linux-arm64
+          path: packages/duckdb-bun-linux-arm64
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -280,5 +294,6 @@ jobs:
             npm publish "./$dir" --access public --tag latest
           }
           publish packages/duckdb-bun-linux-x64
+          publish packages/duckdb-bun-linux-arm64
           publish packages/duckdb-bun-darwin-arm64
           publish .

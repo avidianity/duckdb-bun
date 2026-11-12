@@ -97,9 +97,9 @@ Upgrade by hand when the workflow opened an issue instead, or to try a release b
 
 The `Release` workflow (`.github/workflows/release.yml`) then:
 
-1. Builds the linux-x64 shim in the `rust:1.99.1-bookworm` image and the darwin-arm64 shim on `macos-latest`, runs every test suite on each, and uploads each platform package directory.
+1. Builds the linux-x64 shim on `ubuntu-latest` and the linux-arm64 shim on `ubuntu-24.04-arm`, both in the `rust:1.99.1-bookworm` image, and the darwin-arm64 shim on `macos-latest`, runs every test suite on each, and uploads each platform package directory.
 2. Checks that every version equals the tag and that each platform package holds and lists its native files.
-3. Publishes the two platform packages, then the main package, with the `latest` dist-tag and a provenance statement.
+3. Publishes the three platform packages, then the main package, with the `latest` dist-tag and a provenance statement.
 
 A version that is already on npm is skipped, so a failed run can be re-run.
 To rebuild a tag without a new release, run the workflow by hand with `gh workflow run release.yml -f tag=v1.0.1`.
