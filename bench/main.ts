@@ -30,8 +30,12 @@ interface Summary {
   metrics: Record<string, number>;
   peakRssMiB: number;
   maxRssMiB: number;
+  /** Median over the measured runs of each run's peak RSS; the gate compares this. */
+  runPeakRssMiB?: number;
   /** Spread between the medians of this implementation's two ABBA children, in percent. */
   noisePct?: number;
+  /** Spread between the peak RSS of those two children, in percent. */
+  memoryNoisePct?: number;
   error?: string;
   raw: ChildResult;
 }
@@ -90,6 +94,7 @@ async function runChild(
       runsMs: [],
       metrics: {},
       peakRssBytes: 0,
+      runPeakRssBytes: [],
       maxRssBytes: 0,
       error: `child exited with ${cause}: ${detail}`,
     };
@@ -100,9 +105,15 @@ async function runChild(
 function merge(raws: ChildResult[]): ChildResult {
   const [first, ...rest] = raws;
   if (!first) throw new Error("merge needs at least one child result");
-  const merged: ChildResult = { ...first, runsMs: [...first.runsMs], metrics: structuredClone(first.metrics) };
+  const merged: ChildResult = {
+    ...first,
+    runsMs: [...first.runsMs],
+    runPeakRssBytes: [...first.runPeakRssBytes],
+    metrics: structuredClone(first.metrics),
+  };
   for (const raw of rest) {
     merged.runsMs.push(...raw.runsMs);
+    merged.runPeakRssBytes.push(...raw.runPeakRssBytes);
     for (const [key, values] of Object.entries(raw.metrics)) {
       merged.metrics[key] = [...(merged.metrics[key] ?? []), ...values];
     }
@@ -128,6 +139,7 @@ function summarize(scenario: Scenario, raw: ChildResult): Summary {
     summary.medianMs = median(raw.runsMs);
     summary.minMs = Math.min(...raw.runsMs);
     summary.maxMs = Math.max(...raw.runsMs);
+    if (raw.runPeakRssBytes.length > 0) summary.runPeakRssMiB = median(raw.runPeakRssBytes) / MIB;
     for (const spec of scenario.metrics) {
       const values = raw.metrics[spec.key] ?? [];
       if (values.length > 0) summary.metrics[spec.key] = aggregate(spec, values);
@@ -152,6 +164,7 @@ function table(scenario: Scenario, rows: Summary[]): string {
     "Min (ms)",
     "Max (ms)",
     ...scenario.metrics.map((m) => m.label),
+    "Run peak RSS (MiB)",
     "Peak RSS (MiB)",
     "Max RSS (MiB)",
     "Error",
@@ -165,6 +178,7 @@ function table(scenario: Scenario, rows: Summary[]): string {
       cell(row.minMs),
       cell(row.maxMs),
       ...scenario.metrics.map((m) => cell(row.metrics[m.key])),
+      cell(row.runPeakRssMiB, 0),
       cell(row.peakRssMiB, 0),
       cell(row.maxRssMiB, 0),
       row.error ? escapeCell(row.error) : "",
@@ -238,7 +252,9 @@ async function main(): Promise<void> {
       const summaries = impls.map((impl) => {
         const children = raws.get(impl) ?? [];
         const summary = summarize(scenario, merge(children));
-        summary.noisePct = noise(children.filter((c) => c.runsMs.length > 0).map((c) => median(c.runsMs)));
+        const measured = children.filter((c) => c.runsMs.length > 0);
+        summary.noisePct = noise(measured.map((c) => median(c.runsMs)));
+        summary.memoryNoisePct = noise(measured.map((c) => median(c.runPeakRssBytes)));
         return summary;
       });
       results[scenario.name] = summaries;

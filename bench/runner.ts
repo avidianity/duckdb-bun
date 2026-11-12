@@ -20,6 +20,8 @@ export interface ChildResult {
   metrics: Record<string, number[]>;
   /** Highest RSS the in-process sampler saw, in bytes. */
   peakRssBytes: number;
+  /** Highest RSS during each measured run, which starts after a full garbage collection, in bytes. */
+  runPeakRssBytes: number[];
   /** The OS high-water mark from getrusage (`process.resourceUsage().maxRSS`), in bytes. */
   maxRssBytes: number;
   error?: string;
@@ -61,8 +63,11 @@ async function main(): Promise<void> {
   if (!values.data || !values.work || !values.out) throw new Error("--data, --work and --out are required");
 
   let peakRssBytes = process.memoryUsage.rss();
+  let runPeakRssBytes = 0;
   const sample = () => {
-    peakRssBytes = Math.max(peakRssBytes, process.memoryUsage.rss());
+    const rss = process.memoryUsage.rss();
+    peakRssBytes = Math.max(peakRssBytes, rss);
+    runPeakRssBytes = Math.max(runPeakRssBytes, rss);
   };
   const sampler = setInterval(sample, RSS_SAMPLE_MS);
 
@@ -72,6 +77,7 @@ async function main(): Promise<void> {
     runsMs: [],
     metrics: Object.fromEntries(scenario.metrics.map((m) => [m.key, []])),
     peakRssBytes: 0,
+    runPeakRssBytes: [],
     maxRssBytes: 0,
   };
 
@@ -97,11 +103,13 @@ async function main(): Promise<void> {
       if (scenario.warmup) await scenario.run(ctx, -1);
       for (let i = 0; i < runs; i++) {
         Bun.gc(true);
+        runPeakRssBytes = 0;
         sample();
         const t0 = performance.now();
         const metrics = await scenario.run(ctx, i);
         result.runsMs.push(performance.now() - t0);
         sample();
+        result.runPeakRssBytes.push(runPeakRssBytes);
         for (const spec of scenario.metrics) result.metrics[spec.key]?.push(metrics[spec.key] ?? Number.NaN);
       }
       await scenario.verify?.(ctx);

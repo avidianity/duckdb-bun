@@ -57,6 +57,8 @@ Each scenario prints one Markdown table with one row per implementation.
 
 - **Median, Min, Max (ms)**: wall time of one measured run, from before the first call to after the last awaited result.
   Compare medians; a wide gap between min and max means the machine was noisy.
+- **Run peak RSS (MiB)**: the highest `process.memoryUsage.rss()` during one measured run, which starts after a full garbage collection, as the median over the runs.
+  This is what the gate compares: the whole-child peak depends on when the garbage collector happened to run, and in `read-all` two children of the same package differed by 9% on that alone.
 - **Peak RSS (MiB)**: the highest `process.memoryUsage.rss()` a 10 ms timer in the child saw, also sampled before and after every run.
   The timer cannot fire while the JavaScript thread is blocked, so a peak reached inside a synchronous call can be missed.
 - **Max RSS (MiB)**: the operating system's high-water mark for the child (`process.resourceUsage().maxRSS`), which catches what the timer misses.
@@ -75,13 +77,24 @@ Pick `--lag-rows` so the lag query takes about 5 seconds on the machine; the def
 
 `bun run bench --gate` fails, with exit status 1, when ours does worse than official on any scenario:
 
-- The median run is more than 10% slower (`--max-slower`), and slower by more than 5 ms.
-- Peak RSS is more than 10% higher (`--max-memory`), and higher by more than 16 MiB, which covers the baseline difference between the two packages at start-up.
+- Ours is more than 10% slower (`--max-slower`) on both the median run and the fastest run, and the medians differ by more than 5 ms.
+- The run peak RSS is more than 10% higher (`--max-memory`), and higher by more than 16 MiB, which covers the baseline difference between the two packages at start-up.
 - In `event-loop-lag`, ours lets the event loop stall for 50 ms or more.
 - Either implementation fails or returns a wrong result.
 
-The gate table also shows the noise of each scenario: the spread between the medians of one implementation's two ABBA children, the larger of the two implementations'.
-A limit below that noise would fail at random, so the limits must stay above the noise CI measures.
+When a scenario's measured noise is larger than a limit, the noise is the limit for that scenario.
+The noise is the spread between the two ABBA children of one implementation, which run the same code, as a percent of their mean; the gate takes the larger of the two implementations'.
+A difference inside that spread is no evidence either way, so a fixed limit below it would fail at random.
+The fastest-run condition exists because some scenarios fall into two speed modes: on the Linux runner, `parquet-write` runs took either about 115 ms or about 140 ms for both packages, and the median moved by which mode each child happened to hit.
+A real slowdown moves both the median and the fastest run.
+
+Time noise CI measured on 2026-11-12:
+
+- Linux x64 (4 vCPU): 0.4% to 3% time for most scenarios, but 17% for `parquet-write` and 20% for `ingest-csv`.
+  The 10% limits hold for most scenarios there.
+- macOS arm64 (3 vCPU, virtualized): 11% to 61% time.
+  There the gate catches only large regressions; the Linux job is the sharp one.
+
 CI runs the gate on both platforms on every push, and the release workflow runs it before it publishes.
 Each run uploads `bench/results/` as the `bench-<platform>` artifact.
 

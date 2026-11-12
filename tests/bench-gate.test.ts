@@ -1,26 +1,32 @@
-// The bench release gate (bench/gate.ts): limits, floors and the event-loop gap.
+// The bench release gate (bench/gate.ts): limits, noise, floors and the event-loop gap.
 import { expect, test } from "bun:test";
 import { DEFAULT_LIMITS, judge, noise } from "../bench/gate.ts";
 
-const base = { medianMs: 100, peakRssMiB: 500, metrics: {} };
+const base = { medianMs: 100, minMs: 90, runPeakRssMiB: 500, metrics: {} };
 
 test("ours within the limits passes", () => {
-  expect(judge("s", base, { ...base, medianMs: 109, peakRssMiB: 549 }, DEFAULT_LIMITS).failures).toEqual([]);
+  const ours = { ...base, medianMs: 109, minMs: 98, runPeakRssMiB: 549 };
+  expect(judge("s", base, ours, DEFAULT_LIMITS).failures).toEqual([]);
 });
 
-test("more than 10% slower fails", () => {
-  const verdict = judge("s", base, { ...base, medianMs: 111 }, DEFAULT_LIMITS);
-  expect(verdict.failures).toEqual(["11.0% slower (111.0 vs 100.0 ms), limit 10%"]);
+test("more than 10% slower on the median and the fastest run fails", () => {
+  const verdict = judge("s", base, { ...base, medianMs: 111, minMs: 100 }, DEFAULT_LIMITS);
+  expect(verdict.failures).toEqual(["11.0% slower (111.0 vs 100.0 ms), fastest run 11.1% slower, limit 10.0%"]);
 });
 
-test("more than 10% more peak RSS fails", () => {
-  const verdict = judge("s", base, { ...base, peakRssMiB: 600 }, DEFAULT_LIMITS);
-  expect(verdict.failures).toEqual(["20.0% more peak RSS (600 vs 500 MiB), limit 10%"]);
+test("a slower median with an equal fastest run passes: the runs fell into a slower mode", () => {
+  expect(judge("s", base, { ...base, medianMs: 118, minMs: 91 }, DEFAULT_LIMITS).failures).toEqual([]);
+});
+
+test("more than 10% more peak RSS per run fails", () => {
+  const verdict = judge("s", base, { ...base, runPeakRssMiB: 600 }, DEFAULT_LIMITS);
+  expect(verdict.failures).toEqual(["20.0% more peak RSS per run (600 vs 500 MiB), limit 10.0%"]);
 });
 
 test("differences under the floors never fail", () => {
-  const small = { medianMs: 10, peakRssMiB: 25, metrics: {} };
-  expect(judge("s", small, { ...small, medianMs: 14, peakRssMiB: 40 }, DEFAULT_LIMITS).failures).toEqual([]);
+  const small = { medianMs: 10, minMs: 9, runPeakRssMiB: 25, metrics: {} };
+  const ours = { ...small, medianMs: 14, minMs: 13, runPeakRssMiB: 40 };
+  expect(judge("s", small, ours, DEFAULT_LIMITS).failures).toEqual([]);
 });
 
 test("an event loop gap at the limit fails, and a child error fails", () => {
@@ -32,7 +38,16 @@ test("an event loop gap at the limit fails, and a child error fails", () => {
   ]);
 });
 
-test("noise is the spread of the child medians over their mean", () => {
+test("a limit below the measured noise rises to the noise", () => {
+  const noisy = { ...base, noisePct: 20, memoryNoisePct: 15 };
+  const within = { ...noisy, medianMs: 118, minMs: 106, runPeakRssMiB: 570 };
+  expect(judge("s", noisy, within, DEFAULT_LIMITS).failures).toEqual([]);
+  expect(judge("s", noisy, { ...noisy, medianMs: 125, minMs: 113 }, DEFAULT_LIMITS).failures).toEqual([
+    "25.0% slower (125.0 vs 100.0 ms), fastest run 25.6% slower, limit 20.0%",
+  ]);
+});
+
+test("noise is the spread of the per-child numbers over their mean", () => {
   expect(noise([90, 110])).toBe(20);
   expect(noise([100])).toBeUndefined();
 });
