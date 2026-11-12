@@ -13,7 +13,8 @@
 //  4. Shows the npm account and what it will publish, and asks for confirmation unless --yes.
 //  5. Runs `bun publish <tarball> --access public --tag latest`, platform packages first. npm asks for
 //     two-factor authentication in the terminal or the browser; the script never sees it.
-//  6. Waits until npm serves each version, then prints the trusted publisher settings to enter on npmjs.com.
+//  6. Waits up to 20 minutes for npm to serve each version (scripts/npm-registry.ts), then prints the trusted
+//     publisher settings to enter on npmjs.com.
 //
 // A version already on npm is skipped, so a failed run can be re-run. Auth comes from the npm config Bun
 // reads (~/.npmrc, or NPM_CONFIG_TOKEN with a short-lived granular token); `bun pm whoami` must succeed.
@@ -25,13 +26,13 @@ import { parseArgs } from "node:util";
 import { $ } from "bun";
 import { TARGETS } from "./fetch-lib.ts";
 import { architectures, newestGlibcMinor } from "./native-file.ts";
+import { awaitVersion, notServed, onRegistry as servedByNpm } from "./npm-registry.ts";
 
 const REPO = "avidianity/duckdb-bun";
 const REPOSITORY_URL = "git+https://github.com/avidianity/duckdb-bun.git";
 const WORKFLOW = "release.yml";
 const ENVIRONMENT = "npm";
 const DIST_TAG = "latest";
-const REGISTRY = "https://registry.npmjs.org";
 const SHIM = "libduckdb_bun_shim";
 // The Linux shims are built in rust:1.99.1-bookworm (docs/adr/0003, 0005); the README promises glibc 2.36.
 const MAX_GLIBC_MINOR = 36;
@@ -204,18 +205,16 @@ async function checkTarball(pkg: Pkg, version: string, scratch: string): Promise
 // --- npm registry --------------------------------------------------------------------------
 
 async function onRegistry(name: string, version: string): Promise<boolean> {
-  const response = await fetch(`${REGISTRY}/${name.replace("/", "%2f")}/${version}`);
-  if (response.status === 404) return false;
-  if (response.ok) return true;
-  fail(`${REGISTRY} answered ${response.status} for ${name}@${version}`);
+  try {
+    return await servedByNpm(name, version);
+  } catch (error) {
+    fail(error instanceof Error ? error.message : String(error));
+  }
 }
 
 async function waitForRegistry(name: string, version: string): Promise<void> {
-  for (let attempt = 0; attempt < 30; attempt++) {
-    if (await onRegistry(name, version)) return;
-    await Bun.sleep(2000);
-  }
-  fail(`${name}@${version} was published, but npm did not serve it within 60 s; check npmjs.com before re-running`);
+  console.log(`  waiting for npm to serve ${name}@${version}; processing a large tarball takes minutes`);
+  if (!(await awaitVersion(name, version))) fail(notServed(name, version));
 }
 
 // --- main ----------------------------------------------------------------------------------
