@@ -27,9 +27,8 @@ export interface LocaleOptions {
 
 function getDecimalSeparator(locales?: string | string[]): string {
   const decimalSeparator =
-    new Intl.NumberFormat(locales, { useGrouping: false })
-      .formatToParts(0.1)
-      .find((part) => part.type === 'decimal')?.value ?? '.';
+    new Intl.NumberFormat(locales, { useGrouping: false }).formatToParts(0.1).find((part) => part.type === "decimal")
+      ?.value ?? ".";
   return decimalSeparator;
 }
 
@@ -52,10 +51,7 @@ function getCachedDecimalSeparator(locales?: string | string[]): string {
 // Note that we explicitly omit 'minimumFractionDigits' and 'maximumFractionDigits' from the options
 // passed to toLocaleString, because they are only relevant for the fractional part of the number, and
 // would result in formatting the whole part as a real number, which we don't want.
-function formatWholePart(
-  localeOptions: LocaleOptions | undefined,
-  val: bigint,
-): string {
+function formatWholePart(localeOptions: LocaleOptions | undefined, val: bigint): string {
   if (localeOptions) {
     const {
       minimumFractionDigits: _minFD,
@@ -70,29 +66,21 @@ function formatWholePart(
 // Format the fractional part of a decimal value
 // Note that we must handle minimumFractionDigits and maximumFractionDigits ourselves, and that
 // we don't apply `useGrouping` because that only applies to the whole part of the number.
-function formatFractionalPart(
-  localeOptions: LocaleOptions | undefined,
-  val: bigint,
-  scale: number,
-): string {
-  const fractionalPartStr = String(val).padStart(scale, '0');
+function formatFractionalPart(localeOptions: LocaleOptions | undefined, val: bigint, scale: number): string {
+  const fractionalPartStr = String(val).padStart(scale, "0");
   if (!localeOptions) {
     return fractionalPartStr;
   }
   const minFracDigits = localeOptions?.options?.minimumFractionDigits ?? 0;
   const maxFracDigits = localeOptions?.options?.maximumFractionDigits ?? 20;
 
-  return fractionalPartStr.padEnd(minFracDigits, '0').slice(0, maxFracDigits);
+  return fractionalPartStr.padEnd(minFracDigits, "0").slice(0, maxFracDigits);
 }
 
 /**
  * Convert a scaled decimal value to a string, possibly using locale-specific formatting.
  */
-export function stringFromDecimal(
-  scaledValue: bigint,
-  scale: number,
-  localeOptions?: LocaleOptions,
-): string {
+export function stringFromDecimal(scaledValue: bigint, scale: number, localeOptions?: LocaleOptions): string {
   // Decimal values are represented as integers that have been scaled up by a power of ten. The `scale` property of
   // the type is the exponent of the scale factor. For a scale greater than zero, we need to separate out the
   // fractional part by reversing this scaling.
@@ -100,21 +88,15 @@ export function stringFromDecimal(
     const scaleFactor = BigInt(10) ** BigInt(scale);
     const absScaledValue = scaledValue < 0 ? -scaledValue : scaledValue;
 
-    const prefix = scaledValue < 0 ? '-' : '';
+    const prefix = scaledValue < 0 ? "-" : "";
 
     const wholePartNum = absScaledValue / scaleFactor;
     const wholePartStr = formatWholePart(localeOptions, wholePartNum);
 
     const fractionalPartNum = absScaledValue % scaleFactor;
-    const fractionalPartStr = formatFractionalPart(
-      localeOptions,
-      fractionalPartNum,
-      scale,
-    );
+    const fractionalPartStr = formatFractionalPart(localeOptions, fractionalPartNum, scale);
 
-    const decimalSeparatorStr = localeOptions
-      ? getCachedDecimalSeparator(localeOptions.locales)
-      : '.';
+    const decimalSeparatorStr = localeOptions ? getCachedDecimalSeparator(localeOptions.locales) : ".";
 
     return `${prefix}${wholePartStr}${decimalSeparatorStr}${fractionalPartStr}`;
   }

@@ -1,13 +1,13 @@
-import { BaseDuckDBType } from './BaseDuckDBType';
-import { DuckDBTypeId } from '../DuckDBTypeId';
-import { DuckDBTimeTZValue } from '../values';
+import { DuckDBTypeId } from "../DuckDBTypeId";
+import { DuckDBTimeTZValue } from "../values";
+import { BaseDuckDBType } from "./BaseDuckDBType";
 
 export class DuckDBTimeTZType extends BaseDuckDBType<DuckDBTypeId.TIME_TZ> {
   public constructor(alias?: string) {
     super(DuckDBTypeId.TIME_TZ, alias);
   }
   public toString(): string {
-    return 'TIME WITH TIME ZONE';
+    return "TIME WITH TIME ZONE";
   }
   public static readonly instance = new DuckDBTimeTZType();
   public static create(alias?: string): DuckDBTimeTZType {

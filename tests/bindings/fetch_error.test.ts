@@ -1,9 +1,9 @@
-import duckdb from '../../src/bindings/index.ts';
-import { expect, suite, test } from '../vitest-shim.ts';
-import { withConnection } from './utils/withConnection';
+import duckdb from "../../src/bindings/index.ts";
+import { expect, suite, test } from "../vitest-shim.ts";
+import { withConnection } from "./utils/withConnection";
 
-suite('fetch errors', () => {
-  test.each([0, 5000])('preserves normal streaming EOF for %i rows', async (count) => {
+suite("fetch errors", () => {
+  test.each([0, 5000])("preserves normal streaming EOF for %i rows", async (count) => {
     await withConnection(async (connection) => {
       const prepared = await duckdb.prepare(connection, `SELECT i FROM range(${count}) t(i)`);
       const pending = duckdb.pending_prepared_streaming(prepared);
@@ -18,15 +18,18 @@ suite('fetch errors', () => {
     });
   });
 
-  test('rejects a late streaming error after delivering rows', async () => {
+  test("rejects a late streaming error after delivering rows", async () => {
     await withConnection(async (connection) => {
-      await duckdb.query(connection, 'SET threads = 1');
+      await duckdb.query(connection, "SET threads = 1");
       await duckdb.query(connection, "SET streaming_buffer_size = '1MB'");
       // Keep the error beyond the initial streaming execution buffer.
-      const prepared = await duckdb.prepare(connection, `
+      const prepared = await duckdb.prepare(
+        connection,
+        `
         SELECT CASE WHEN i = 999999 THEN error('late-fetch-error') ELSE i END
         FROM range(1000000) t(i)
-      `);
+      `,
+      );
       const pending = duckdb.pending_prepared_streaming(prepared);
       const result = await duckdb.execute_pending(pending);
       expect(duckdb.result_is_streaming(result)).toBe(true);
@@ -38,11 +41,11 @@ suite('fetch errors', () => {
           rows += duckdb.data_chunk_get_size(chunk);
         }
       };
-      await expect(consume()).rejects.toThrow('late-fetch-error');
+      await expect(consume()).rejects.toThrow("late-fetch-error");
       expect(rows).toBeGreaterThan(0);
       expect(rows).toBeLessThan(1000000);
       // A failed result must not prevent subsequent queries on the connection.
-      const recovery = await duckdb.query(connection, 'SELECT 42');
+      const recovery = await duckdb.query(connection, "SELECT 42");
       expect(duckdb.row_count(recovery)).toBe(1);
     });
   });

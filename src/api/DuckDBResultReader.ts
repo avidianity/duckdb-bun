@@ -1,23 +1,23 @@
-import { convertColumnsFromChunks } from './convertColumnsFromChunks';
-import { convertColumnsObjectFromChunks } from './convertColumnsObjectFromChunks';
-import { convertRowObjectsFromChunks } from './convertRowObjectsFromChunks';
-import { convertRowsFromChunks } from './convertRowsFromChunks';
-import { DuckDBDataChunk } from './DuckDBDataChunk';
-import { DuckDBLogicalType } from './DuckDBLogicalType';
-import { DuckDBResult } from './DuckDBResult';
-import { DuckDBType } from './DuckDBType';
-import { DuckDBTypeId } from './DuckDBTypeId';
-import { DuckDBValueConverter } from './DuckDBValueConverter';
-import { ResultReturnType, StatementType } from './enums';
-import { getColumnsFromChunks } from './getColumnsFromChunks';
-import { getColumnsObjectFromChunks } from './getColumnsObjectFromChunks';
-import { getRowObjectsFromChunks } from './getRowObjectsFromChunks';
-import { getRowsFromChunks } from './getRowsFromChunks';
-import { JS } from './JS';
-import { JSDuckDBValueConverter } from './JSDuckDBValueConverter';
-import { Json } from './Json';
-import { JsonDuckDBValueConverter } from './JsonDuckDBValueConverter';
-import { DuckDBValue } from './values';
+import { convertColumnsFromChunks } from "./convertColumnsFromChunks";
+import { convertColumnsObjectFromChunks } from "./convertColumnsObjectFromChunks";
+import { convertRowObjectsFromChunks } from "./convertRowObjectsFromChunks";
+import { convertRowsFromChunks } from "./convertRowsFromChunks";
+import type { DuckDBDataChunk } from "./DuckDBDataChunk";
+import type { DuckDBLogicalType } from "./DuckDBLogicalType";
+import type { DuckDBResult } from "./DuckDBResult";
+import type { DuckDBType } from "./DuckDBType";
+import type { DuckDBTypeId } from "./DuckDBTypeId";
+import type { DuckDBValueConverter } from "./DuckDBValueConverter";
+import type { ResultReturnType, StatementType } from "./enums";
+import { getColumnsFromChunks } from "./getColumnsFromChunks";
+import { getColumnsObjectFromChunks } from "./getColumnsObjectFromChunks";
+import { getRowObjectsFromChunks } from "./getRowObjectsFromChunks";
+import { getRowsFromChunks } from "./getRowsFromChunks";
+import type { JS } from "./JS";
+import { JSDuckDBValueConverter } from "./JSDuckDBValueConverter";
+import type { Json } from "./Json";
+import { JsonDuckDBValueConverter } from "./JsonDuckDBValueConverter";
+import type { DuckDBValue } from "./values";
 
 interface ChunkSizeRun {
   chunkCount: number;
@@ -103,7 +103,7 @@ export class DuckDBResultReader {
   public columnNameAndTypeObjectsJson(): Json {
     return this.result.columnNameAndTypeObjectsJson();
   }
-  
+
   public get rowsChanged(): number {
     return this.result.rowsChanged;
   }
@@ -146,9 +146,7 @@ export class DuckDBResultReader {
       currentRowIndex -= run.rowCount;
     }
     // We didn't find our row. It must have been out of range.
-    throw Error(
-      `Row index ${rowIndex} requested, but only ${this.currentRowCount_} row have been read so far.`
-    );
+    throw Error(`Row index ${rowIndex} requested, but only ${this.currentRowCount_} row have been read so far.`);
   }
 
   /** Read all rows. */
@@ -166,13 +164,7 @@ export class DuckDBResultReader {
   }
 
   private async fetchChunks(targetRowCount?: number): Promise<void> {
-    while (
-      !(
-        this.done_ ||
-        (targetRowCount !== undefined &&
-          this.currentRowCount_ >= targetRowCount)
-      )
-    ) {
+    while (!(this.done_ || (targetRowCount !== undefined && this.currentRowCount_ >= targetRowCount))) {
       const chunk = await this.result.fetchChunk();
       if (chunk && chunk.rowCount > 0) {
         this.updateChunkSizeRuns(chunk);
@@ -219,20 +211,11 @@ export class DuckDBResultReader {
   }
 
   public getColumnsObject(): Record<string, DuckDBValue[]> {
-    return getColumnsObjectFromChunks(
-      this.chunks,
-      this.deduplicatedColumnNames()
-    );
+    return getColumnsObjectFromChunks(this.chunks, this.deduplicatedColumnNames());
   }
 
-  public convertColumnsObject<T>(
-    converter: DuckDBValueConverter<T>
-  ): Record<string, (T | null)[]> {
-    return convertColumnsObjectFromChunks(
-      this.chunks,
-      this.deduplicatedColumnNames(),
-      converter
-    );
+  public convertColumnsObject<T>(converter: DuckDBValueConverter<T>): Record<string, (T | null)[]> {
+    return convertColumnsObjectFromChunks(this.chunks, this.deduplicatedColumnNames(), converter);
   }
 
   public getColumnsObjectJS(): Record<string, JS[]> {
@@ -263,14 +246,8 @@ export class DuckDBResultReader {
     return getRowObjectsFromChunks(this.chunks, this.deduplicatedColumnNames());
   }
 
-  public convertRowObjects<T>(
-    converter: DuckDBValueConverter<T>
-  ): Record<string, T | null>[] {
-    return convertRowObjectsFromChunks(
-      this.chunks,
-      this.deduplicatedColumnNames(),
-      converter
-    );
+  public convertRowObjects<T>(converter: DuckDBValueConverter<T>): Record<string, T | null>[] {
+    return convertRowObjectsFromChunks(this.chunks, this.deduplicatedColumnNames(), converter);
   }
 
   public getRowObjectsJS(): Record<string, JS>[] {

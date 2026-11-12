@@ -1,35 +1,22 @@
 import duckdb from "../../bindings/index.ts";
-import {
-  DuckDBEnumType,
-} from '../DuckDBType';
-import { DuckDBVector } from './DuckDBVector';
-import { DuckDBValidity } from './DuckDBValidity';
-import {
-  vectorData,
-} from './dataAccessors';
+import type { DuckDBEnumType } from "../DuckDBType";
+import { DuckDBValidity } from "./DuckDBValidity";
+import { DuckDBVector } from "./DuckDBVector";
+import { vectorData } from "./dataAccessors";
 
 export class DuckDBEnum16Vector extends DuckDBVector<string> {
   private readonly enumType: DuckDBEnumType;
   private readonly items: Uint16Array;
   private readonly validity: DuckDBValidity;
   private readonly vector: duckdb.Vector;
-  constructor(
-    enumType: DuckDBEnumType,
-    items: Uint16Array,
-    validity: DuckDBValidity,
-    vector: duckdb.Vector
-  ) {
+  constructor(enumType: DuckDBEnumType, items: Uint16Array, validity: DuckDBValidity, vector: duckdb.Vector) {
     super();
     this.enumType = enumType;
     this.items = items;
     this.validity = validity;
     this.vector = vector;
   }
-  static fromRawVector(
-    enumType: DuckDBEnumType,
-    vector: duckdb.Vector,
-    itemCount: number
-  ): DuckDBEnum16Vector {
+  static fromRawVector(enumType: DuckDBEnumType, vector: duckdb.Vector, itemCount: number): DuckDBEnum16Vector {
     const data = vectorData(vector, itemCount * 2);
     const items = new Uint16Array(data.buffer, data.byteOffset, itemCount);
     const validity = DuckDBValidity.fromVector(vector, itemCount);
@@ -42,9 +29,7 @@ export class DuckDBEnum16Vector extends DuckDBVector<string> {
     return this.items.length;
   }
   public override getItem(itemIndex: number): string | null {
-    return this.validity.itemValid(itemIndex)
-      ? this.enumType.values[this.items[itemIndex]]
-      : null;
+    return this.validity.itemValid(itemIndex) ? this.enumType.values[this.items[itemIndex]] : null;
   }
   public override setItem(itemIndex: number, value: string | null) {
     if (value != null) {
@@ -60,7 +45,7 @@ export class DuckDBEnum16Vector extends DuckDBVector<string> {
       0,
       this.items.buffer as ArrayBuffer,
       this.items.byteOffset,
-      this.items.byteLength
+      this.items.byteLength,
     );
     this.validity.flush(this.vector);
   }
@@ -69,7 +54,7 @@ export class DuckDBEnum16Vector extends DuckDBVector<string> {
       this.enumType,
       this.items.slice(offset, offset + length),
       this.validity.slice(offset, length),
-      this.vector
+      this.vector,
     );
   }
 }

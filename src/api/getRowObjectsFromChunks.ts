@@ -1,9 +1,9 @@
-import { DuckDBDataChunk } from './DuckDBDataChunk';
-import { DuckDBValue } from './values';
+import type { DuckDBDataChunk } from "./DuckDBDataChunk";
+import type { DuckDBValue } from "./values";
 
 export function getRowObjectsFromChunks(
   chunks: readonly DuckDBDataChunk[],
-  columnNames: readonly string[]
+  columnNames: readonly string[],
 ): Record<string, DuckDBValue>[] {
   const rowObjects: Record<string, DuckDBValue>[] = [];
   for (const chunk of chunks) {

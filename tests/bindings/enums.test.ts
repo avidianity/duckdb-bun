@@ -1,19 +1,19 @@
-import duckdb from '../../src/bindings/index.ts';
-import { expect, suite, test } from '../vitest-shim.ts';
+import duckdb from "../../src/bindings/index.ts";
+import { expect, suite, test } from "../vitest-shim.ts";
 
-suite('enums', () => {
-  test('ResultType', () => {
+suite("enums", () => {
+  test("ResultType", () => {
     expect(duckdb.ResultType.INVALID).toBe(0);
     expect(duckdb.ResultType.CHANGED_ROWS).toBe(1);
     expect(duckdb.ResultType.NOTHING).toBe(2);
     expect(duckdb.ResultType.QUERY_RESULT).toBe(3);
 
-    expect(duckdb.ResultType[duckdb.ResultType.INVALID]).toBe('INVALID');
-    expect(duckdb.ResultType[duckdb.ResultType.CHANGED_ROWS]).toBe('CHANGED_ROWS');
-    expect(duckdb.ResultType[duckdb.ResultType.NOTHING]).toBe('NOTHING');
-    expect(duckdb.ResultType[duckdb.ResultType.QUERY_RESULT]).toBe('QUERY_RESULT');
+    expect(duckdb.ResultType[duckdb.ResultType.INVALID]).toBe("INVALID");
+    expect(duckdb.ResultType[duckdb.ResultType.CHANGED_ROWS]).toBe("CHANGED_ROWS");
+    expect(duckdb.ResultType[duckdb.ResultType.NOTHING]).toBe("NOTHING");
+    expect(duckdb.ResultType[duckdb.ResultType.QUERY_RESULT]).toBe("QUERY_RESULT");
   });
-  test('StatementType', () => {
+  test("StatementType", () => {
     expect(duckdb.StatementType.INVALID).toBe(0);
     expect(duckdb.StatementType.SELECT).toBe(1);
     expect(duckdb.StatementType.INSERT).toBe(2);
@@ -43,36 +43,36 @@ suite('enums', () => {
     expect(duckdb.StatementType.DETACH).toBe(26);
     expect(duckdb.StatementType.MULTI).toBe(27);
 
-    expect(duckdb.StatementType[duckdb.StatementType.INVALID]).toBe('INVALID');
-    expect(duckdb.StatementType[duckdb.StatementType.SELECT]).toBe('SELECT');
-    expect(duckdb.StatementType[duckdb.StatementType.INSERT]).toBe('INSERT');
-    expect(duckdb.StatementType[duckdb.StatementType.UPDATE]).toBe('UPDATE');
-    expect(duckdb.StatementType[duckdb.StatementType.EXPLAIN]).toBe('EXPLAIN');
-    expect(duckdb.StatementType[duckdb.StatementType.DELETE]).toBe('DELETE');
-    expect(duckdb.StatementType[duckdb.StatementType.PREPARE]).toBe('PREPARE');
-    expect(duckdb.StatementType[duckdb.StatementType.CREATE]).toBe('CREATE');
-    expect(duckdb.StatementType[duckdb.StatementType.EXECUTE]).toBe('EXECUTE');
-    expect(duckdb.StatementType[duckdb.StatementType.ALTER]).toBe('ALTER');
-    expect(duckdb.StatementType[duckdb.StatementType.TRANSACTION]).toBe('TRANSACTION');
-    expect(duckdb.StatementType[duckdb.StatementType.COPY]).toBe('COPY');
-    expect(duckdb.StatementType[duckdb.StatementType.ANALYZE]).toBe('ANALYZE');
-    expect(duckdb.StatementType[duckdb.StatementType.VARIABLE_SET]).toBe('VARIABLE_SET');
-    expect(duckdb.StatementType[duckdb.StatementType.CREATE_FUNC]).toBe('CREATE_FUNC');
-    expect(duckdb.StatementType[duckdb.StatementType.DROP]).toBe('DROP');
-    expect(duckdb.StatementType[duckdb.StatementType.EXPORT]).toBe('EXPORT');
-    expect(duckdb.StatementType[duckdb.StatementType.PRAGMA]).toBe('PRAGMA');
-    expect(duckdb.StatementType[duckdb.StatementType.VACUUM]).toBe('VACUUM');
-    expect(duckdb.StatementType[duckdb.StatementType.CALL]).toBe('CALL');
-    expect(duckdb.StatementType[duckdb.StatementType.SET]).toBe('SET');
-    expect(duckdb.StatementType[duckdb.StatementType.LOAD]).toBe('LOAD');
-    expect(duckdb.StatementType[duckdb.StatementType.RELATION]).toBe('RELATION');
-    expect(duckdb.StatementType[duckdb.StatementType.EXTENSION]).toBe('EXTENSION');
-    expect(duckdb.StatementType[duckdb.StatementType.LOGICAL_PLAN]).toBe('LOGICAL_PLAN');
-    expect(duckdb.StatementType[duckdb.StatementType.ATTACH]).toBe('ATTACH');
-    expect(duckdb.StatementType[duckdb.StatementType.DETACH]).toBe('DETACH');
-    expect(duckdb.StatementType[duckdb.StatementType.MULTI]).toBe('MULTI');
+    expect(duckdb.StatementType[duckdb.StatementType.INVALID]).toBe("INVALID");
+    expect(duckdb.StatementType[duckdb.StatementType.SELECT]).toBe("SELECT");
+    expect(duckdb.StatementType[duckdb.StatementType.INSERT]).toBe("INSERT");
+    expect(duckdb.StatementType[duckdb.StatementType.UPDATE]).toBe("UPDATE");
+    expect(duckdb.StatementType[duckdb.StatementType.EXPLAIN]).toBe("EXPLAIN");
+    expect(duckdb.StatementType[duckdb.StatementType.DELETE]).toBe("DELETE");
+    expect(duckdb.StatementType[duckdb.StatementType.PREPARE]).toBe("PREPARE");
+    expect(duckdb.StatementType[duckdb.StatementType.CREATE]).toBe("CREATE");
+    expect(duckdb.StatementType[duckdb.StatementType.EXECUTE]).toBe("EXECUTE");
+    expect(duckdb.StatementType[duckdb.StatementType.ALTER]).toBe("ALTER");
+    expect(duckdb.StatementType[duckdb.StatementType.TRANSACTION]).toBe("TRANSACTION");
+    expect(duckdb.StatementType[duckdb.StatementType.COPY]).toBe("COPY");
+    expect(duckdb.StatementType[duckdb.StatementType.ANALYZE]).toBe("ANALYZE");
+    expect(duckdb.StatementType[duckdb.StatementType.VARIABLE_SET]).toBe("VARIABLE_SET");
+    expect(duckdb.StatementType[duckdb.StatementType.CREATE_FUNC]).toBe("CREATE_FUNC");
+    expect(duckdb.StatementType[duckdb.StatementType.DROP]).toBe("DROP");
+    expect(duckdb.StatementType[duckdb.StatementType.EXPORT]).toBe("EXPORT");
+    expect(duckdb.StatementType[duckdb.StatementType.PRAGMA]).toBe("PRAGMA");
+    expect(duckdb.StatementType[duckdb.StatementType.VACUUM]).toBe("VACUUM");
+    expect(duckdb.StatementType[duckdb.StatementType.CALL]).toBe("CALL");
+    expect(duckdb.StatementType[duckdb.StatementType.SET]).toBe("SET");
+    expect(duckdb.StatementType[duckdb.StatementType.LOAD]).toBe("LOAD");
+    expect(duckdb.StatementType[duckdb.StatementType.RELATION]).toBe("RELATION");
+    expect(duckdb.StatementType[duckdb.StatementType.EXTENSION]).toBe("EXTENSION");
+    expect(duckdb.StatementType[duckdb.StatementType.LOGICAL_PLAN]).toBe("LOGICAL_PLAN");
+    expect(duckdb.StatementType[duckdb.StatementType.ATTACH]).toBe("ATTACH");
+    expect(duckdb.StatementType[duckdb.StatementType.DETACH]).toBe("DETACH");
+    expect(duckdb.StatementType[duckdb.StatementType.MULTI]).toBe("MULTI");
   });
-  test('Type', () => {
+  test("Type", () => {
     expect(duckdb.Type.BOOLEAN).toBe(1);
     expect(duckdb.Type.TINYINT).toBe(2);
     expect(duckdb.Type.SMALLINT).toBe(3);
@@ -110,44 +110,44 @@ suite('enums', () => {
     expect(duckdb.Type.BIGNUM).toBe(35);
     expect(duckdb.Type.SQLNULL).toBe(36);
 
-    expect(duckdb.Type[duckdb.Type.BOOLEAN]).toBe('BOOLEAN')
-    expect(duckdb.Type[duckdb.Type.TINYINT]).toBe('TINYINT');
-    expect(duckdb.Type[duckdb.Type.SMALLINT]).toBe('SMALLINT');
-    expect(duckdb.Type[duckdb.Type.INTEGER]).toBe('INTEGER');
-    expect(duckdb.Type[duckdb.Type.BIGINT]).toBe('BIGINT');
-    expect(duckdb.Type[duckdb.Type.UTINYINT]).toBe('UTINYINT');
-    expect(duckdb.Type[duckdb.Type.USMALLINT]).toBe('USMALLINT');
-    expect(duckdb.Type[duckdb.Type.UINTEGER]).toBe('UINTEGER');
-    expect(duckdb.Type[duckdb.Type.UBIGINT]).toBe('UBIGINT');
-    expect(duckdb.Type[duckdb.Type.FLOAT]).toBe('FLOAT');
-    expect(duckdb.Type[duckdb.Type.DOUBLE]).toBe('DOUBLE');
-    expect(duckdb.Type[duckdb.Type.TIMESTAMP]).toBe('TIMESTAMP');
-    expect(duckdb.Type[duckdb.Type.DATE]).toBe('DATE');
-    expect(duckdb.Type[duckdb.Type.TIME]).toBe('TIME');
-    expect(duckdb.Type[duckdb.Type.INTERVAL]).toBe('INTERVAL');
-    expect(duckdb.Type[duckdb.Type.HUGEINT]).toBe('HUGEINT');
-    expect(duckdb.Type[duckdb.Type.UHUGEINT]).toBe('UHUGEINT');
-    expect(duckdb.Type[duckdb.Type.VARCHAR]).toBe('VARCHAR');
-    expect(duckdb.Type[duckdb.Type.BLOB]).toBe('BLOB');
-    expect(duckdb.Type[duckdb.Type.DECIMAL]).toBe('DECIMAL');
-    expect(duckdb.Type[duckdb.Type.TIMESTAMP_S]).toBe('TIMESTAMP_S');
-    expect(duckdb.Type[duckdb.Type.TIMESTAMP_MS]).toBe('TIMESTAMP_MS');
-    expect(duckdb.Type[duckdb.Type.TIMESTAMP_NS]).toBe('TIMESTAMP_NS');
-    expect(duckdb.Type[duckdb.Type.ENUM]).toBe('ENUM');
-    expect(duckdb.Type[duckdb.Type.LIST]).toBe('LIST');
-    expect(duckdb.Type[duckdb.Type.STRUCT]).toBe('STRUCT');
-    expect(duckdb.Type[duckdb.Type.MAP]).toBe('MAP');
-    expect(duckdb.Type[duckdb.Type.ARRAY]).toBe('ARRAY');
-    expect(duckdb.Type[duckdb.Type.UUID]).toBe('UUID');
-    expect(duckdb.Type[duckdb.Type.UNION]).toBe('UNION');
-    expect(duckdb.Type[duckdb.Type.BIT]).toBe('BIT');
-    expect(duckdb.Type[duckdb.Type.TIME_TZ]).toBe('TIME_TZ');
-    expect(duckdb.Type[duckdb.Type.TIMESTAMP_TZ]).toBe('TIMESTAMP_TZ');
-    expect(duckdb.Type[duckdb.Type.ANY]).toBe('ANY');
-    expect(duckdb.Type[duckdb.Type.BIGNUM]).toBe('BIGNUM');
-    expect(duckdb.Type[duckdb.Type.SQLNULL]).toBe('SQLNULL');
+    expect(duckdb.Type[duckdb.Type.BOOLEAN]).toBe("BOOLEAN");
+    expect(duckdb.Type[duckdb.Type.TINYINT]).toBe("TINYINT");
+    expect(duckdb.Type[duckdb.Type.SMALLINT]).toBe("SMALLINT");
+    expect(duckdb.Type[duckdb.Type.INTEGER]).toBe("INTEGER");
+    expect(duckdb.Type[duckdb.Type.BIGINT]).toBe("BIGINT");
+    expect(duckdb.Type[duckdb.Type.UTINYINT]).toBe("UTINYINT");
+    expect(duckdb.Type[duckdb.Type.USMALLINT]).toBe("USMALLINT");
+    expect(duckdb.Type[duckdb.Type.UINTEGER]).toBe("UINTEGER");
+    expect(duckdb.Type[duckdb.Type.UBIGINT]).toBe("UBIGINT");
+    expect(duckdb.Type[duckdb.Type.FLOAT]).toBe("FLOAT");
+    expect(duckdb.Type[duckdb.Type.DOUBLE]).toBe("DOUBLE");
+    expect(duckdb.Type[duckdb.Type.TIMESTAMP]).toBe("TIMESTAMP");
+    expect(duckdb.Type[duckdb.Type.DATE]).toBe("DATE");
+    expect(duckdb.Type[duckdb.Type.TIME]).toBe("TIME");
+    expect(duckdb.Type[duckdb.Type.INTERVAL]).toBe("INTERVAL");
+    expect(duckdb.Type[duckdb.Type.HUGEINT]).toBe("HUGEINT");
+    expect(duckdb.Type[duckdb.Type.UHUGEINT]).toBe("UHUGEINT");
+    expect(duckdb.Type[duckdb.Type.VARCHAR]).toBe("VARCHAR");
+    expect(duckdb.Type[duckdb.Type.BLOB]).toBe("BLOB");
+    expect(duckdb.Type[duckdb.Type.DECIMAL]).toBe("DECIMAL");
+    expect(duckdb.Type[duckdb.Type.TIMESTAMP_S]).toBe("TIMESTAMP_S");
+    expect(duckdb.Type[duckdb.Type.TIMESTAMP_MS]).toBe("TIMESTAMP_MS");
+    expect(duckdb.Type[duckdb.Type.TIMESTAMP_NS]).toBe("TIMESTAMP_NS");
+    expect(duckdb.Type[duckdb.Type.ENUM]).toBe("ENUM");
+    expect(duckdb.Type[duckdb.Type.LIST]).toBe("LIST");
+    expect(duckdb.Type[duckdb.Type.STRUCT]).toBe("STRUCT");
+    expect(duckdb.Type[duckdb.Type.MAP]).toBe("MAP");
+    expect(duckdb.Type[duckdb.Type.ARRAY]).toBe("ARRAY");
+    expect(duckdb.Type[duckdb.Type.UUID]).toBe("UUID");
+    expect(duckdb.Type[duckdb.Type.UNION]).toBe("UNION");
+    expect(duckdb.Type[duckdb.Type.BIT]).toBe("BIT");
+    expect(duckdb.Type[duckdb.Type.TIME_TZ]).toBe("TIME_TZ");
+    expect(duckdb.Type[duckdb.Type.TIMESTAMP_TZ]).toBe("TIMESTAMP_TZ");
+    expect(duckdb.Type[duckdb.Type.ANY]).toBe("ANY");
+    expect(duckdb.Type[duckdb.Type.BIGNUM]).toBe("BIGNUM");
+    expect(duckdb.Type[duckdb.Type.SQLNULL]).toBe("SQLNULL");
   });
-  test('CatalogEntryType', () => {
+  test("CatalogEntryType", () => {
     expect(duckdb.CatalogEntryType.INVALID).toBe(0);
     expect(duckdb.CatalogEntryType.TABLE).toBe(1);
     expect(duckdb.CatalogEntryType.SCHEMA).toBe(2);
@@ -159,15 +159,15 @@ suite('enums', () => {
     expect(duckdb.CatalogEntryType.TYPE).toBe(8);
     expect(duckdb.CatalogEntryType.DATABASE).toBe(9);
 
-    expect(duckdb.CatalogEntryType[duckdb.CatalogEntryType.INVALID]).toBe('INVALID');
-    expect(duckdb.CatalogEntryType[duckdb.CatalogEntryType.TABLE]).toBe('TABLE');
-    expect(duckdb.CatalogEntryType[duckdb.CatalogEntryType.SCHEMA]).toBe('SCHEMA');
-    expect(duckdb.CatalogEntryType[duckdb.CatalogEntryType.VIEW]).toBe('VIEW');
-    expect(duckdb.CatalogEntryType[duckdb.CatalogEntryType.INDEX]).toBe('INDEX');
-    expect(duckdb.CatalogEntryType[duckdb.CatalogEntryType.PREPARED_STATEMENT]).toBe('PREPARED_STATEMENT');
-    expect(duckdb.CatalogEntryType[duckdb.CatalogEntryType.SEQUENCE]).toBe('SEQUENCE');
-    expect(duckdb.CatalogEntryType[duckdb.CatalogEntryType.COLLATION]).toBe('COLLATION');
-    expect(duckdb.CatalogEntryType[duckdb.CatalogEntryType.TYPE]).toBe('TYPE');
-    expect(duckdb.CatalogEntryType[duckdb.CatalogEntryType.DATABASE]).toBe('DATABASE');
+    expect(duckdb.CatalogEntryType[duckdb.CatalogEntryType.INVALID]).toBe("INVALID");
+    expect(duckdb.CatalogEntryType[duckdb.CatalogEntryType.TABLE]).toBe("TABLE");
+    expect(duckdb.CatalogEntryType[duckdb.CatalogEntryType.SCHEMA]).toBe("SCHEMA");
+    expect(duckdb.CatalogEntryType[duckdb.CatalogEntryType.VIEW]).toBe("VIEW");
+    expect(duckdb.CatalogEntryType[duckdb.CatalogEntryType.INDEX]).toBe("INDEX");
+    expect(duckdb.CatalogEntryType[duckdb.CatalogEntryType.PREPARED_STATEMENT]).toBe("PREPARED_STATEMENT");
+    expect(duckdb.CatalogEntryType[duckdb.CatalogEntryType.SEQUENCE]).toBe("SEQUENCE");
+    expect(duckdb.CatalogEntryType[duckdb.CatalogEntryType.COLLATION]).toBe("COLLATION");
+    expect(duckdb.CatalogEntryType[duckdb.CatalogEntryType.TYPE]).toBe("TYPE");
+    expect(duckdb.CatalogEntryType[duckdb.CatalogEntryType.DATABASE]).toBe("DATABASE");
   });
 });

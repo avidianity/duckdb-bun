@@ -1,9 +1,9 @@
+import os from "node:os";
 import duckdb from "../../bindings/index.ts";
-import os from 'os';
-import { DuckDBDecimalType } from '../DuckDBType';
-import { DuckDBDecimalValue } from '../values';
+import type { DuckDBDecimalType } from "../DuckDBType";
+import { DuckDBDecimalValue } from "../values";
 
-export const littleEndian = os.endianness() === 'LE';
+export const littleEndian = os.endianness() === "LE";
 
 // function getInt8(dataView: DataView, offset: number): number {
 //   return dataView.getInt8(offset);
@@ -60,16 +60,12 @@ export function getUInt128(dataView: DataView, offset: number): bigint {
 export function getStringBytes(dataView: DataView, offset: number): Uint8Array {
   const lengthInBytes = dataView.getUint32(offset, true);
   if (lengthInBytes <= 12) {
-    return new Uint8Array(
-      dataView.buffer,
-      dataView.byteOffset + offset + 4,
-      lengthInBytes
-    );
+    return new Uint8Array(dataView.buffer, dataView.byteOffset + offset + 4, lengthInBytes);
   } else {
     return duckdb.get_data_from_pointer(
       dataView.buffer as ArrayBuffer,
       dataView.byteOffset + offset + 8,
-      lengthInBytes
+      lengthInBytes,
     );
   }
 }
@@ -91,10 +87,11 @@ export function getBigNumFromBytes(bytes: Uint8Array): bigint {
   const positive = (firstByte & 0x80) > 0;
   const uint64Mask = positive ? 0n : 0xffffffffffffffffn;
   const uint8Mask = positive ? 0 : 0xff;
-  const dv = new DataView( // bytes is big endian
+  const dv = new DataView(
+    // bytes is big endian
     bytes.buffer,
     bytes.byteOffset + 3,
-    bytes.byteLength - 3
+    bytes.byteLength - 3,
   );
   const lastUint64Offset = dv.byteLength - 8;
   let offset = 0;
@@ -325,11 +322,7 @@ export function setBoolean8(dataView: DataView, offset: number, value: boolean) 
   setUInt64(dataView, offset, value ? BigInt(1) : BigInt(0));
 }
 
-export function makeSetBoolean(): (
-  dataView: DataView,
-  offset: number,
-  value: boolean
-) => void {
+export function makeSetBoolean(): (dataView: DataView, offset: number, value: boolean) => void {
   switch (duckdb.sizeof_bool) {
     case 1:
       return setBoolean1;
@@ -346,38 +339,22 @@ export function makeSetBoolean(): (
 
 export const setBoolean = makeSetBoolean();
 
-export function getDecimal16(
-  dataView: DataView,
-  offset: number,
-  type: DuckDBDecimalType
-): DuckDBDecimalValue {
+export function getDecimal16(dataView: DataView, offset: number, type: DuckDBDecimalType): DuckDBDecimalValue {
   const value = getInt16(dataView, offset);
   return new DuckDBDecimalValue(BigInt(value), type.width, type.scale);
 }
 
-export function getDecimal32(
-  dataView: DataView,
-  offset: number,
-  type: DuckDBDecimalType
-): DuckDBDecimalValue {
+export function getDecimal32(dataView: DataView, offset: number, type: DuckDBDecimalType): DuckDBDecimalValue {
   const value = getInt32(dataView, offset);
   return new DuckDBDecimalValue(BigInt(value), type.width, type.scale);
 }
 
-export function getDecimal64(
-  dataView: DataView,
-  offset: number,
-  type: DuckDBDecimalType
-): DuckDBDecimalValue {
+export function getDecimal64(dataView: DataView, offset: number, type: DuckDBDecimalType): DuckDBDecimalValue {
   const value = getInt64(dataView, offset);
   return new DuckDBDecimalValue(value, type.width, type.scale);
 }
 
-export function getDecimal128(
-  dataView: DataView,
-  offset: number,
-  type: DuckDBDecimalType
-): DuckDBDecimalValue {
+export function getDecimal128(dataView: DataView, offset: number, type: DuckDBDecimalType): DuckDBDecimalValue {
   const value = getInt128(dataView, offset);
   return new DuckDBDecimalValue(value, type.width, type.scale);
 }

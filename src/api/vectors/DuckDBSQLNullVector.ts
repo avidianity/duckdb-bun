@@ -1,27 +1,20 @@
-import duckdb from "../../bindings/index.ts";
-import { DuckDBSQLNullType } from '../DuckDBType';
-import { DuckDBVector } from './DuckDBVector';
-import { DuckDBValidity } from './DuckDBValidity';
+import type duckdb from "../../bindings/index.ts";
+import { DuckDBSQLNullType } from "../DuckDBType";
+import { DuckDBValidity } from "./DuckDBValidity";
+import { DuckDBVector } from "./DuckDBVector";
 
 /** A vector of the SQLNULL type, whose items are all null. */
 export class DuckDBSQLNullVector extends DuckDBVector<null> {
   private readonly validity: DuckDBValidity;
   private readonly vector: duckdb.Vector;
   private readonly _itemCount: number;
-  constructor(
-    validity: DuckDBValidity,
-    vector: duckdb.Vector,
-    itemCount: number
-  ) {
+  constructor(validity: DuckDBValidity, vector: duckdb.Vector, itemCount: number) {
     super();
     this.validity = validity;
     this.vector = vector;
     this._itemCount = itemCount;
   }
-  static fromRawVector(
-    vector: duckdb.Vector,
-    itemCount: number
-  ): DuckDBSQLNullVector {
+  static fromRawVector(vector: duckdb.Vector, itemCount: number): DuckDBSQLNullVector {
     const validity = DuckDBValidity.fromVector(vector, itemCount);
     return new DuckDBSQLNullVector(validity, vector, itemCount);
   }
@@ -44,10 +37,6 @@ export class DuckDBSQLNullVector extends DuckDBVector<null> {
     this.validity.flush(this.vector);
   }
   public override slice(offset: number, length: number): DuckDBSQLNullVector {
-    return new DuckDBSQLNullVector(
-      this.validity.slice(offset, length),
-      this.vector,
-      length
-    );
+    return new DuckDBSQLNullVector(this.validity.slice(offset, length), this.vector, length);
   }
 }

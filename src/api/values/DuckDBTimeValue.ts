@@ -1,5 +1,5 @@
-import duckdb, { Time, TimeParts } from "../../bindings/index.ts";
-import { getDuckDBTimeStringFromMicrosecondsInDay } from '../conversion/dateTimeStringConversion';
+import duckdb, { type Time, type TimeParts } from "../../bindings/index.ts";
+import { getDuckDBTimeStringFromMicrosecondsInDay } from "../conversion/dateTimeStringConversion";
 
 export type { TimeParts };
 
@@ -27,7 +27,7 @@ export class DuckDBTimeValue implements Time {
 }
 
 export function timeValue(microsOrParts: bigint | TimeParts): DuckDBTimeValue {
-  if (typeof microsOrParts === 'bigint') {
+  if (typeof microsOrParts === "bigint") {
     return new DuckDBTimeValue(microsOrParts);
   }
   return DuckDBTimeValue.fromParts(microsOrParts);

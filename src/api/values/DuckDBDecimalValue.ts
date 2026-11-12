@@ -1,5 +1,5 @@
-import duckdb, { Decimal } from "../../bindings/index.ts";
-import { stringFromDecimal } from '../conversion/stringFromDecimal';
+import duckdb, { type Decimal } from "../../bindings/index.ts";
+import { stringFromDecimal } from "../conversion/stringFromDecimal";
 
 export class DuckDBDecimalValue implements Decimal {
   /** Total number of decimal digits (including fractional digits) in represented number. */
@@ -37,7 +37,7 @@ export class DuckDBDecimalValue implements Decimal {
 }
 
 export function decimalValue(value: bigint | number, width: number, scale: number): DuckDBDecimalValue {
-  if (typeof value === 'number') {
+  if (typeof value === "number") {
     return DuckDBDecimalValue.fromDouble(value, width, scale);
   }
   return new DuckDBDecimalValue(value, width, scale);

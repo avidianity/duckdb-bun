@@ -1,7 +1,7 @@
 import duckdb from "../../bindings/index.ts";
-import { DuckDBLogicalType } from '../DuckDBLogicalType';
-import { DuckDBTypeId } from '../DuckDBTypeId';
-import { Json } from '../Json';
+import { DuckDBLogicalType } from "../DuckDBLogicalType";
+import { DuckDBTypeId } from "../DuckDBTypeId";
+import type { Json } from "../Json";
 
 export abstract class BaseDuckDBType<T extends DuckDBTypeId> {
   public readonly typeId: T;
@@ -14,9 +14,7 @@ export abstract class BaseDuckDBType<T extends DuckDBTypeId> {
     return DuckDBTypeId[this.typeId];
   }
   public toLogicalType(): DuckDBLogicalType {
-    const logicalType = DuckDBLogicalType.create(
-      duckdb.create_logical_type(this.typeId as number as duckdb.Type)
-    );
+    const logicalType = DuckDBLogicalType.create(duckdb.create_logical_type(this.typeId as number as duckdb.Type));
     if (this.alias) {
       logicalType.alias = this.alias;
     }

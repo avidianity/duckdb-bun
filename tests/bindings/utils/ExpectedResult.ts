@@ -1,6 +1,6 @@
-import duckdb from '../../../src/bindings/index.ts';
-import { ExpectedLogicalType } from './ExpectedLogicalType';
-import { ExpectedVector } from './ExpectedVector';
+import type duckdb from "../../../src/bindings/index.ts";
+import type { ExpectedLogicalType } from "./ExpectedLogicalType";
+import type { ExpectedVector } from "./ExpectedVector";
 
 export interface ExpectedColumn {
   name: string;

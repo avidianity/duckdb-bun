@@ -1,31 +1,20 @@
 import duckdb from "../../bindings/index.ts";
-import {
-  DuckDBSmallIntType,
-} from '../DuckDBType';
-import { DuckDBVector } from './DuckDBVector';
-import { DuckDBValidity } from './DuckDBValidity';
-import {
-  vectorData,
-} from './dataAccessors';
+import { DuckDBSmallIntType } from "../DuckDBType";
+import { DuckDBValidity } from "./DuckDBValidity";
+import { DuckDBVector } from "./DuckDBVector";
+import { vectorData } from "./dataAccessors";
 
 export class DuckDBSmallIntVector extends DuckDBVector<number> {
   private readonly items: Int16Array;
   private readonly validity: DuckDBValidity;
   private readonly vector: duckdb.Vector;
-  constructor(
-    items: Int16Array,
-    validity: DuckDBValidity,
-    vector: duckdb.Vector
-  ) {
+  constructor(items: Int16Array, validity: DuckDBValidity, vector: duckdb.Vector) {
     super();
     this.items = items;
     this.validity = validity;
     this.vector = vector;
   }
-  static fromRawVector(
-    vector: duckdb.Vector,
-    itemCount: number
-  ): DuckDBSmallIntVector {
+  static fromRawVector(vector: duckdb.Vector, itemCount: number): DuckDBSmallIntVector {
     const data = vectorData(vector, itemCount * Int16Array.BYTES_PER_ELEMENT);
     const items = new Int16Array(data.buffer, data.byteOffset, itemCount);
     const validity = DuckDBValidity.fromVector(vector, itemCount);
@@ -61,7 +50,7 @@ export class DuckDBSmallIntVector extends DuckDBVector<number> {
       0,
       this.items.buffer as ArrayBuffer,
       this.items.byteOffset,
-      this.items.byteLength
+      this.items.byteLength,
     );
     this.validity.flush(this.vector);
   }
@@ -69,7 +58,7 @@ export class DuckDBSmallIntVector extends DuckDBVector<number> {
     return new DuckDBSmallIntVector(
       this.items.slice(offset, offset + length),
       this.validity.slice(offset, length),
-      this.vector
+      this.vector,
     );
   }
 }

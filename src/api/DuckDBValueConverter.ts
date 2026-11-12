@@ -1,10 +1,10 @@
-import { DuckDBType } from './DuckDBType';
-import { DuckDBValue } from './values';
+import type { DuckDBType } from "./DuckDBType";
+import type { DuckDBValue } from "./values";
 
 export type DuckDBValueConverter<T> = (
   value: DuckDBValue,
   type: DuckDBType,
-  converter: DuckDBValueConverter<T>
+  converter: DuckDBValueConverter<T>,
 ) => T | null;
 
 /**
@@ -19,5 +19,5 @@ export type DuckDBValueConverter<T> = (
 export type DuckDBValueConverterFor<Out, Nested> = (
   value: DuckDBValue,
   type: DuckDBType,
-  converter: DuckDBValueConverter<Nested>
+  converter: DuckDBValueConverter<Nested>,
 ) => Out | null;

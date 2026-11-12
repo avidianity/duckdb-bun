@@ -1,5 +1,5 @@
-import { BaseDuckDBType } from './BaseDuckDBType';
-import { DuckDBTypeId } from '../DuckDBTypeId';
+import { DuckDBTypeId } from "../DuckDBTypeId";
+import { BaseDuckDBType } from "./BaseDuckDBType";
 
 export class DuckDBBitType extends BaseDuckDBType<DuckDBTypeId.BIT> {
   public constructor(alias?: string) {

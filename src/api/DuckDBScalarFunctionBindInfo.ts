@@ -1,5 +1,5 @@
 import duckdb from "../bindings/index.ts";
-import { DuckDBClientContext } from './DuckDBClientContext';
+import { DuckDBClientContext } from "./DuckDBClientContext";
 
 export class DuckDBScalarFunctionBindInfo {
   private readonly bind_info: duckdb.ScalarFunctionBindInfo;
@@ -10,9 +10,7 @@ export class DuckDBScalarFunctionBindInfo {
     return this.getClientContext();
   }
   public getClientContext(): DuckDBClientContext {
-    return new DuckDBClientContext(
-      duckdb.scalar_function_get_client_context(this.bind_info),
-    );
+    return new DuckDBClientContext(duckdb.scalar_function_get_client_context(this.bind_info));
   }
   public get extraInfo(): object | undefined {
     return this.getExtraInfo();

@@ -1,12 +1,12 @@
 import type duckdb from "../../bindings/index.ts";
-import type { DuckDBType } from '../DuckDBType';
-import type { DuckDBValue } from '../values';
-import type { DuckDBVector } from './DuckDBVector';
+import type { DuckDBType } from "../DuckDBType";
+import type { DuckDBValue } from "../values";
+import type { DuckDBVector } from "./DuckDBVector";
 
 export type CreateDuckDBVectorFn = (
   vector: duckdb.Vector,
   itemCount: number,
-  knownType?: DuckDBType
+  knownType?: DuckDBType,
 ) => DuckDBVector<DuckDBValue>;
 
 /**

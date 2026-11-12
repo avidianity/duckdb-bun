@@ -1,8 +1,8 @@
-import { BaseDuckDBType } from './BaseDuckDBType';
-import type { DuckDBType } from './DuckDBType';
-import { DuckDBLogicalType } from '../DuckDBLogicalType';
-import { DuckDBTypeId } from '../DuckDBTypeId';
-import { Json } from '../Json';
+import { DuckDBLogicalType } from "../DuckDBLogicalType";
+import { DuckDBTypeId } from "../DuckDBTypeId";
+import type { Json } from "../Json";
+import { BaseDuckDBType } from "./BaseDuckDBType";
+import type { DuckDBType } from "./DuckDBType";
 
 export class DuckDBListType extends BaseDuckDBType<DuckDBTypeId.LIST> {
   public readonly valueType: DuckDBType;
@@ -14,9 +14,7 @@ export class DuckDBListType extends BaseDuckDBType<DuckDBTypeId.LIST> {
     return `${this.valueType}[]`;
   }
   public override toLogicalType(): DuckDBLogicalType {
-    const logicalType = DuckDBLogicalType.createList(
-      this.valueType.toLogicalType()
-    );
+    const logicalType = DuckDBLogicalType.createList(this.valueType.toLogicalType());
     if (this.alias) {
       logicalType.alias = this.alias;
     }

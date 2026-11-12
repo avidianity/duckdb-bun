@@ -1,5 +1,5 @@
-import { BaseDuckDBType } from './BaseDuckDBType';
-import { DuckDBTypeId } from '../DuckDBTypeId';
+import { DuckDBTypeId } from "../DuckDBTypeId";
+import { BaseDuckDBType } from "./BaseDuckDBType";
 
 export class DuckDBIntervalType extends BaseDuckDBType<DuckDBTypeId.INTERVAL> {
   public constructor(alias?: string) {

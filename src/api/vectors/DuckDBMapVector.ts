@@ -1,18 +1,9 @@
-import duckdb from "../../bindings/index.ts";
-import {
-  DuckDBListType,
-  DuckDBMapType,
-  DuckDBStructType,
-} from '../DuckDBType';
-import {
-  DuckDBMapEntry,
-  DuckDBMapValue,
-  listValue,
-  structValue,
-} from '../values';
-import { DuckDBVector } from './DuckDBVector';
-import { DuckDBListVector } from './DuckDBListVector';
-import { DuckDBStructVector } from './DuckDBStructVector';
+import type duckdb from "../../bindings/index.ts";
+import { DuckDBListType, type DuckDBMapType, DuckDBStructType } from "../DuckDBType";
+import { type DuckDBMapEntry, DuckDBMapValue, listValue, structValue } from "../values";
+import { DuckDBListVector } from "./DuckDBListVector";
+import { DuckDBStructVector } from "./DuckDBStructVector";
+import { DuckDBVector } from "./DuckDBVector";
 
 // MAP = LIST(STRUCT(key KEY_TYPE, value VALUE_TYPE))
 export class DuckDBMapVector extends DuckDBVector<DuckDBMapValue> {
@@ -23,21 +14,11 @@ export class DuckDBMapVector extends DuckDBVector<DuckDBMapValue> {
     this.mapType = mapType;
     this.listVector = listVector;
   }
-  static fromRawVector(
-    mapType: DuckDBMapType,
-    vector: duckdb.Vector,
-    itemCount: number
-  ): DuckDBMapVector {
+  static fromRawVector(mapType: DuckDBMapType, vector: duckdb.Vector, itemCount: number): DuckDBMapVector {
     const listVectorType = new DuckDBListType(
-      new DuckDBStructType(
-        ['key', 'value'],
-        [mapType.keyType, mapType.valueType]
-      )
+      new DuckDBStructType(["key", "value"], [mapType.keyType, mapType.valueType]),
     );
-    return new DuckDBMapVector(
-      mapType,
-      DuckDBListVector.fromRawVector(listVectorType, vector, itemCount)
-    );
+    return new DuckDBMapVector(mapType, DuckDBListVector.fromRawVector(listVectorType, vector, itemCount));
   }
   public override get type(): DuckDBMapType {
     return this.mapType;
@@ -51,7 +32,7 @@ export class DuckDBMapVector extends DuckDBVector<DuckDBMapValue> {
       return null;
     }
     if (!(itemVector instanceof DuckDBStructVector)) {
-      throw new Error('item in map list vector is not a struct');
+      throw new Error("item in map list vector is not a struct");
     }
     const entries: DuckDBMapEntry[] = [];
     const itemEntryCount = itemVector.itemCount;
@@ -66,11 +47,7 @@ export class DuckDBMapVector extends DuckDBVector<DuckDBMapValue> {
     if (value != null) {
       this.listVector.setItem(
         itemIndex,
-        listValue(
-          value.entries.map((entry) =>
-            structValue({ 'key': entry.key, 'value': entry.value })
-          )
-        )
+        listValue(value.entries.map((entry) => structValue({ key: entry.key, value: entry.value }))),
       );
     } else {
       this.listVector.setItem(itemIndex, null);
@@ -80,9 +57,6 @@ export class DuckDBMapVector extends DuckDBVector<DuckDBMapValue> {
     this.listVector.flush();
   }
   public override slice(offset: number, length: number): DuckDBMapVector {
-    return new DuckDBMapVector(
-      this.mapType,
-      this.listVector.slice(offset, length)
-    );
+    return new DuckDBMapVector(this.mapType, this.listVector.slice(offset, length));
   }
 }

@@ -1,15 +1,8 @@
-import duckdb from "../../bindings/index.ts";
-import {
-  DuckDBStructType,
-  DuckDBType,
-  DuckDBUTinyIntType,
-  DuckDBUnionType,
-} from '../DuckDBType';
-import {
-  DuckDBUnionValue,
-} from '../values';
-import { DuckDBVector } from './DuckDBVector';
-import { DuckDBStructVector } from './DuckDBStructVector';
+import type duckdb from "../../bindings/index.ts";
+import { DuckDBStructType, type DuckDBType, type DuckDBUnionType, DuckDBUTinyIntType } from "../DuckDBType";
+import { DuckDBUnionValue } from "../values";
+import { DuckDBStructVector } from "./DuckDBStructVector";
+import { DuckDBVector } from "./DuckDBVector";
 
 // UNION = STRUCT with first entry named "tag"
 export class DuckDBUnionVector extends DuckDBVector<DuckDBUnionValue> {
@@ -20,12 +13,8 @@ export class DuckDBUnionVector extends DuckDBVector<DuckDBUnionValue> {
     this.unionType = unionType;
     this.structVector = structVector;
   }
-  static fromRawVector(
-    unionType: DuckDBUnionType,
-    vector: duckdb.Vector,
-    itemCount: number
-  ): DuckDBUnionVector {
-    const entryNames: string[] = ['tag'];
+  static fromRawVector(unionType: DuckDBUnionType, vector: duckdb.Vector, itemCount: number): DuckDBUnionVector {
+    const entryNames: string[] = ["tag"];
     const entryTypes: DuckDBType[] = [DuckDBUTinyIntType.instance];
     const memberCount = unionType.memberCount;
     for (let i = 0; i < memberCount; i++) {
@@ -33,10 +22,7 @@ export class DuckDBUnionVector extends DuckDBVector<DuckDBUnionValue> {
       entryTypes.push(unionType.memberTypes[i]);
     }
     const structVectorType = new DuckDBStructType(entryNames, entryTypes);
-    return new DuckDBUnionVector(
-      unionType,
-      DuckDBStructVector.fromRawVector(structVectorType, vector, itemCount)
-    );
+    return new DuckDBUnionVector(unionType, DuckDBStructVector.fromRawVector(structVectorType, vector, itemCount));
   }
   public override get type(): DuckDBUnionType {
     return this.unionType;
@@ -76,9 +62,6 @@ export class DuckDBUnionVector extends DuckDBVector<DuckDBUnionValue> {
     this.structVector.flush();
   }
   public override slice(offset: number, length: number): DuckDBUnionVector {
-    return new DuckDBUnionVector(
-      this.unionType,
-      this.structVector.slice(offset, length)
-    );
+    return new DuckDBUnionVector(this.unionType, this.structVector.slice(offset, length));
   }
 }

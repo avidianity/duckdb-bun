@@ -1,8 +1,8 @@
-import { displayStringForDuckDBValue } from '../conversion/displayStringForDuckDBValue';
+import { displayStringForDuckDBValue } from "../conversion/displayStringForDuckDBValue";
 // Type-only import avoids a runtime cycle with ../DuckDBType, which itself
 // pulls in the values barrel.
-import type { DuckDBType } from '../DuckDBType';
-import { DuckDBValue } from './DuckDBValue';
+import type { DuckDBType } from "../DuckDBType";
+import type { DuckDBValue } from "./DuckDBValue";
 
 /**
  * Wraps a single decoded VARIANT row value. The wrapper distinguishes a
@@ -26,9 +26,6 @@ export class DuckDBVariantValue {
   }
 }
 
-export function variantValue(
-  value: DuckDBValue,
-  type?: DuckDBType,
-): DuckDBVariantValue {
+export function variantValue(value: DuckDBValue, type?: DuckDBType): DuckDBVariantValue {
   return new DuckDBVariantValue(value, type);
 }

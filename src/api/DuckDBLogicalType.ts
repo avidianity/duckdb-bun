@@ -19,32 +19,32 @@ import {
   DuckDBIntervalType,
   DuckDBListType,
   DuckDBMapType,
-  DuckDBSQLNullType,
   DuckDBSmallIntType,
+  DuckDBSQLNullType,
   DuckDBStringLiteralType,
   DuckDBStructType,
   DuckDBTimeNSType,
-  DuckDBTimeTZType,
-  DuckDBTimeType,
   DuckDBTimestampMillisecondsType,
   DuckDBTimestampNanosecondsType,
   DuckDBTimestampSecondsType,
-  DuckDBTimestampTZType,
-  DuckDBTimestampTZNanosecondsType,
   DuckDBTimestampType,
+  DuckDBTimestampTZNanosecondsType,
+  DuckDBTimestampTZType,
+  DuckDBTimeType,
+  DuckDBTimeTZType,
   DuckDBTinyIntType,
-  DuckDBType,
+  type DuckDBType,
   DuckDBUBigIntType,
   DuckDBUHugeIntType,
   DuckDBUIntegerType,
+  DuckDBUnionType,
   DuckDBUSmallIntType,
   DuckDBUTinyIntType,
   DuckDBUUIDType,
-  DuckDBUnionType,
   DuckDBVarCharType,
   DuckDBVariantType,
-} from './DuckDBType';
-import { DuckDBTypeId } from './DuckDBTypeId';
+} from "./DuckDBType";
+import { DuckDBTypeId } from "./DuckDBTypeId";
 
 export class DuckDBLogicalType {
   readonly logical_type: duckdb.LogicalType;
@@ -73,29 +73,18 @@ export class DuckDBLogicalType {
         return new DuckDBLogicalType(logical_type);
     }
   }
-  public static createDecimal(
-    width: number,
-    scale: number
-  ): DuckDBDecimalLogicalType {
-    return new DuckDBDecimalLogicalType(
-      duckdb.create_decimal_type(width, scale)
-    );
+  public static createDecimal(width: number, scale: number): DuckDBDecimalLogicalType {
+    return new DuckDBDecimalLogicalType(duckdb.create_decimal_type(width, scale));
   }
-  public static createEnum(
-    member_names: readonly string[]
-  ): DuckDBEnumLogicalType {
+  public static createEnum(member_names: readonly string[]): DuckDBEnumLogicalType {
     return new DuckDBEnumLogicalType(duckdb.create_enum_type(member_names));
   }
-  public static createList(
-    valueType: DuckDBLogicalType
-  ): DuckDBListLogicalType {
-    return new DuckDBListLogicalType(
-      duckdb.create_list_type(valueType.logical_type)
-    );
+  public static createList(valueType: DuckDBLogicalType): DuckDBListLogicalType {
+    return new DuckDBListLogicalType(duckdb.create_list_type(valueType.logical_type));
   }
   public static createStruct(
     entryNames: readonly string[],
-    entryLogicalTypes: readonly DuckDBLogicalType[]
+    entryLogicalTypes: readonly DuckDBLogicalType[],
   ): DuckDBStructLogicalType {
     const length = entryNames.length;
     if (length !== entryLogicalTypes.length) {
@@ -108,29 +97,17 @@ export class DuckDBLogicalType {
       member_types.push(entryLogicalTypes[i].logical_type);
       member_names.push(entryNames[i]);
     }
-    return new DuckDBStructLogicalType(
-      duckdb.create_struct_type(member_types, member_names)
-    );
+    return new DuckDBStructLogicalType(duckdb.create_struct_type(member_types, member_names));
   }
-  public static createMap(
-    keyType: DuckDBLogicalType,
-    valueType: DuckDBLogicalType
-  ): DuckDBMapLogicalType {
-    return new DuckDBMapLogicalType(
-      duckdb.create_map_type(keyType.logical_type, valueType.logical_type)
-    );
+  public static createMap(keyType: DuckDBLogicalType, valueType: DuckDBLogicalType): DuckDBMapLogicalType {
+    return new DuckDBMapLogicalType(duckdb.create_map_type(keyType.logical_type, valueType.logical_type));
   }
-  public static createArray(
-    valueType: DuckDBLogicalType,
-    length: number
-  ): DuckDBArrayLogicalType {
-    return new DuckDBArrayLogicalType(
-      duckdb.create_array_type(valueType.logical_type, length)
-    );
+  public static createArray(valueType: DuckDBLogicalType, length: number): DuckDBArrayLogicalType {
+    return new DuckDBArrayLogicalType(duckdb.create_array_type(valueType.logical_type, length));
   }
   public static createUnion(
     memberTags: readonly string[],
-    memberLogicalTypes: readonly DuckDBLogicalType[]
+    memberLogicalTypes: readonly DuckDBLogicalType[],
   ): DuckDBUnionLogicalType {
     const length = memberTags.length;
     if (length !== memberLogicalTypes.length) {
@@ -143,9 +120,7 @@ export class DuckDBLogicalType {
       member_types.push(memberLogicalTypes[i].logical_type);
       member_names.push(memberTags[i]);
     }
-    return new DuckDBUnionLogicalType(
-      duckdb.create_union_type(member_types, member_names)
-    );
+    return new DuckDBUnionLogicalType(duckdb.create_union_type(member_types, member_names));
   }
   public get typeId(): DuckDBTypeId {
     return duckdb.get_type_id(this.logical_type) as number as DuckDBTypeId;
@@ -154,7 +129,7 @@ export class DuckDBLogicalType {
     return duckdb.logical_type_get_alias(this.logical_type) || undefined;
   }
   public set alias(newAlias: string | null | undefined) {
-    duckdb.logical_type_set_alias(this.logical_type, newAlias || '');
+    duckdb.logical_type_set_alias(this.logical_type, newAlias || "");
   }
   public asType(): DuckDBType {
     const alias = this.alias;
@@ -198,7 +173,7 @@ export class DuckDBLogicalType {
       case DuckDBTypeId.BLOB:
         return DuckDBBlobType.create(alias);
       case DuckDBTypeId.DECIMAL:
-        throw new Error('Expected override');
+        throw new Error("Expected override");
       case DuckDBTypeId.TIMESTAMP_S:
         return DuckDBTimestampSecondsType.create(alias);
       case DuckDBTypeId.TIMESTAMP_MS:
@@ -206,19 +181,19 @@ export class DuckDBLogicalType {
       case DuckDBTypeId.TIMESTAMP_NS:
         return DuckDBTimestampNanosecondsType.create(alias);
       case DuckDBTypeId.ENUM:
-        throw new Error('Expected override');
+        throw new Error("Expected override");
       case DuckDBTypeId.LIST:
-        throw new Error('Expected override');
+        throw new Error("Expected override");
       case DuckDBTypeId.STRUCT:
-        throw new Error('Expected override');
+        throw new Error("Expected override");
       case DuckDBTypeId.MAP:
-        throw new Error('Expected override');
+        throw new Error("Expected override");
       case DuckDBTypeId.ARRAY:
-        throw new Error('Expected override');
+        throw new Error("Expected override");
       case DuckDBTypeId.UUID:
         return DuckDBUUIDType.create(alias);
       case DuckDBTypeId.UNION:
-        throw new Error('Expected override');
+        throw new Error("Expected override");
       case DuckDBTypeId.BIT:
         return DuckDBBitType.create(alias);
       case DuckDBTypeId.TIME_TZ:
@@ -238,7 +213,7 @@ export class DuckDBLogicalType {
       case DuckDBTypeId.TIME_NS:
         return DuckDBTimeNSType.create(alias);
       case DuckDBTypeId.GEOMETRY:
-        throw new Error('Expected override');
+        throw new Error("Expected override");
       case DuckDBTypeId.VARIANT:
         return DuckDBVariantType.create(alias);
       case DuckDBTypeId.TIMESTAMP_TZ_NS:
@@ -257,9 +232,7 @@ export class DuckDBDecimalLogicalType extends DuckDBLogicalType {
     return duckdb.decimal_scale(this.logical_type);
   }
   public get internalTypeId(): DuckDBTypeId {
-    return duckdb.decimal_internal_type(
-      this.logical_type
-    ) as number as DuckDBTypeId;
+    return duckdb.decimal_internal_type(this.logical_type) as number as DuckDBTypeId;
   }
   public override asType(): DuckDBDecimalType {
     return new DuckDBDecimalType(this.width, this.scale, this.alias);
@@ -282,9 +255,7 @@ export class DuckDBEnumLogicalType extends DuckDBLogicalType {
     return values;
   }
   public get internalTypeId(): DuckDBTypeId {
-    return duckdb.enum_internal_type(
-      this.logical_type
-    ) as number as DuckDBTypeId;
+    return duckdb.enum_internal_type(this.logical_type) as number as DuckDBTypeId;
   }
   public override asType(): DuckDBEnumType {
     return new DuckDBEnumType(this.values(), this.internalTypeId, this.alias);
@@ -293,9 +264,7 @@ export class DuckDBEnumLogicalType extends DuckDBLogicalType {
 
 export class DuckDBListLogicalType extends DuckDBLogicalType {
   public get valueType(): DuckDBLogicalType {
-    return DuckDBLogicalType.create(
-      duckdb.list_type_child_type(this.logical_type)
-    );
+    return DuckDBLogicalType.create(duckdb.list_type_child_type(this.logical_type));
   }
   public override asType(): DuckDBListType {
     return new DuckDBListType(this.valueType.asType(), this.alias);
@@ -310,9 +279,7 @@ export class DuckDBStructLogicalType extends DuckDBLogicalType {
     return duckdb.struct_type_child_name(this.logical_type, index);
   }
   public entryLogicalType(index: number): DuckDBLogicalType {
-    return DuckDBLogicalType.create(
-      duckdb.struct_type_child_type(this.logical_type, index)
-    );
+    return DuckDBLogicalType.create(duckdb.struct_type_child_type(this.logical_type, index));
   }
   public entryType(index: number): DuckDBType {
     return this.entryLogicalType(index).asType();
@@ -342,49 +309,31 @@ export class DuckDBStructLogicalType extends DuckDBLogicalType {
     return valueTypes;
   }
   public override asType(): DuckDBStructType {
-    return new DuckDBStructType(
-      this.entryNames(),
-      this.entryTypes(),
-      this.alias
-    );
+    return new DuckDBStructType(this.entryNames(), this.entryTypes(), this.alias);
   }
 }
 
 export class DuckDBMapLogicalType extends DuckDBLogicalType {
   public get keyType(): DuckDBLogicalType {
-    return DuckDBLogicalType.create(
-      duckdb.map_type_key_type(this.logical_type)
-    );
+    return DuckDBLogicalType.create(duckdb.map_type_key_type(this.logical_type));
   }
   public get valueType(): DuckDBLogicalType {
-    return DuckDBLogicalType.create(
-      duckdb.map_type_value_type(this.logical_type)
-    );
+    return DuckDBLogicalType.create(duckdb.map_type_value_type(this.logical_type));
   }
   public override asType(): DuckDBMapType {
-    return new DuckDBMapType(
-      this.keyType.asType(),
-      this.valueType.asType(),
-      this.alias
-    );
+    return new DuckDBMapType(this.keyType.asType(), this.valueType.asType(), this.alias);
   }
 }
 
 export class DuckDBArrayLogicalType extends DuckDBLogicalType {
   public get valueType(): DuckDBLogicalType {
-    return DuckDBLogicalType.create(
-      duckdb.array_type_child_type(this.logical_type)
-    );
+    return DuckDBLogicalType.create(duckdb.array_type_child_type(this.logical_type));
   }
   public get length(): number {
     return duckdb.array_type_array_size(this.logical_type);
   }
   public override asType(): DuckDBArrayType {
-    return new DuckDBArrayType(
-      this.valueType.asType(),
-      this.length,
-      this.alias
-    );
+    return new DuckDBArrayType(this.valueType.asType(), this.length, this.alias);
   }
 }
 
@@ -396,9 +345,7 @@ export class DuckDBUnionLogicalType extends DuckDBLogicalType {
     return duckdb.union_type_member_name(this.logical_type, index);
   }
   public memberLogicalType(index: number): DuckDBLogicalType {
-    return DuckDBLogicalType.create(
-      duckdb.union_type_member_type(this.logical_type, index)
-    );
+    return DuckDBLogicalType.create(duckdb.union_type_member_type(this.logical_type, index));
   }
   public memberType(index: number): DuckDBType {
     return this.memberLogicalType(index).asType();
@@ -428,11 +375,7 @@ export class DuckDBUnionLogicalType extends DuckDBLogicalType {
     return valueTypes;
   }
   public override asType(): DuckDBUnionType {
-    return new DuckDBUnionType(
-      this.memberTags(),
-      this.memberTypes(),
-      this.alias
-    );
+    return new DuckDBUnionType(this.memberTags(), this.memberTypes(), this.alias);
   }
 }
 

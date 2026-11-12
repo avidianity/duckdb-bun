@@ -1,18 +1,14 @@
-import { BaseDuckDBType } from './BaseDuckDBType';
-import { DuckDBLogicalType } from '../DuckDBLogicalType';
-import { DuckDBTypeId } from '../DuckDBTypeId';
-import { Json } from '../Json';
-import { quotedString } from '../sql';
+import { DuckDBLogicalType } from "../DuckDBLogicalType";
+import { DuckDBTypeId } from "../DuckDBTypeId";
+import type { Json } from "../Json";
+import { quotedString } from "../sql";
+import { BaseDuckDBType } from "./BaseDuckDBType";
 
 export class DuckDBEnumType extends BaseDuckDBType<DuckDBTypeId.ENUM> {
   public readonly values: readonly string[];
   public readonly valueIndexes: Readonly<Record<string, number>>;
   public readonly internalTypeId: DuckDBTypeId;
-  public constructor(
-    values: readonly string[],
-    internalTypeId: DuckDBTypeId,
-    alias?: string
-  ) {
+  public constructor(values: readonly string[], internalTypeId: DuckDBTypeId, alias?: string) {
     super(DuckDBTypeId.ENUM, alias);
     this.values = values;
     // Null prototype: with a plain object literal, a lookup of an inherited key
@@ -35,9 +31,7 @@ export class DuckDBEnumType extends BaseDuckDBType<DuckDBTypeId.ENUM> {
   public indexForValue(value: string): number {
     const index = this.valueIndexes[value];
     if (index === undefined) {
-      throw new Error(
-        `${quotedString(value)} is not a member of ${this.toStringForError()}`
-      );
+      throw new Error(`${quotedString(value)} is not a member of ${this.toStringForError()}`);
     }
     return index;
   }
@@ -53,11 +47,11 @@ export class DuckDBEnumType extends BaseDuckDBType<DuckDBTypeId.ENUM> {
     if (this.values.length <= shown) {
       return this.toString();
     }
-    const listed = this.values.slice(0, shown).map(quotedString).join(', ');
+    const listed = this.values.slice(0, shown).map(quotedString).join(", ");
     return `ENUM(${listed}, and ${this.values.length - shown} more)`;
   }
   public toString(): string {
-    return `ENUM(${this.values.map(quotedString).join(', ')})`;
+    return `ENUM(${this.values.map(quotedString).join(", ")})`;
   }
   public override toLogicalType(): DuckDBLogicalType {
     const logicalType = DuckDBLogicalType.createEnum(this.values);
@@ -75,28 +69,16 @@ export class DuckDBEnumType extends BaseDuckDBType<DuckDBTypeId.ENUM> {
     };
   }
 }
-export function ENUM8(
-  values: readonly string[],
-  alias?: string
-): DuckDBEnumType {
+export function ENUM8(values: readonly string[], alias?: string): DuckDBEnumType {
   return new DuckDBEnumType(values, DuckDBTypeId.UTINYINT, alias);
 }
-export function ENUM16(
-  values: readonly string[],
-  alias?: string
-): DuckDBEnumType {
+export function ENUM16(values: readonly string[], alias?: string): DuckDBEnumType {
   return new DuckDBEnumType(values, DuckDBTypeId.USMALLINT, alias);
 }
-export function ENUM32(
-  values: readonly string[],
-  alias?: string
-): DuckDBEnumType {
+export function ENUM32(values: readonly string[], alias?: string): DuckDBEnumType {
   return new DuckDBEnumType(values, DuckDBTypeId.UINTEGER, alias);
 }
-export function ENUM(
-  values: readonly string[],
-  alias?: string
-): DuckDBEnumType {
+export function ENUM(values: readonly string[], alias?: string): DuckDBEnumType {
   if (values.length < 256) {
     return ENUM8(values, alias);
   } else if (values.length < 65536) {
@@ -104,8 +86,6 @@ export function ENUM(
   } else if (values.length < 4294967296) {
     return ENUM32(values, alias);
   } else {
-    throw new Error(
-      `ENUM types cannot have more than 4294967295 values; received ${values.length}`
-    );
+    throw new Error(`ENUM types cannot have more than 4294967295 values; received ${values.length}`);
   }
 }

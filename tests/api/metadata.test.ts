@@ -1,21 +1,16 @@
-import { assert, beforeAll, describe, test } from '../vitest-shim.ts';
-import {
-  configurationOptionDescriptions,
-  version,
-} from '../../src/api';
-import {
-  setDefaultTimezone,
-} from './util/testHelpers';
+import { configurationOptionDescriptions, version } from "../../src/api";
+import { assert, beforeAll, describe, test } from "../vitest-shim.ts";
+import { setDefaultTimezone } from "./util/testHelpers";
 
-describe('metadata', () => {
+describe("metadata", () => {
   beforeAll(setDefaultTimezone);
 
-  test('should expose version', () => {
+  test("should expose version", () => {
     const ver = version();
-    assert.ok(ver.startsWith('v'), `version starts with 'v'`);
+    assert.ok(ver.startsWith("v"), `version starts with 'v'`);
   });
-  test('should expose configuration option descriptions', () => {
+  test("should expose configuration option descriptions", () => {
     const descriptions = configurationOptionDescriptions();
-    assert.ok(descriptions['memory_limit'], `descriptions has 'memory_limit'`);
+    assert.ok(descriptions.memory_limit, `descriptions has 'memory_limit'`);
   });
 });

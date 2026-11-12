@@ -1,7 +1,8 @@
-import duckdb from '../../../src/bindings/index.ts';
+import type duckdb from "../../../src/bindings/index.ts";
 
 export interface ExpectedSimpleLogicalType {
-  typeId: Exclude<duckdb.Type,
+  typeId: Exclude<
+    duckdb.Type,
     | duckdb.Type.ARRAY
     | duckdb.Type.DECIMAL
     | duckdb.Type.ENUM
@@ -70,5 +71,4 @@ export type ExpectedLogicalType =
   | ExpectedListLogicalType
   | ExpectedMapLogicalType
   | ExpectedStructLogicalType
-  | ExpectedUnionLogicalType
-  ;
+  | ExpectedUnionLogicalType;

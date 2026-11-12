@@ -1,13 +1,8 @@
 import duckdb from "../../bindings/index.ts";
-import {
-  DuckDBStructType,
-} from '../DuckDBType';
-import {
-  DuckDBStructValue,
-  DuckDBValue,
-} from '../values';
-import { DuckDBVector } from './DuckDBVector';
-import { DuckDBValidity } from './DuckDBValidity';
+import type { DuckDBStructType } from "../DuckDBType";
+import { DuckDBStructValue, type DuckDBValue } from "../values";
+import { DuckDBValidity } from "./DuckDBValidity";
+import { DuckDBVector } from "./DuckDBVector";
 
 export class DuckDBStructVector extends DuckDBVector<DuckDBStructValue> {
   private readonly structType: DuckDBStructType;
@@ -20,7 +15,7 @@ export class DuckDBStructVector extends DuckDBVector<DuckDBStructValue> {
     itemCount: number,
     entryVectors: readonly DuckDBVector[],
     validity: DuckDBValidity,
-    vector: duckdb.Vector
+    vector: duckdb.Vector,
   ) {
     super();
     this.structType = structType;
@@ -29,27 +24,15 @@ export class DuckDBStructVector extends DuckDBVector<DuckDBStructValue> {
     this.validity = validity;
     this.vector = vector;
   }
-  static fromRawVector(
-    structType: DuckDBStructType,
-    vector: duckdb.Vector,
-    itemCount: number
-  ): DuckDBStructVector {
+  static fromRawVector(structType: DuckDBStructType, vector: duckdb.Vector, itemCount: number): DuckDBStructVector {
     const entryCount = structType.entryCount;
     const entryVectors: DuckDBVector[] = [];
     for (let i = 0; i < entryCount; i++) {
       const child_vector = duckdb.struct_vector_get_child(vector, i);
-      entryVectors.push(
-        DuckDBVector.create(child_vector, itemCount, structType.entryTypes[i])
-      );
+      entryVectors.push(DuckDBVector.create(child_vector, itemCount, structType.entryTypes[i]));
     }
     const validity = DuckDBValidity.fromVector(vector, itemCount);
-    return new DuckDBStructVector(
-      structType,
-      itemCount,
-      entryVectors,
-      validity,
-      vector
-    );
+    return new DuckDBStructVector(structType, itemCount, entryVectors, validity, vector);
   }
   public override get type(): DuckDBStructType {
     return this.structType;
@@ -64,15 +47,11 @@ export class DuckDBStructVector extends DuckDBVector<DuckDBStructValue> {
     const entries: { [name: string]: DuckDBValue } = {};
     const entryCount = this.structType.entryCount;
     for (let i = 0; i < entryCount; i++) {
-      entries[this.structType.entryNames[i]] =
-        this.entryVectors[i].getItem(itemIndex);
+      entries[this.structType.entryNames[i]] = this.entryVectors[i].getItem(itemIndex);
     }
     return new DuckDBStructValue(entries);
   }
-  public getItemValue(
-    itemIndex: number,
-    entryIndex: number
-  ): DuckDBValue | null {
+  public getItemValue(itemIndex: number, entryIndex: number): DuckDBValue | null {
     if (!this.validity.itemValid(itemIndex)) {
       return null;
     }
@@ -99,10 +78,7 @@ export class DuckDBStructVector extends DuckDBVector<DuckDBStructValue> {
     if (value != null) {
       const entryCount = this.structType.entryCount;
       for (let i = 0; i < entryCount; i++) {
-        this.entryVectors[i].setItem(
-          itemIndex,
-          value.entries[this.structType.entryNames[i]]
-        );
+        this.entryVectors[i].setItem(itemIndex, value.entries[this.structType.entryNames[i]]);
       }
       this.validity.setItemValid(itemIndex, true);
     } else {
@@ -113,11 +89,7 @@ export class DuckDBStructVector extends DuckDBVector<DuckDBStructValue> {
       this.validity.setItemValid(itemIndex, false);
     }
   }
-  public setItemValue(
-    itemIndex: number,
-    entryIndex: number,
-    value: DuckDBValue
-  ) {
+  public setItemValue(itemIndex: number, entryIndex: number, value: DuckDBValue) {
     return this.entryVectors[entryIndex].setItem(itemIndex, value);
   }
   public override flush() {
@@ -132,7 +104,7 @@ export class DuckDBStructVector extends DuckDBVector<DuckDBStructValue> {
       length,
       this.entryVectors.map((entryVector) => entryVector.slice(offset, length)),
       this.validity.slice(offset, length),
-      this.vector
+      this.vector,
     );
   }
 }

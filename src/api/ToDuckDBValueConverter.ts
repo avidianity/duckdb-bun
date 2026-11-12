@@ -1,6 +1,6 @@
-import { DuckDBType } from './DuckDBType';
-import { DuckDBTypeId } from './DuckDBTypeId';
-import { DuckDBValue } from './values';
+import type { DuckDBType } from "./DuckDBType";
+import type { DuckDBTypeId } from "./DuckDBTypeId";
+import type { DuckDBValue } from "./values";
 
 /**
  * Converts a `T` into the `DuckDBValue` representation for a DuckDB type: the
@@ -17,7 +17,7 @@ import { DuckDBValue } from './values';
 export type ToDuckDBValueConverter<T> = (
   value: T,
   type: DuckDBType,
-  converter: ToDuckDBValueConverter<T>
+  converter: ToDuckDBValueConverter<T>,
 ) => DuckDBValue;
 
 /**
@@ -32,7 +32,7 @@ export type ToDuckDBValueConverter<T> = (
 export type ToDuckDBValueConverterFor<In, Nested> = (
   value: In,
   type: DuckDBType,
-  converter: ToDuckDBValueConverter<Nested>
+  converter: ToDuckDBValueConverter<Nested>,
 ) => DuckDBValue;
 
 /**
@@ -47,19 +47,16 @@ export type ToDuckDBValueConverterFor<In, Nested> = (
  * get a checked signature, and the mismatch surfaces as the converter's own
  * `Expected ...` error.
  */
-export function createToDuckDBValueConverter<
-  T,
-  InputTable extends Record<DuckDBTypeId, unknown>,
->(convertersByTypeId: {
-  [Id in DuckDBTypeId]: ToDuckDBValueConverterFor<InputTable[Id], T>;
-}): ToDuckDBValueConverter<T> {
+export function createToDuckDBValueConverter<T, InputTable extends Record<DuckDBTypeId, unknown>>(
+  convertersByTypeId: {
+    [Id in DuckDBTypeId]: ToDuckDBValueConverterFor<InputTable[Id], T>;
+  },
+): ToDuckDBValueConverter<T> {
   return (value, type, converter) => {
     if (value == null) {
       return null;
     }
-    const converterForTypeId = convertersByTypeId[type.typeId] as
-      | ToDuckDBValueConverter<T>
-      | undefined;
+    const converterForTypeId = convertersByTypeId[type.typeId] as ToDuckDBValueConverter<T> | undefined;
     if (!converterForTypeId) {
       throw new Error(`No converter for typeId: ${type.typeId}`);
     }

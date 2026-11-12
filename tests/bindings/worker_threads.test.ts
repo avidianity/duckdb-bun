@@ -1,6 +1,6 @@
-import { fileURLToPath } from 'node:url';
-import { Worker } from 'node:worker_threads';
-import { expect, suite, test } from '../vitest-shim.ts';
+import { fileURLToPath } from "node:url";
+import { Worker } from "node:worker_threads";
+import { expect, suite, test } from "../vitest-shim.ts";
 
 // Worker threads are the only place an env is ever torn down for real: Node skips
 // instance data finalizers for the main env at process exit. So this is the only
@@ -20,9 +20,7 @@ import { expect, suite, test } from '../vitest-shim.ts';
 // from "the worker finished but its env never tore down", which is the
 // distinction that matters.
 
-const bindings_path = fileURLToPath(
-  new URL('../../src/bindings/index.ts', import.meta.url),
-);
+const bindings_path = fileURLToPath(new URL("../../src/bindings/index.ts", import.meta.url));
 
 const worker_count = 4;
 const queries_per_worker = 25;
@@ -109,17 +107,18 @@ function describe(progress: readonly WorkerProgress[]): string {
     if (p.online) return `${i}:ONLINE BUT WORK UNFINISHED`;
     return `${i}:NEVER STARTED`;
   });
-  return `workers did not all exit within ${deadlineMs}ms [${states.join(', ')}]`;
+  return `workers did not all exit within ${deadlineMs}ms [${states.join(", ")}]`;
 }
 
-suite('worker threads', () => {
+suite("worker threads", () => {
   test(
-    'scalar functions work, and their envs tear down, in workers',
+    "scalar functions work, and their envs tear down, in workers",
     async () => {
-      const progress: WorkerProgress[] = Array.from(
-        { length: worker_count },
-        () => ({ online: false, reported: false, exited: false }),
-      );
+      const progress: WorkerProgress[] = Array.from({ length: worker_count }, () => ({
+        online: false,
+        reported: false,
+        exited: false,
+      }));
       const workers: Worker[] = [];
 
       const runs = progress.map((state, index) => {
@@ -130,22 +129,22 @@ suite('worker threads', () => {
           });
           workers.push(worker);
           let outcome: WorkerOutcome | undefined;
-          worker.on('online', () => {
+          worker.on("online", () => {
             state.online = true;
           });
-          worker.on('message', (m: WorkerOutcome) => {
+          worker.on("message", (m: WorkerOutcome) => {
             outcome = m;
             state.reported = true;
           });
-          worker.on('error', reject);
+          worker.on("error", reject);
           // Resolving on 'exit' rather than 'message' is the point: the work
           // completing is not enough, the env has to tear down too.
-          worker.on('exit', (code) => {
+          worker.on("exit", (code) => {
             state.exited = true;
             if (code !== 0) {
               reject(new Error(`worker ${index} exited with code ${code}`));
             } else {
-              resolve(outcome ?? { error: 'worker sent no message' });
+              resolve(outcome ?? { error: "worker sent no message" });
             }
           });
         });

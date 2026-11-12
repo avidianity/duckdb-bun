@@ -1,7 +1,7 @@
-import { BaseDuckDBType } from './BaseDuckDBType';
-import { DuckDBLogicalType } from '../DuckDBLogicalType';
-import { DuckDBTypeId } from '../DuckDBTypeId';
-import { Json } from '../Json';
+import { DuckDBLogicalType } from "../DuckDBLogicalType";
+import { DuckDBTypeId } from "../DuckDBTypeId";
+import type { Json } from "../Json";
+import { BaseDuckDBType } from "./BaseDuckDBType";
 
 export class DuckDBDecimalType extends BaseDuckDBType<DuckDBTypeId.DECIMAL> {
   public readonly width: number;
@@ -31,11 +31,7 @@ export class DuckDBDecimalType extends BaseDuckDBType<DuckDBTypeId.DECIMAL> {
   }
   public static readonly default = new DuckDBDecimalType(18, 3);
 }
-export function DECIMAL(
-  width?: number,
-  scale?: number,
-  alias?: string
-): DuckDBDecimalType {
+export function DECIMAL(width?: number, scale?: number, alias?: string): DuckDBDecimalType {
   if (width === undefined) {
     return DuckDBDecimalType.default;
   }

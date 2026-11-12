@@ -1,6 +1,6 @@
-import type { DuckDBType } from './DuckDBType';
-import { DuckDBTypeId } from './DuckDBTypeId';
-import type { Json } from './Json';
+import type { DuckDBType } from "./DuckDBType";
+import { DuckDBTypeId } from "./DuckDBTypeId";
+import type { Json } from "./Json";
 
 /**
  * The JSON-compatible type produced by `JsonDuckDBValueConverter` for each
@@ -83,4 +83,4 @@ export interface JsonTypeForTypeId {
  *
  * Excludes NULL; use `JsonTypeFor<T> | null` for a nullable value.
  */
-export type JsonTypeFor<T extends DuckDBType> = JsonTypeForTypeId[T['typeId']];
+export type JsonTypeFor<T extends DuckDBType> = JsonTypeForTypeId[T["typeId"]];

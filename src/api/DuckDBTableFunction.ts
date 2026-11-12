@@ -1,17 +1,13 @@
 import duckdb from "../bindings/index.ts";
-import { DuckDBDataChunk } from './DuckDBDataChunk';
-import { DuckDBTableFunctionBindInfo } from './DuckDBTableFunctionBindInfo';
-import { DuckDBTableFunctionInfo } from './DuckDBTableFunctionInfo';
-import { DuckDBTableFunctionInitInfo } from './DuckDBTableFunctionInitInfo';
-import { DuckDBType } from './DuckDBType';
+import { DuckDBDataChunk } from "./DuckDBDataChunk";
+import { DuckDBTableFunctionBindInfo } from "./DuckDBTableFunctionBindInfo";
+import { DuckDBTableFunctionInfo } from "./DuckDBTableFunctionInfo";
+import { DuckDBTableFunctionInitInfo } from "./DuckDBTableFunctionInitInfo";
+import type { DuckDBType } from "./DuckDBType";
 
-export type DuckDBTableBindFunction = (
-  bindInfo: DuckDBTableFunctionBindInfo,
-) => void;
+export type DuckDBTableBindFunction = (bindInfo: DuckDBTableFunctionBindInfo) => void;
 
-export type DuckDBTableInitFunction = (
-  initInfo: DuckDBTableFunctionInitInfo,
-) => void;
+export type DuckDBTableInitFunction = (initInfo: DuckDBTableFunctionInitInfo) => void;
 
 /**
  * Produces one chunk of the scan per call.
@@ -20,10 +16,7 @@ export type DuckDBTableInitFunction = (
  * each column vector. A row count of zero reports that the scan is finished, so
  * a function that never sets zero never terminates.
  */
-export type DuckDBTableMainFunction = (
-  functionInfo: DuckDBTableFunctionInfo,
-  outputDataChunk: DuckDBDataChunk,
-) => void;
+export type DuckDBTableMainFunction = (functionInfo: DuckDBTableFunctionInfo, outputDataChunk: DuckDBDataChunk) => void;
 
 export class DuckDBTableFunction {
   readonly table_function: duckdb.TableFunction;
@@ -67,10 +60,7 @@ export class DuckDBTableFunction {
       }
     }
     if (namedParameterTypes) {
-      for (const [
-        parameterName,
-        parameterType,
-      ] of Object.entries(namedParameterTypes)) {
+      for (const [parameterName, parameterType] of Object.entries(namedParameterTypes)) {
         tableFunction.addNamedParameter(parameterName, parameterType);
       }
     }
@@ -110,37 +100,21 @@ export class DuckDBTableFunction {
   }
 
   public setMainFunction(mainFunction: DuckDBTableMainFunction) {
-    duckdb.table_function_set_function(
-      this.table_function,
-      (info, output) => {
-        mainFunction(
-          new DuckDBTableFunctionInfo(info),
-          new DuckDBDataChunk(output),
-        );
-      },
-    );
+    duckdb.table_function_set_function(this.table_function, (info, output) => {
+      mainFunction(new DuckDBTableFunctionInfo(info), new DuckDBDataChunk(output));
+    });
   }
 
   public addParameter(parameterType: DuckDBType) {
-    duckdb.table_function_add_parameter(
-      this.table_function,
-      parameterType.toLogicalType().logical_type,
-    );
+    duckdb.table_function_add_parameter(this.table_function, parameterType.toLogicalType().logical_type);
   }
 
   public addNamedParameter(name: string, parameterType: DuckDBType) {
-    duckdb.table_function_add_named_parameter(
-      this.table_function,
-      name,
-      parameterType.toLogicalType().logical_type,
-    );
+    duckdb.table_function_add_named_parameter(this.table_function, name, parameterType.toLogicalType().logical_type);
   }
 
   public setSupportsProjectionPushdown(pushdown: boolean) {
-    duckdb.table_function_supports_projection_pushdown(
-      this.table_function,
-      pushdown,
-    );
+    duckdb.table_function_supports_projection_pushdown(this.table_function, pushdown);
   }
 
   public setExtraInfo(extraInfo: object) {

@@ -59,8 +59,8 @@ export enum StatementType {
   DETACH = 26,
   MULTI = 27,
   COPY_DATABASE = 28,
-	UPDATE_EXTENSIONS = 29,
-	MERGE_INTO = 30,
+  UPDATE_EXTENSIONS = 29,
+  MERGE_INTO = 30,
 }
 
 export enum Type {
@@ -157,16 +157,16 @@ export interface TimeNS {
 
 export interface TimeTZ {
   /**
-  * 40 bits for micros, then 24 bits for encoded offset in seconds.
-  * 
-  * Max absolute unencoded offset = 15:59:59 = 60 * (60 * 15 + 59) + 59 = 57599.
-  * 
-  * Encoded offset is unencoded offset inverted then shifted (by +57599) to unsigned.
-  * 
-  * Max unencoded offset = 57599 -> -57599 -> 0 encoded.
-  * 
-  * Min unencoded offset = -57599 -> 57599 -> 115198 encoded.
-  */
+   * 40 bits for micros, then 24 bits for encoded offset in seconds.
+   *
+   * Max absolute unencoded offset = 15:59:59 = 60 * (60 * 15 + 59) + 59 = 57599.
+   *
+   * Encoded offset is unencoded offset inverted then shifted (by +57599) to unsigned.
+   *
+   * Max unencoded offset = 57599 -> -57599 -> 0 encoded.
+   *
+   * Min unencoded offset = -57599 -> 57599 -> 115198 encoded.
+   */
   bits: bigint;
 }
 export interface TimeTZParts {
@@ -206,33 +206,33 @@ export interface TimestampParts {
 // keeps the families from being assignable to one another.
 
 export interface ScalarFunctionBindInfo {
-  __duckdb_type: 'duckdb_bind_info';
-  __duckdb_function_kind: 'scalar_function';
+  __duckdb_type: "duckdb_bind_info";
+  __duckdb_function_kind: "scalar_function";
 }
 
 export interface ScalarFunctionInitInfo {
-  __duckdb_type: 'duckdb_init_info';
-  __duckdb_function_kind: 'scalar_function';
+  __duckdb_type: "duckdb_init_info";
+  __duckdb_function_kind: "scalar_function";
 }
 
 export interface ScalarFunctionInfo {
-  __duckdb_type: 'duckdb_function_info';
-  __duckdb_function_kind: 'scalar_function';
+  __duckdb_type: "duckdb_function_info";
+  __duckdb_function_kind: "scalar_function";
 }
 
 export interface TableFunctionBindInfo {
-  __duckdb_type: 'duckdb_bind_info';
-  __duckdb_function_kind: 'table_function';
+  __duckdb_type: "duckdb_bind_info";
+  __duckdb_function_kind: "table_function";
 }
 
 export interface TableFunctionInitInfo {
-  __duckdb_type: 'duckdb_init_info';
-  __duckdb_function_kind: 'table_function';
+  __duckdb_type: "duckdb_init_info";
+  __duckdb_function_kind: "table_function";
 }
 
 export interface TableFunctionInfo {
-  __duckdb_type: 'duckdb_function_info';
-  __duckdb_function_kind: 'table_function';
+  __duckdb_type: "duckdb_function_info";
+  __duckdb_function_kind: "table_function";
 }
 
 /** @deprecated Renamed to ScalarFunctionBindInfo. */
@@ -242,17 +242,17 @@ export type BindInfo = ScalarFunctionBindInfo;
 export type FunctionInfo = ScalarFunctionInfo;
 
 export interface Vector {
-  __duckdb_type: 'duckdb_vector';
+  __duckdb_type: "duckdb_vector";
 }
 
 // Types (explicit destroy)
 
 export interface Appender {
-  __duckdb_type: 'duckdb_appender';
+  __duckdb_type: "duckdb_appender";
 }
 
 export interface Catalog {
-  __duckdb_type: 'duckdb_catalog';
+  __duckdb_type: "duckdb_catalog";
 }
 
 /**
@@ -260,19 +260,19 @@ export interface Catalog {
  * or disconnect can read freed memory; retaining this handle does not extend its lifetime.
  */
 export interface CatalogEntry {
-  __duckdb_type: 'duckdb_catalog_entry';
+  __duckdb_type: "duckdb_catalog_entry";
 }
 
 export interface ClientContext {
-  __duckdb_type: 'duckdb_client_context';
+  __duckdb_type: "duckdb_client_context";
 }
 
 export interface Config {
-  __duckdb_type: 'duckdb_config';
+  __duckdb_type: "duckdb_config";
 }
 
 export interface Connection {
-  __duckdb_type: 'duckdb_connection';
+  __duckdb_type: "duckdb_connection";
 }
 
 // export interface CreateTypeInfo {
@@ -280,43 +280,43 @@ export interface Connection {
 // }
 
 export interface Database {
-  __duckdb_type: 'duckdb_database';
+  __duckdb_type: "duckdb_database";
 }
 
 export interface DataChunk {
-  __duckdb_type: 'duckdb_data_chunk';
+  __duckdb_type: "duckdb_data_chunk";
 }
 
 export interface ExtractedStatements {
-  __duckdb_type: 'duckdb_extracted_statements';
+  __duckdb_type: "duckdb_extracted_statements";
 }
 
 export interface InstanceCache {
-  __duckdb_type: 'duckdb_instance_cache';
+  __duckdb_type: "duckdb_instance_cache";
 }
 
 export interface LogicalType {
-  __duckdb_type: 'duckdb_logical_type';
+  __duckdb_type: "duckdb_logical_type";
 }
 
 export interface PendingResult {
-  __duckdb_type: 'duckdb_pending_result';
+  __duckdb_type: "duckdb_pending_result";
 }
 
 export interface PreparedStatement {
-  __duckdb_type: 'duckdb_prepared_statement';
+  __duckdb_type: "duckdb_prepared_statement";
 }
 
 export interface Result {
-  __duckdb_type: 'duckdb_result';
+  __duckdb_type: "duckdb_result";
 }
 
 export interface ScalarFunction {
-  __duckdb_type: 'duckdb_scalar_function';
+  __duckdb_type: "duckdb_scalar_function";
 }
 
 export interface TableFunction {
-  __duckdb_type: 'duckdb_table_function';
+  __duckdb_type: "duckdb_table_function";
 }
 
 // export interface SelectionVector {
@@ -324,7 +324,7 @@ export interface TableFunction {
 // }
 
 export interface Value {
-  __duckdb_type: 'duckdb_value';
+  __duckdb_type: "duckdb_value";
 }
 
 // Types (TypeScript only)
@@ -428,7 +428,12 @@ export function decimal_to_double(decimal: Decimal): number;
 export function appender_create(connection: Connection, schema: string | null, table: string): Appender;
 
 // DUCKDB_C_API duckdb_state duckdb_appender_create_ext(duckdb_connection connection, const char *catalog, const char *schema, const char *table, duckdb_appender *out_appender);
-export function appender_create_ext(connection: Connection, catalog: string | null, schema: string | null, table: string): Appender;
+export function appender_create_ext(
+  connection: Connection,
+  catalog: string | null,
+  schema: string | null,
+  table: string,
+): Appender;
 
 // DUCKDB_C_API duckdb_state duckdb_appender_create_query(duckdb_connection connection, const char *query, idx_t column_count, duckdb_logical_type *types, const char *table_name, const char **column_names, duckdb_appender *out_appender);
 
@@ -583,7 +588,13 @@ export function client_context_get_catalog(context: ClientContext, catalog_name:
 export function catalog_get_type_name(catalog: Catalog): string;
 
 // DUCKDB_C_API duckdb_catalog_entry duckdb_catalog_get_entry(duckdb_catalog catalog, duckdb_client_context context, duckdb_catalog_entry_type entry_type, const char *schema_name, const char *entry_name);
-export function catalog_get_entry(catalog: Catalog, context: ClientContext, entry_type: CatalogEntryType, schema_name: string, entry_name: string): CatalogEntry | null;
+export function catalog_get_entry(
+  catalog: Catalog,
+  context: ClientContext,
+  entry_type: CatalogEntryType,
+  schema_name: string,
+  entry_name: string,
+): CatalogEntry | null;
 // DUCKDB_C_API void duckdb_destroy_catalog(duckdb_catalog *catalog);
 // DUCKDB_C_API duckdb_catalog_entry_type duckdb_catalog_entry_get_type(duckdb_catalog_entry entry);
 export function catalog_entry_get_type(entry: CatalogEntry): CatalogEntryType;
@@ -903,7 +914,10 @@ export function prepared_statement_column_count(prepared_statement: PreparedStat
 export function prepared_statement_column_name(prepared_statement: PreparedStatement, index: number): string;
 
 // DUCKDB_C_API duckdb_logical_type duckdb_prepared_statement_column_logical_type(duckdb_prepared_statement prepared_statement, idx_t col_idx);
-export function prepared_statement_column_logical_type(prepared_statement: PreparedStatement, index: number): LogicalType;
+export function prepared_statement_column_logical_type(
+  prepared_statement: PreparedStatement,
+  index: number,
+): LogicalType;
 
 // DUCKDB_C_API duckdb_type duckdb_prepared_statement_column_type(duckdb_prepared_statement prepared_statement, idx_t col_idx);
 export function prepared_statement_column_type(prepared_statement: PreparedStatement, index: number): Type;
@@ -990,7 +1004,11 @@ export function execute_prepared(prepared_statement: PreparedStatement): Promise
 export function extract_statements(connection: Connection, query: string): Promise<ExtractedStatementsAndCount>;
 
 // DUCKDB_C_API duckdb_state duckdb_prepare_extracted_statement(duckdb_connection connection, duckdb_extracted_statements extracted_statements, idx_t index, duckdb_prepared_statement *out_prepared_statement);
-export function prepare_extracted_statement(connection: Connection, extracted_statements: ExtractedStatements, index: number): Promise<PreparedStatement>;
+export function prepare_extracted_statement(
+  connection: Connection,
+  extracted_statements: ExtractedStatements,
+  index: number,
+): Promise<PreparedStatement>;
 
 // DUCKDB_C_API const char *duckdb_extract_statements_error(duckdb_extracted_statements extracted_statements);
 export function extract_statements_error(extracted_statements: ExtractedStatements): string;
@@ -1209,7 +1227,11 @@ export function table_function_set_name(table_function: TableFunction, name: str
 export function table_function_add_parameter(table_function: TableFunction, logical_type: LogicalType): void;
 
 // DUCKDB_C_API void duckdb_table_function_add_named_parameter(duckdb_table_function table_function, const char *name, duckdb_logical_type type);
-export function table_function_add_named_parameter(table_function: TableFunction, name: string, logical_type: LogicalType): void;
+export function table_function_add_named_parameter(
+  table_function: TableFunction,
+  name: string,
+  logical_type: LogicalType,
+): void;
 
 // DUCKDB_C_API void duckdb_table_function_set_extra_info(duckdb_table_function table_function, void *extra_info, duckdb_delete_callback_t destroy);
 export function table_function_set_extra_info(table_function: TableFunction, extra_info: object): void;
@@ -1641,29 +1663,45 @@ export function validity_set_row_valid(validity: Uint8Array, row_index: number):
 // DUCKDB_C_API sel_t *duckdb_selection_vector_get_data_ptr(duckdb_selection_vector sel);
 
 // ADDED
-/** 
+/**
  * Read a pointer from `array_buffer` at `pointer_offset`, then read and return `byte_count` bytes from that pointer.
- * 
+ *
  * Used to read from `duckdb_string_t`s with non-inlined data that are embedded in VARCHAR, BLOB, and BIT vectors.
  */
-export function get_data_from_pointer(array_buffer: ArrayBuffer, pointer_offset: number, byte_count: number): Uint8Array;
+export function get_data_from_pointer(
+  array_buffer: ArrayBuffer,
+  pointer_offset: number,
+  byte_count: number,
+): Uint8Array;
 
 // ADDED
-/** 
+/**
  * Copy `source_byte_count` bytes from `source_buffer` at `source_byte_offset` into `target_vector` at `target_byte_offset`.
- * 
+ *
  * Used to write to data chunks.
  *
  * Performs an efficient-but-unsafe memory copy. Use with care.
  */
-export function copy_data_to_vector(target_vector: Vector, target_byte_offset: number, source_buffer: ArrayBuffer, source_byte_offset: number, source_byte_count: number): void;
+export function copy_data_to_vector(
+  target_vector: Vector,
+  target_byte_offset: number,
+  source_buffer: ArrayBuffer,
+  source_byte_offset: number,
+  source_byte_count: number,
+): void;
 
 // ADDED
-/** 
+/**
  * Copy `source_byte_count` bytes from `source_buffer` at `source_byte_offset` into the validity of `target_vector` at `target_byte_offset`.
- * 
+ *
  * Used to write to data chunks.
  *
  * Performs an efficient-but-unsafe memory copy. Use with care.
  */
-export function copy_data_to_vector_validity(target_vector: Vector, target_byte_offset: number, source_buffer: ArrayBuffer, source_byte_offset: number, source_byte_count: number): void;
+export function copy_data_to_vector_validity(
+  target_vector: Vector,
+  target_byte_offset: number,
+  source_buffer: ArrayBuffer,
+  source_byte_offset: number,
+  source_byte_count: number,
+): void;

@@ -1,4 +1,4 @@
-import { DuckDBValue } from './DuckDBValue';
+import type { DuckDBValue } from "./DuckDBValue";
 
 export class DuckDBUnionValue {
   public readonly tag: string;
@@ -11,7 +11,7 @@ export class DuckDBUnionValue {
 
   public toString(): string {
     if (this.value == null) {
-      return 'NULL';
+      return "NULL";
     }
     return this.value.toString();
   }

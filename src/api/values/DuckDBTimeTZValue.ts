@@ -1,8 +1,8 @@
-import duckdb, { TimeTZ, TimeTZParts } from "../../bindings/index.ts";
+import duckdb, { type TimeTZ, type TimeTZParts } from "../../bindings/index.ts";
 import {
   getDuckDBTimeStringFromMicrosecondsInDay,
-  getOffsetStringFromSeconds
-} from '../conversion/dateTimeStringConversion';
+  getOffsetStringFromSeconds,
+} from "../conversion/dateTimeStringConversion";
 
 export type { TimeTZParts };
 
@@ -33,9 +33,7 @@ export class DuckDBTimeTZValue implements TimeTZ {
   }
 
   public toString(): string {
-    return `${getDuckDBTimeStringFromMicrosecondsInDay(
-      this.micros
-    )}${getOffsetStringFromSeconds(this.offset)}`;
+    return `${getDuckDBTimeStringFromMicrosecondsInDay(this.micros)}${getOffsetStringFromSeconds(this.offset)}`;
   }
 
   public toParts(): TimeTZParts {
@@ -50,44 +48,29 @@ export class DuckDBTimeTZValue implements TimeTZ {
   public static MinMicros = 0n;
 
   public static fromBits(bits: bigint): DuckDBTimeTZValue {
-    const micros = BigInt.asUintN(
-      DuckDBTimeTZValue.TimeBits,
-      bits >> BigInt(DuckDBTimeTZValue.OffsetBits)
-    );
-    const offset =
-      DuckDBTimeTZValue.MaxOffset -
-      Number(BigInt.asUintN(DuckDBTimeTZValue.OffsetBits, bits));
+    const micros = BigInt.asUintN(DuckDBTimeTZValue.TimeBits, bits >> BigInt(DuckDBTimeTZValue.OffsetBits));
+    const offset = DuckDBTimeTZValue.MaxOffset - Number(BigInt.asUintN(DuckDBTimeTZValue.OffsetBits, bits));
     return new DuckDBTimeTZValue(bits, micros, offset);
   }
 
-  public static fromMicrosAndOffset(
-    micros: bigint,
-    offset: number
-  ): DuckDBTimeTZValue {
+  public static fromMicrosAndOffset(micros: bigint, offset: number): DuckDBTimeTZValue {
     const bits =
-      (BigInt.asUintN(DuckDBTimeTZValue.TimeBits, micros) <<
-        BigInt(DuckDBTimeTZValue.OffsetBits)) |
-      BigInt.asUintN(
-        DuckDBTimeTZValue.OffsetBits,
-        BigInt(DuckDBTimeTZValue.MaxOffset - offset)
-      );
+      (BigInt.asUintN(DuckDBTimeTZValue.TimeBits, micros) << BigInt(DuckDBTimeTZValue.OffsetBits)) |
+      BigInt.asUintN(DuckDBTimeTZValue.OffsetBits, BigInt(DuckDBTimeTZValue.MaxOffset - offset));
     return new DuckDBTimeTZValue(bits, micros, offset);
   }
 
   public static fromParts(parts: TimeTZParts): DuckDBTimeTZValue {
-    return DuckDBTimeTZValue.fromMicrosAndOffset(
-      duckdb.to_time(parts.time).micros,
-      parts.offset
-    );
+    return DuckDBTimeTZValue.fromMicrosAndOffset(duckdb.to_time(parts.time).micros, parts.offset);
   }
 
   public static readonly Max = DuckDBTimeTZValue.fromMicrosAndOffset(
     DuckDBTimeTZValue.MaxMicros,
-    DuckDBTimeTZValue.MinOffset
+    DuckDBTimeTZValue.MinOffset,
   );
   public static readonly Min = DuckDBTimeTZValue.fromMicrosAndOffset(
     DuckDBTimeTZValue.MinMicros,
-    DuckDBTimeTZValue.MaxOffset
+    DuckDBTimeTZValue.MaxOffset,
   );
 }
 

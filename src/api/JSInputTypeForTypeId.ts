@@ -1,7 +1,7 @@
-import type { DuckDBType } from './DuckDBType';
-import { DuckDBTypeId } from './DuckDBTypeId';
-import type { JS } from './JS';
-import type { DuckDBVariantValue } from './values';
+import type { DuckDBType } from "./DuckDBType";
+import { DuckDBTypeId } from "./DuckDBTypeId";
+import type { JS } from "./JS";
+import type { DuckDBVariantValue } from "./values";
 
 /**
  * The JS type accepted by `jsToDuckDBValue` for each DuckDB type id: the write
@@ -66,9 +66,7 @@ export interface JSInputTypeForTypeId {
   [DuckDBTypeId.TIMESTAMP_NS]: Date;
   [DuckDBTypeId.ENUM]: string;
   [DuckDBTypeId.LIST]: readonly (JS | null)[];
-  [DuckDBTypeId.STRUCT]:
-    | Readonly<Record<string, JS | null>>
-    | readonly (JS | null)[];
+  [DuckDBTypeId.STRUCT]: Readonly<Record<string, JS | null>> | readonly (JS | null)[];
   [DuckDBTypeId.MAP]: readonly { key: JS | null; value: JS | null }[];
   [DuckDBTypeId.ARRAY]: readonly (JS | null)[];
   [DuckDBTypeId.UUID]: string;
@@ -83,12 +81,7 @@ export interface JSInputTypeForTypeId {
   [DuckDBTypeId.INTEGER_LITERAL]: never;
   [DuckDBTypeId.TIME_NS]: bigint;
   [DuckDBTypeId.GEOMETRY]: Uint8Array;
-  [DuckDBTypeId.VARIANT]:
-    | DuckDBVariantValue
-    | boolean
-    | number
-    | bigint
-    | string;
+  [DuckDBTypeId.VARIANT]: DuckDBVariantValue | boolean | number | bigint | string;
   [DuckDBTypeId.TIMESTAMP_TZ_NS]: Date;
 }
 
@@ -97,5 +90,4 @@ export interface JSInputTypeForTypeId {
  *
  * Excludes NULL; use `JSInputTypeFor<T> | null` for a nullable value.
  */
-export type JSInputTypeFor<T extends DuckDBType> =
-  JSInputTypeForTypeId[T['typeId']];
+export type JSInputTypeFor<T extends DuckDBType> = JSInputTypeForTypeId[T["typeId"]];

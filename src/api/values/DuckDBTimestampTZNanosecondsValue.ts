@@ -1,7 +1,7 @@
-import duckdb, { TimestampNanoseconds } from "../../bindings/index.ts";
-import { getDuckDBTimestampStringFromNanoseconds } from '../conversion/dateTimeStringConversion';
-import { DuckDBTimestampNanosecondsValue } from './DuckDBTimestampNanosecondsValue';
-import { DuckDBTimestampTZValue } from './DuckDBTimestampTZValue';
+import duckdb, { type TimestampNanoseconds } from "../../bindings/index.ts";
+import { getDuckDBTimestampStringFromNanoseconds } from "../conversion/dateTimeStringConversion";
+import { DuckDBTimestampNanosecondsValue } from "./DuckDBTimestampNanosecondsValue";
+import { DuckDBTimestampTZValue } from "./DuckDBTimestampTZValue";
 
 export class DuckDBTimestampTZNanosecondsValue implements TimestampNanoseconds {
   public readonly nanos: bigint;
@@ -16,29 +16,16 @@ export class DuckDBTimestampTZNanosecondsValue implements TimestampNanoseconds {
 
   /** Formats in the time zone set by `DuckDBTimestampTZValue.timezoneOffsetInMinutes`. */
   public toString(): string {
-    return getDuckDBTimestampStringFromNanoseconds(
-      this.nanos,
-      DuckDBTimestampTZValue.timezoneOffsetInMinutes
-    );
+    return getDuckDBTimestampStringFromNanoseconds(this.nanos, DuckDBTimestampTZValue.timezoneOffsetInMinutes);
   }
 
   public static readonly Epoch = new DuckDBTimestampTZNanosecondsValue(0n);
-  public static readonly Max = new DuckDBTimestampTZNanosecondsValue(
-    DuckDBTimestampNanosecondsValue.Max.nanos
-  );
-  public static readonly Min = new DuckDBTimestampTZNanosecondsValue(
-    DuckDBTimestampNanosecondsValue.Min.nanos
-  );
-  public static readonly PosInf = new DuckDBTimestampTZNanosecondsValue(
-    DuckDBTimestampNanosecondsValue.PosInf.nanos
-  );
-  public static readonly NegInf = new DuckDBTimestampTZNanosecondsValue(
-    DuckDBTimestampNanosecondsValue.NegInf.nanos
-  );
+  public static readonly Max = new DuckDBTimestampTZNanosecondsValue(DuckDBTimestampNanosecondsValue.Max.nanos);
+  public static readonly Min = new DuckDBTimestampTZNanosecondsValue(DuckDBTimestampNanosecondsValue.Min.nanos);
+  public static readonly PosInf = new DuckDBTimestampTZNanosecondsValue(DuckDBTimestampNanosecondsValue.PosInf.nanos);
+  public static readonly NegInf = new DuckDBTimestampTZNanosecondsValue(DuckDBTimestampNanosecondsValue.NegInf.nanos);
 }
 
-export function timestampTZNanosValue(
-  nanos: bigint
-): DuckDBTimestampTZNanosecondsValue {
+export function timestampTZNanosValue(nanos: bigint): DuckDBTimestampTZNanosecondsValue {
   return new DuckDBTimestampTZNanosecondsValue(nanos);
 }

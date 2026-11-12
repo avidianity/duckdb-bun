@@ -1,5 +1,5 @@
-import { displayStringForDuckDBValue } from '../conversion/displayStringForDuckDBValue';
-import { DuckDBValue } from './DuckDBValue';
+import { displayStringForDuckDBValue } from "../conversion/displayStringForDuckDBValue";
+import type { DuckDBValue } from "./DuckDBValue";
 
 /**
  * A value of a tuple type: an unnamed STRUCT, such as `(1, 'a')` or
@@ -13,7 +13,7 @@ export class DuckDBTupleValue {
   }
 
   public toString(): string {
-    return `(${this.items.map(displayStringForDuckDBValue).join(', ')})`;
+    return `(${this.items.map(displayStringForDuckDBValue).join(", ")})`;
   }
 }
 

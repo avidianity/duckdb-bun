@@ -1,15 +1,8 @@
 import duckdb from "../../bindings/index.ts";
-import {
-  DuckDBBigNumType,
-} from '../DuckDBType';
-import { DuckDBVector } from './DuckDBVector';
-import { DuckDBValidity } from './DuckDBValidity';
-import {
-  getBigNumFromBytes,
-  getBytesFromBigNum,
-  getStringBytes,
-  vectorData,
-} from './dataAccessors';
+import { DuckDBBigNumType } from "../DuckDBType";
+import { DuckDBValidity } from "./DuckDBValidity";
+import { DuckDBVector } from "./DuckDBVector";
+import { getBigNumFromBytes, getBytesFromBigNum, getStringBytes, vectorData } from "./dataAccessors";
 
 export class DuckDBBigNumVector extends DuckDBVector<bigint> {
   private readonly dataView: DataView;
@@ -24,7 +17,7 @@ export class DuckDBBigNumVector extends DuckDBVector<bigint> {
     validity: DuckDBValidity,
     vector: duckdb.Vector,
     itemOffset: number,
-    itemCount: number
+    itemCount: number,
   ) {
     super();
     this.dataView = dataView;
@@ -35,16 +28,9 @@ export class DuckDBBigNumVector extends DuckDBVector<bigint> {
     this.itemCache = [];
     this.itemCacheDirty = [];
   }
-  static fromRawVector(
-    vector: duckdb.Vector,
-    itemCount: number
-  ): DuckDBBigNumVector {
+  static fromRawVector(vector: duckdb.Vector, itemCount: number): DuckDBBigNumVector {
     const data = vectorData(vector, itemCount * 16);
-    const dataView = new DataView(
-      data.buffer,
-      data.byteOffset,
-      data.byteLength
-    );
+    const dataView = new DataView(data.buffer, data.byteOffset, data.byteLength);
     const validity = DuckDBValidity.fromVector(vector, itemCount);
     return new DuckDBBigNumVector(dataView, validity, vector, 0, itemCount);
   }
@@ -74,7 +60,7 @@ export class DuckDBBigNumVector extends DuckDBVector<bigint> {
           duckdb.vector_assign_string_element_len(
             this.vector,
             this.itemOffset + itemIndex,
-            getBytesFromBigNum(cachedItem)
+            getBytesFromBigNum(cachedItem),
           );
         }
         this.itemCacheDirty[itemIndex] = false;
@@ -84,15 +70,11 @@ export class DuckDBBigNumVector extends DuckDBVector<bigint> {
   }
   public override slice(offset: number, length: number): DuckDBBigNumVector {
     return new DuckDBBigNumVector(
-      new DataView(
-        this.dataView.buffer,
-        this.dataView.byteOffset + offset * 16,
-        length * 16
-      ),
+      new DataView(this.dataView.buffer, this.dataView.byteOffset + offset * 16, length * 16),
       this.validity.slice(offset, length),
       this.vector,
       offset,
-      length
+      length,
     );
   }
 }

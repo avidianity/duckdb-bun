@@ -46,21 +46,21 @@ export class DuckDBBitValue {
     const length = this.length;
     const chars = Array.from<string>({ length });
     for (let i = 0; i < length; i++) {
-      chars[i] = this.getBool(i) ? '1' : '0';
+      chars[i] = this.getBool(i) ? "1" : "0";
     }
-    return chars.join('');
+    return chars.join("");
   }
 
-  public static fromString(str: string, on: string = '1'): DuckDBBitValue {
-    return DuckDBBitValue.fromLengthAndPredicate(str.length, i => str[i] === on);
+  public static fromString(str: string, on: string = "1"): DuckDBBitValue {
+    return DuckDBBitValue.fromLengthAndPredicate(str.length, (i) => str[i] === on);
   }
 
   public static fromBits(bits: readonly number[], on: number = 1): DuckDBBitValue {
-    return DuckDBBitValue.fromLengthAndPredicate(bits.length, i => bits[i] === on);
+    return DuckDBBitValue.fromLengthAndPredicate(bits.length, (i) => bits[i] === on);
   }
 
   public static fromBools(bools: readonly boolean[]): DuckDBBitValue {
-    return DuckDBBitValue.fromLengthAndPredicate(bools.length, i => bools[i]);
+    return DuckDBBitValue.fromLengthAndPredicate(bools.length, (i) => bools[i]);
   }
 
   public static fromLengthAndPredicate(length: number, predicate: (index: number) => boolean): DuckDBBitValue {
@@ -103,15 +103,15 @@ export class DuckDBBitValue {
 }
 
 export function bitValue(input: string | readonly boolean[] | readonly number[]): DuckDBBitValue {
-  if (typeof input === 'string') {
+  if (typeof input === "string") {
     return DuckDBBitValue.fromString(input);
   }
   if (input.length > 0) {
-    if (typeof input[0] === 'boolean') {
+    if (typeof input[0] === "boolean") {
       return DuckDBBitValue.fromBools(input as readonly boolean[]);
-    } else if (typeof input[0] === 'number') {
+    } else if (typeof input[0] === "number") {
       return DuckDBBitValue.fromBits(input as readonly number[]);
     }
   }
-  return DuckDBBitValue.fromLengthAndPredicate(0, _ => false);
+  return DuckDBBitValue.fromLengthAndPredicate(0, (_) => false);
 }

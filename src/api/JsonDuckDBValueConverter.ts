@@ -1,6 +1,6 @@
-import { createDuckDBValueConverter } from './createDuckDBValueConverter';
-import { DuckDBTypeId } from './DuckDBTypeId';
-import { DuckDBValueConverterFor } from './DuckDBValueConverter';
+import { createDuckDBValueConverter } from "./createDuckDBValueConverter";
+import { DuckDBTypeId } from "./DuckDBTypeId";
+import type { DuckDBValueConverterFor } from "./DuckDBValueConverter";
 import {
   arrayFromArrayValue,
   arrayFromListValue,
@@ -11,13 +11,13 @@ import {
   nullConverter,
   numberFromValue,
   objectArrayFromMapValue,
-  objectOrArrayFromStructValue,
   objectFromUnionValue,
+  objectOrArrayFromStructValue,
   stringFromValue,
   unsupportedConverter,
-} from './DuckDBValueConverters';
-import { Json } from './Json';
-import { JsonTypeForTypeId } from './JsonTypeForTypeId';
+} from "./DuckDBValueConverters";
+import type { Json } from "./Json";
+import type { JsonTypeForTypeId } from "./JsonTypeForTypeId";
 
 const JsonConvertersByTypeId: {
   [Id in DuckDBTypeId]: DuckDBValueConverterFor<JsonTypeForTypeId[Id], Json>;
@@ -67,6 +67,4 @@ const JsonConvertersByTypeId: {
   [DuckDBTypeId.TIMESTAMP_TZ_NS]: stringFromValue,
 };
 
-export const JsonDuckDBValueConverter = createDuckDBValueConverter<Json>(
-  JsonConvertersByTypeId
-);
+export const JsonDuckDBValueConverter = createDuckDBValueConverter<Json>(JsonConvertersByTypeId);

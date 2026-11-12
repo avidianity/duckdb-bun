@@ -1,9 +1,9 @@
 import duckdb from "../bindings/index.ts";
-import { createResult } from './createResult';
-import { DuckDBResult } from './DuckDBResult';
-import { DuckDBResultReader } from './DuckDBResultReader';
-import { StatementType } from './enums';
-import { sleep } from './sleep';
+import { createResult } from "./createResult";
+import type { DuckDBResult } from "./DuckDBResult";
+import { DuckDBResultReader } from "./DuckDBResultReader";
+import type { StatementType } from "./enums";
+import { sleep } from "./sleep";
 
 // Values match similar enum in C API.
 export enum DuckDBPendingResultState {
@@ -18,10 +18,7 @@ export class DuckDBPendingResult {
   /**
    * `preparedStatementType` is passed on to the result; see `DuckDBResult`.
    */
-  constructor(
-    pending_result: duckdb.PendingResult,
-    preparedStatementType?: StatementType
-  ) {
+  constructor(pending_result: duckdb.PendingResult, preparedStatementType?: StatementType) {
     this.pending_result = pending_result;
     this.preparedStatementType = preparedStatementType;
   }
@@ -45,11 +42,7 @@ export class DuckDBPendingResult {
       case duckdb.PendingState.RESULT_NOT_READY:
         return DuckDBPendingResultState.RESULT_NOT_READY;
       case duckdb.PendingState.ERROR:
-        throw new Error(
-          `Failure running pending result task: ${duckdb.pending_error(
-            this.pending_result
-          )}`
-        );
+        throw new Error(`Failure running pending result task: ${duckdb.pending_error(this.pending_result)}`);
       case duckdb.PendingState.NO_TASKS_AVAILABLE:
         return DuckDBPendingResultState.NO_TASKS_AVAILABLE;
       default:
@@ -62,10 +55,7 @@ export class DuckDBPendingResult {
     }
   }
   public async getResult(): Promise<DuckDBResult> {
-    return createResult(
-      await duckdb.execute_pending(this.pending_result),
-      this.preparedStatementType
-    );
+    return createResult(await duckdb.execute_pending(this.pending_result), this.preparedStatementType);
   }
   public async read(): Promise<DuckDBResultReader> {
     return new DuckDBResultReader(await this.getResult());

@@ -1,5 +1,5 @@
-import { displayStringForDuckDBValue } from '../conversion/displayStringForDuckDBValue';
-import { DuckDBValue } from './DuckDBValue';
+import { displayStringForDuckDBValue } from "../conversion/displayStringForDuckDBValue";
+import type { DuckDBValue } from "./DuckDBValue";
 
 export interface DuckDBMapEntry {
   key: DuckDBValue;
@@ -14,9 +14,9 @@ export class DuckDBMapValue {
   }
 
   public toString(): string {
-    return `{${this.entries.map(({ key, value }) =>
-      `${displayStringForDuckDBValue(key)}: ${displayStringForDuckDBValue(value)}`
-    ).join(', ')}}`;
+    return `{${this.entries
+      .map(({ key, value }) => `${displayStringForDuckDBValue(key)}: ${displayStringForDuckDBValue(value)}`)
+      .join(", ")}}`;
   }
 }
 

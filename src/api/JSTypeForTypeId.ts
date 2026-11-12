@@ -1,6 +1,6 @@
-import type { DuckDBType } from './DuckDBType';
-import { DuckDBTypeId } from './DuckDBTypeId';
-import type { JS } from './JS';
+import type { DuckDBType } from "./DuckDBType";
+import { DuckDBTypeId } from "./DuckDBTypeId";
+import type { JS } from "./JS";
 
 /**
  * The JS type produced by `JSDuckDBValueConverter` for each DuckDB type id.
@@ -75,4 +75,4 @@ export interface JSTypeForTypeId {
  *
  * Excludes NULL; use `JSTypeFor<T> | null` for a nullable value.
  */
-export type JSTypeFor<T extends DuckDBType> = JSTypeForTypeId[T['typeId']];
+export type JSTypeFor<T extends DuckDBType> = JSTypeForTypeId[T["typeId"]];

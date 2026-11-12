@@ -1,8 +1,8 @@
-import duckdb from '../../../src/bindings/index.ts';
-import { expect } from '../../vitest-shim.ts';
-import { expectChunk } from './expectChunk';
-import { ExpectedResult } from './ExpectedResult';
-import { expectLogicalType } from './expectLogicalType';
+import duckdb from "../../../src/bindings/index.ts";
+import { expect } from "../../vitest-shim.ts";
+import type { ExpectedResult } from "./ExpectedResult";
+import { expectChunk } from "./expectChunk";
+import { expectLogicalType } from "./expectLogicalType";
 
 export async function expectResult(
   result: duckdb.Result,
@@ -19,10 +19,10 @@ export async function expectResult(
   }
   expect(duckdb.result_return_type(result)).toBe(expectedResult.resultType ?? duckdb.ResultType.QUERY_RESULT);
   expect(duckdb.result_is_streaming(result)).toBe(!!expectedResult.isStreaming);
-  if (expectedResult.chunkCount != undefined) {
+  if (expectedResult.chunkCount != null) {
     expect(duckdb.result_chunk_count(result)).toBe(expectedResult.chunkCount);
   }
-  if (expectedResult.rowCount != undefined) {
+  if (expectedResult.rowCount != null) {
     expect(duckdb.row_count(result)).toBe(expectedResult.rowCount);
   }
   expect(duckdb.rows_changed(result)).toBe(expectedResult.rowsChanged ?? 0);
@@ -33,7 +33,7 @@ export async function expectResult(
     expect(duckdb.column_type(result, col), `${col}`).toBe(expectedColumn.logicalType.typeId);
     expectLogicalType(duckdb.column_logical_type(result, col), expectedColumn.logicalType, `col ${col}`);
   }
-  if (expectedResult.chunkCount != undefined && expectedResult.chunkCount > 0) {
+  if (expectedResult.chunkCount != null && expectedResult.chunkCount > 0) {
     for (let chunkIndex = 0; chunkIndex < expectedResult.chunkCount; chunkIndex++) {
       const chunk = duckdb.result_get_chunk(result, chunkIndex);
       expectChunk(chunk, expectedResult.chunks[chunkIndex], expectedResult.columns);

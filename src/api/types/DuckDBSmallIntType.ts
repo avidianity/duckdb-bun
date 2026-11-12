@@ -1,5 +1,5 @@
-import { BaseDuckDBType } from './BaseDuckDBType';
-import { DuckDBTypeId } from '../DuckDBTypeId';
+import { DuckDBTypeId } from "../DuckDBTypeId";
+import { BaseDuckDBType } from "./BaseDuckDBType";
 
 export class DuckDBSmallIntType extends BaseDuckDBType<DuckDBTypeId.SMALLINT> {
   public constructor(alias?: string) {

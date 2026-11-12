@@ -8,7 +8,7 @@ import {
   DATE,
   DECIMAL,
   DOUBLE,
-  DuckDBType,
+  type DuckDBType,
   HUGEINT,
   INTEGER,
   INTERVAL,
@@ -30,7 +30,7 @@ import {
   UUID,
   VARCHAR,
   VARIANT,
-} from './DuckDBType';
+} from "./DuckDBType";
 import {
   DuckDBArrayValue,
   DuckDBBitValue,
@@ -45,26 +45,26 @@ import {
   DuckDBTimestampMillisecondsValue,
   DuckDBTimestampNanosecondsValue,
   DuckDBTimestampSecondsValue,
-  DuckDBTimestampTZValue,
   DuckDBTimestampTZNanosecondsValue,
+  DuckDBTimestampTZValue,
   DuckDBTimestampValue,
   DuckDBTimeTZValue,
   DuckDBTimeValue,
   DuckDBTupleValue,
   DuckDBUnionValue,
   DuckDBUUIDValue,
-  DuckDBValue,
+  type DuckDBValue,
   DuckDBVariantValue,
-} from './values';
+} from "./values";
 
 export function typeForValue(value: DuckDBValue): DuckDBType {
   if (value === null) {
     return SQLNULL;
   } else {
     switch (typeof value) {
-      case 'boolean':
+      case "boolean":
         return BOOLEAN;
-      case 'number':
+      case "number":
         if (Number.isInteger(value)) {
           if (value >= -2_147_483_648 && value <= 2_147_483_647) {
             return INTEGER;
@@ -73,11 +73,11 @@ export function typeForValue(value: DuckDBValue): DuckDBType {
         } else {
           return DOUBLE;
         }
-      case 'bigint':
+      case "bigint":
         return HUGEINT;
-      case 'string':
+      case "string":
         return VARCHAR;
-      case 'object':
+      case "object":
         if (value instanceof DuckDBArrayValue) {
           return ARRAY(typeForValue(value.items[0]), value.items.length);
         } else if (value instanceof DuckDBBitValue) {
@@ -100,10 +100,7 @@ export function typeForValue(value: DuckDBValue): DuckDBType {
             // a cryptic "Cannot read properties of undefined (reading 'key')".
             return MAP(ANY, ANY);
           }
-          return MAP(
-            typeForValue(value.entries[0].key),
-            typeForValue(value.entries[0].value)
-          );
+          return MAP(typeForValue(value.entries[0].key), typeForValue(value.entries[0].value));
         } else if (value instanceof DuckDBStructValue) {
           const entryTypes: Record<string, DuckDBType> = {};
           for (const key in value.entries) {

@@ -1,5 +1,5 @@
-import { BaseDuckDBType } from './BaseDuckDBType';
-import { DuckDBTypeId } from '../DuckDBTypeId';
+import { DuckDBTypeId } from "../DuckDBTypeId";
+import { BaseDuckDBType } from "./BaseDuckDBType";
 
 export class DuckDBIntegerLiteralType extends BaseDuckDBType<DuckDBTypeId.INTEGER_LITERAL> {
   public constructor(alias?: string) {

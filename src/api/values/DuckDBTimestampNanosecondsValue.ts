@@ -1,5 +1,5 @@
-import duckdb, { TimestampNanoseconds } from "../../bindings/index.ts";
-import { getDuckDBTimestampStringFromNanoseconds } from '../conversion/dateTimeStringConversion';
+import duckdb, { type TimestampNanoseconds } from "../../bindings/index.ts";
+import { getDuckDBTimestampStringFromNanoseconds } from "../conversion/dateTimeStringConversion";
 
 export class DuckDBTimestampNanosecondsValue implements TimestampNanoseconds {
   public readonly nanos: bigint;

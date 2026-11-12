@@ -1,19 +1,15 @@
-import { BaseDuckDBType } from './BaseDuckDBType';
-import type { DuckDBType } from './DuckDBType';
-import { DuckDBLogicalType } from '../DuckDBLogicalType';
-import { DuckDBTypeId } from '../DuckDBTypeId';
-import { Json } from '../Json';
-import { quotedIdentifier } from '../sql';
+import { DuckDBLogicalType } from "../DuckDBLogicalType";
+import { DuckDBTypeId } from "../DuckDBTypeId";
+import type { Json } from "../Json";
+import { quotedIdentifier } from "../sql";
+import { BaseDuckDBType } from "./BaseDuckDBType";
+import type { DuckDBType } from "./DuckDBType";
 
 export class DuckDBStructType extends BaseDuckDBType<DuckDBTypeId.STRUCT> {
   public readonly entryNames: readonly string[];
   public readonly entryTypes: readonly DuckDBType[];
   public readonly entryIndexes: Readonly<Record<string, number>>;
-  public constructor(
-    entryNames: readonly string[],
-    entryTypes: readonly DuckDBType[],
-    alias?: string
-  ) {
+  public constructor(entryNames: readonly string[], entryTypes: readonly DuckDBType[], alias?: string) {
     super(DuckDBTypeId.STRUCT, alias);
     if (entryNames.length !== entryTypes.length) {
       throw new Error(`Could not create DuckDBStructType: \
@@ -39,9 +35,7 @@ export class DuckDBStructType extends BaseDuckDBType<DuckDBTypeId.STRUCT> {
    * positional, rather than `DuckDBStructValue`s.
    */
   public get isTuple(): boolean {
-    return (
-      this.entryNames.length > 0 && this.entryNames.every((name) => name === '')
-    );
+    return this.entryNames.length > 0 && this.entryNames.every((name) => name === "");
   }
   public indexForEntry(entryName: string): number {
     return this.entryIndexes[entryName];
@@ -51,23 +45,21 @@ export class DuckDBStructType extends BaseDuckDBType<DuckDBTypeId.STRUCT> {
   }
   public toString(): string {
     if (this.entryNames.length === 0) {
-      return 'STRUCT';
+      return "STRUCT";
     }
     if (this.isTuple) {
-      return `TUPLE(${this.entryTypes.join(', ')})`;
+      return `TUPLE(${this.entryTypes.join(", ")})`;
     }
     const parts: string[] = [];
     for (let i = 0; i < this.entryNames.length; i++) {
-      parts.push(
-        `${quotedIdentifier(this.entryNames[i])} ${this.entryTypes[i]}`
-      );
+      parts.push(`${quotedIdentifier(this.entryNames[i])} ${this.entryTypes[i]}`);
     }
-    return `STRUCT(${parts.join(', ')})`;
+    return `STRUCT(${parts.join(", ")})`;
   }
   public override toLogicalType(): DuckDBLogicalType {
     const logicalType = DuckDBLogicalType.createStruct(
       this.entryNames,
-      this.entryTypes.map((t) => t.toLogicalType())
+      this.entryTypes.map((t) => t.toLogicalType()),
     );
     if (this.alias) {
       logicalType.alias = this.alias;
@@ -78,27 +70,21 @@ export class DuckDBStructType extends BaseDuckDBType<DuckDBTypeId.STRUCT> {
     return {
       typeId: this.typeId,
       entryNames: [...this.entryNames],
-      entryTypes: this.entryTypes.map(t => t.toJson()),
+      entryTypes: this.entryTypes.map((t) => t.toJson()),
       ...(this.alias ? { alias: this.alias } : {}),
     };
   }
 }
-export function STRUCT(
-  entries: Record<string, DuckDBType>,
-  alias?: string
-): DuckDBStructType {
+export function STRUCT(entries: Record<string, DuckDBType>, alias?: string): DuckDBStructType {
   const entryNames = Object.keys(entries);
   const entryTypes = Object.values(entries);
   return new DuckDBStructType(entryNames, entryTypes, alias);
 }
 /** Creates a tuple type: an unnamed STRUCT with the given entry types. */
-export function TUPLE(
-  entryTypes: readonly DuckDBType[],
-  alias?: string
-): DuckDBStructType {
+export function TUPLE(entryTypes: readonly DuckDBType[], alias?: string): DuckDBStructType {
   return new DuckDBStructType(
-    entryTypes.map(() => ''),
+    entryTypes.map(() => ""),
     entryTypes,
-    alias
+    alias,
   );
 }

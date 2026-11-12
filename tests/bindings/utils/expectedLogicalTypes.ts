@@ -1,5 +1,5 @@
-import duckdb from '../../../src/bindings/index.ts';
-import {
+import duckdb from "../../../src/bindings/index.ts";
+import type {
   ExpectedArrayLogicalType,
   ExpectedDecimalLogicalType,
   ExpectedEnumLogicalType,
@@ -11,7 +11,7 @@ import {
   ExpectedStructLogicalType,
   ExpectedUnionAlternative,
   ExpectedUnionLogicalType,
-} from './ExpectedLogicalType';
+} from "./ExpectedLogicalType";
 
 export const BOOLEAN: ExpectedSimpleLogicalType = {
   typeId: duckdb.Type.BOOLEAN,
@@ -131,10 +131,7 @@ export const TIMESTAMP_TZ_NS: ExpectedSimpleLogicalType = {
   typeId: duckdb.Type.TIMESTAMP_TZ_NS,
 };
 
-export function ARRAY(
-  valueType: ExpectedLogicalType,
-  size: number
-): ExpectedArrayLogicalType {
+export function ARRAY(valueType: ExpectedLogicalType, size: number): ExpectedArrayLogicalType {
   return {
     typeId: duckdb.Type.ARRAY,
     valueType,
@@ -142,11 +139,7 @@ export function ARRAY(
   };
 }
 
-export function DECIMAL(
-  width: number,
-  scale: number,
-  internalType: duckdb.Type
-): ExpectedDecimalLogicalType {
+export function DECIMAL(width: number, scale: number, internalType: duckdb.Type): ExpectedDecimalLogicalType {
   return {
     typeId: duckdb.Type.DECIMAL,
     width,
@@ -155,10 +148,7 @@ export function DECIMAL(
   };
 }
 
-export function ENUM(
-  values: string[],
-  internalType: duckdb.Type
-): ExpectedEnumLogicalType {
+export function ENUM(values: string[], internalType: duckdb.Type): ExpectedEnumLogicalType {
   return {
     typeId: duckdb.Type.ENUM,
     values,
@@ -173,10 +163,7 @@ export function LIST(valueType: ExpectedLogicalType): ExpectedListLogicalType {
   };
 }
 
-export function MAP(
-  keyType: ExpectedLogicalType,
-  valueType: ExpectedLogicalType
-): ExpectedMapLogicalType {
+export function MAP(keyType: ExpectedLogicalType, valueType: ExpectedLogicalType): ExpectedMapLogicalType {
   return {
     typeId: duckdb.Type.MAP,
     keyType,
@@ -184,38 +171,28 @@ export function MAP(
   };
 }
 
-export function ENTRY(
-  name: string,
-  type: ExpectedLogicalType
-): ExpectedStructEntry {
+export function ENTRY(name: string, type: ExpectedLogicalType): ExpectedStructEntry {
   return {
     name,
     type,
   };
 }
 
-export function STRUCT(
-  ...entries: ExpectedStructEntry[]
-): ExpectedStructLogicalType {
+export function STRUCT(...entries: ExpectedStructEntry[]): ExpectedStructLogicalType {
   return {
     typeId: duckdb.Type.STRUCT,
     entries,
   };
 }
 
-export function ALT(
-  tag: string,
-  type: ExpectedLogicalType
-): ExpectedUnionAlternative {
+export function ALT(tag: string, type: ExpectedLogicalType): ExpectedUnionAlternative {
   return {
     tag,
     type,
   };
 }
 
-export function UNION(
-  ...alternatives: ExpectedUnionAlternative[]
-): ExpectedUnionLogicalType {
+export function UNION(...alternatives: ExpectedUnionAlternative[]): ExpectedUnionLogicalType {
   return {
     typeId: duckdb.Type.UNION,
     alternatives,

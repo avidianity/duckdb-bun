@@ -1,6 +1,6 @@
-import { BaseDuckDBType } from './BaseDuckDBType';
-import { DuckDBTypeId } from '../DuckDBTypeId';
-import { DuckDBTimestampMillisecondsValue } from '../values';
+import { DuckDBTypeId } from "../DuckDBTypeId";
+import { DuckDBTimestampMillisecondsValue } from "../values";
+import { BaseDuckDBType } from "./BaseDuckDBType";
 
 export class DuckDBTimestampMillisecondsType extends BaseDuckDBType<DuckDBTypeId.TIMESTAMP_MS> {
   public constructor(alias?: string) {

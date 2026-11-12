@@ -1,8 +1,12 @@
-import duckdb from '../../../src/bindings/index.ts';
-import { expect } from '../../vitest-shim.ts';
-import { ExpectedLogicalType } from './ExpectedLogicalType';
+import duckdb from "../../../src/bindings/index.ts";
+import { expect } from "../../vitest-shim.ts";
+import type { ExpectedLogicalType } from "./ExpectedLogicalType";
 
-export function expectLogicalType(logical_type: duckdb.LogicalType, expectedLogicalType: ExpectedLogicalType, message?: string) {
+export function expectLogicalType(
+  logical_type: duckdb.LogicalType,
+  expectedLogicalType: ExpectedLogicalType,
+  message?: string,
+) {
   expect(duckdb.get_type_id(logical_type), message).toBe(expectedLogicalType.typeId);
   switch (expectedLogicalType.typeId) {
     case duckdb.Type.ARRAY:

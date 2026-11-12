@@ -1,8 +1,8 @@
-import duckdb from '../../../src/bindings/index.ts';
-import { expect } from '../../vitest-shim.ts';
-import { ExpectedChunk, ExpectedColumn } from './ExpectedResult';
-import { expectLogicalType } from './expectLogicalType';
-import { expectVector } from './expectVector';
+import duckdb from "../../../src/bindings/index.ts";
+import { expect } from "../../vitest-shim.ts";
+import type { ExpectedChunk, ExpectedColumn } from "./ExpectedResult";
+import { expectLogicalType } from "./expectLogicalType";
+import { expectVector } from "./expectVector";
 
 export function expectChunk(chunk: duckdb.DataChunk, expectedChunk: ExpectedChunk, expectedColumns: ExpectedColumn[]) {
   const chunkColumnCount = expectedChunk.columnCount ?? expectedColumns.length;

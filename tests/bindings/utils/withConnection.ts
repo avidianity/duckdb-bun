@@ -1,5 +1,5 @@
-import duckdb from '../../../src/bindings/index.ts';
-import { withDatabase } from './withDatabase';
+import duckdb from "../../../src/bindings/index.ts";
+import { withDatabase } from "./withDatabase";
 
 export async function withConnection(
   fn: (connection: duckdb.Connection, db: duckdb.Database) => Promise<void>,

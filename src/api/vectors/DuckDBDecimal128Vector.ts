@@ -1,18 +1,9 @@
 import duckdb from "../../bindings/index.ts";
-import {
-  DuckDBDecimalType,
-} from '../DuckDBType';
-import {
-  DuckDBDecimalValue,
-} from '../values';
-import { DuckDBVector } from './DuckDBVector';
-import { DuckDBValidity } from './DuckDBValidity';
-import {
-  getDecimal128,
-  getInt128,
-  setInt128,
-  vectorData,
-} from './dataAccessors';
+import type { DuckDBDecimalType } from "../DuckDBType";
+import type { DuckDBDecimalValue } from "../values";
+import { DuckDBValidity } from "./DuckDBValidity";
+import { DuckDBVector } from "./DuckDBVector";
+import { getDecimal128, getInt128, setInt128, vectorData } from "./dataAccessors";
 
 export class DuckDBDecimal128Vector extends DuckDBVector<DuckDBDecimalValue> {
   private readonly decimalType: DuckDBDecimalType;
@@ -25,7 +16,7 @@ export class DuckDBDecimal128Vector extends DuckDBVector<DuckDBDecimalValue> {
     dataView: DataView,
     validity: DuckDBValidity,
     vector: duckdb.Vector,
-    itemCount: number
+    itemCount: number,
   ) {
     super();
     this.decimalType = decimalType;
@@ -37,22 +28,12 @@ export class DuckDBDecimal128Vector extends DuckDBVector<DuckDBDecimalValue> {
   static fromRawVector(
     decimalType: DuckDBDecimalType,
     vector: duckdb.Vector,
-    itemCount: number
+    itemCount: number,
   ): DuckDBDecimal128Vector {
     const data = vectorData(vector, itemCount * 16);
-    const dataView = new DataView(
-      data.buffer,
-      data.byteOffset,
-      data.byteLength
-    );
+    const dataView = new DataView(data.buffer, data.byteOffset, data.byteLength);
     const validity = DuckDBValidity.fromVector(vector, itemCount);
-    return new DuckDBDecimal128Vector(
-      decimalType,
-      dataView,
-      validity,
-      vector,
-      itemCount
-    );
+    return new DuckDBDecimal128Vector(decimalType, dataView, validity, vector, itemCount);
   }
   public override get type(): DuckDBDecimalType {
     return this.decimalType;
@@ -61,14 +42,10 @@ export class DuckDBDecimal128Vector extends DuckDBVector<DuckDBDecimalValue> {
     return this._itemCount;
   }
   public override getItem(itemIndex: number): DuckDBDecimalValue | null {
-    return this.validity.itemValid(itemIndex)
-      ? getDecimal128(this.dataView, itemIndex * 16, this.decimalType)
-      : null;
+    return this.validity.itemValid(itemIndex) ? getDecimal128(this.dataView, itemIndex * 16, this.decimalType) : null;
   }
   public getScaledValue(itemIndex: number): bigint | null {
-    return this.validity.itemValid(itemIndex)
-      ? getInt128(this.dataView, itemIndex * 16)
-      : null;
+    return this.validity.itemValid(itemIndex) ? getInt128(this.dataView, itemIndex * 16) : null;
   }
   public override setItem(itemIndex: number, value: DuckDBDecimalValue | null) {
     if (value != null) {
@@ -84,24 +61,17 @@ export class DuckDBDecimal128Vector extends DuckDBVector<DuckDBDecimalValue> {
       0,
       this.dataView.buffer as ArrayBuffer,
       this.dataView.byteOffset,
-      this.dataView.byteLength
+      this.dataView.byteLength,
     );
     this.validity.flush(this.vector);
   }
-  public override slice(
-    offset: number,
-    length: number
-  ): DuckDBDecimal128Vector {
+  public override slice(offset: number, length: number): DuckDBDecimal128Vector {
     return new DuckDBDecimal128Vector(
       this.decimalType,
-      new DataView(
-        this.dataView.buffer,
-        this.dataView.byteOffset + offset * 16,
-        length * 16
-      ),
+      new DataView(this.dataView.buffer, this.dataView.byteOffset + offset * 16, length * 16),
       this.validity.slice(offset, length),
       this.vector,
-      length
+      length,
     );
   }
 }

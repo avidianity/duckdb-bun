@@ -1,6 +1,6 @@
 import duckdb from "../bindings/index.ts";
-import { DuckDBPreparedStatement } from './DuckDBPreparedStatement';
-import { DuckDBPreparedStatementCollection } from './DuckDBPreparedStatementCollection';
+import { DuckDBPreparedStatement } from "./DuckDBPreparedStatement";
+import type { DuckDBPreparedStatementCollection } from "./DuckDBPreparedStatementCollection";
 
 export class DuckDBExtractedStatements {
   private readonly connection: duckdb.Connection;
@@ -11,7 +11,7 @@ export class DuckDBExtractedStatements {
     connection: duckdb.Connection,
     extracted_statements: duckdb.ExtractedStatements,
     statement_count: number,
-    preparedStatements?: DuckDBPreparedStatementCollection
+    preparedStatements?: DuckDBPreparedStatementCollection,
   ) {
     this.connection = connection;
     this.extracted_statements = extracted_statements;
@@ -23,11 +23,7 @@ export class DuckDBExtractedStatements {
   }
   public async prepare(index: number): Promise<DuckDBPreparedStatement> {
     const prepared = new DuckDBPreparedStatement(
-      await duckdb.prepare_extracted_statement(
-        this.connection,
-        this.extracted_statements,
-        index
-      )
+      await duckdb.prepare_extracted_statement(this.connection, this.extracted_statements, index),
     );
     if (this.preparedStatements) {
       this.preparedStatements.add(prepared);

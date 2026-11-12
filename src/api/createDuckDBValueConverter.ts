@@ -1,8 +1,8 @@
-import { DuckDBTypeId } from './DuckDBTypeId';
-import { DuckDBValueConverter } from './DuckDBValueConverter';
+import type { DuckDBTypeId } from "./DuckDBTypeId";
+import type { DuckDBValueConverter } from "./DuckDBValueConverter";
 
 export function createDuckDBValueConverter<T>(
-  convertersByTypeId: Record<DuckDBTypeId, DuckDBValueConverter<T> | undefined>
+  convertersByTypeId: Record<DuckDBTypeId, DuckDBValueConverter<T> | undefined>,
 ): DuckDBValueConverter<T> {
   return (value, type, converter) => {
     if (value == null) {

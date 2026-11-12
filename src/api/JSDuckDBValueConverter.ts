@@ -1,6 +1,6 @@
-import { createDuckDBValueConverter } from './createDuckDBValueConverter';
-import { DuckDBTypeId } from './DuckDBTypeId';
-import { DuckDBValueConverterFor } from './DuckDBValueConverter';
+import { createDuckDBValueConverter } from "./createDuckDBValueConverter";
+import { DuckDBTypeId } from "./DuckDBTypeId";
+import type { DuckDBValueConverterFor } from "./DuckDBValueConverter";
 import {
   arrayFromArrayValue,
   arrayFromListValue,
@@ -15,8 +15,8 @@ import {
   dateFromTimestampMillisecondsValue,
   dateFromTimestampNanosecondsValue,
   dateFromTimestampSecondsValue,
-  dateFromTimestampTZValue,
   dateFromTimestampTZNanosecondsValue,
+  dateFromTimestampTZValue,
   dateFromTimestampValue,
   doubleFromDecimalValue,
   fromVariantValue,
@@ -24,14 +24,14 @@ import {
   numberFromValue,
   objectArrayFromMapValue,
   objectFromIntervalValue,
-  objectOrArrayFromStructValue,
   objectFromTimeTZValue,
   objectFromUnionValue,
+  objectOrArrayFromStructValue,
   stringFromValue,
   unsupportedConverter,
-} from './DuckDBValueConverters';
-import { JS } from './JS';
-import { JSTypeForTypeId } from './JSTypeForTypeId';
+} from "./DuckDBValueConverters";
+import type { JS } from "./JS";
+import type { JSTypeForTypeId } from "./JSTypeForTypeId";
 
 const JSConvertersByTypeId: {
   [Id in DuckDBTypeId]: DuckDBValueConverterFor<JSTypeForTypeId[Id], JS>;
@@ -81,5 +81,4 @@ const JSConvertersByTypeId: {
   [DuckDBTypeId.TIMESTAMP_TZ_NS]: dateFromTimestampTZNanosecondsValue,
 };
 
-export const JSDuckDBValueConverter =
-  createDuckDBValueConverter<JS>(JSConvertersByTypeId);
+export const JSDuckDBValueConverter = createDuckDBValueConverter<JS>(JSConvertersByTypeId);

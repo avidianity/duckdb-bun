@@ -1,14 +1,14 @@
-import { assert } from '../../vitest-shim.ts';
 import {
-  DuckDBConnection,
-  DuckDBDataChunk,
+  type DuckDBConnection,
+  type DuckDBDataChunk,
   DuckDBInstance,
-  DuckDBResult,
+  type DuckDBResult,
   DuckDBTimestampTZValue,
-  DuckDBValue,
-  DuckDBVector,
-} from '../../../src/api';
-import { ColumnNameAndType } from './testAllTypes';
+  type DuckDBValue,
+  type DuckDBVector,
+} from "../../../src/api";
+import { assert } from "../../vitest-shim.ts";
+import type { ColumnNameAndType } from "./testAllTypes";
 
 /**
  * Pin the TIMESTAMPTZ display offset to a constant so tests don't depend on the
@@ -24,53 +24,30 @@ export async function sleep(ms: number): Promise<void> {
   });
 }
 
-export async function withConnection(
-  fn: (connection: DuckDBConnection) => Promise<void>,
-) {
+export async function withConnection(fn: (connection: DuckDBConnection) => Promise<void>) {
   const instance = await DuckDBInstance.create();
   const connection = await instance.connect();
   await fn(connection);
 }
 
-export function assertColumns(
-  result: DuckDBResult,
-  expectedColumns: readonly ColumnNameAndType[],
-) {
-  assert.strictEqual(
-    result.columnCount,
-    expectedColumns.length,
-    'column count',
-  );
+export function assertColumns(result: DuckDBResult, expectedColumns: readonly ColumnNameAndType[]) {
+  assert.strictEqual(result.columnCount, expectedColumns.length, "column count");
   for (let i = 0; i < expectedColumns.length; i++) {
     const { name, type } = expectedColumns[i];
-    assert.strictEqual(result.columnName(i), name, 'column name');
-    assert.strictEqual(
-      result.columnTypeId(i),
-      type.typeId,
-      `column type id (column: ${name})`,
-    );
-    assert.deepStrictEqual(
-      result.columnType(i),
-      type,
-      `column type (column: ${name})`,
-    );
+    assert.strictEqual(result.columnName(i), name, "column name");
+    assert.strictEqual(result.columnTypeId(i), type.typeId, `column type id (column: ${name})`);
+    assert.deepStrictEqual(result.columnType(i), type, `column type (column: ${name})`);
   }
 }
 
-export function isVectorType<
-  TValue extends DuckDBValue,
-  TVector extends DuckDBVector<TValue>,
->(
+export function isVectorType<TValue extends DuckDBValue, TVector extends DuckDBVector<TValue>>(
   vector: DuckDBVector<any> | null,
   vectorType: new (...args: any[]) => TVector,
 ): vector is TVector {
   return vector instanceof vectorType;
 }
 
-export function getColumnVector<
-  TValue extends DuckDBValue,
-  TVector extends DuckDBVector<TValue>,
->(
+export function getColumnVector<TValue extends DuckDBValue, TVector extends DuckDBVector<TValue>>(
   chunk: DuckDBDataChunk,
   columnIndex: number,
   vectorType: new (...args: any[]) => TVector,
@@ -106,10 +83,7 @@ export function assertVectorValues<TValue extends DuckDBValue>(
   }
 }
 
-export function assertValues<
-  TValue extends DuckDBValue,
-  TVector extends DuckDBVector<TValue>,
->(
+export function assertValues<TValue extends DuckDBValue, TVector extends DuckDBVector<TValue>>(
   chunk: DuckDBDataChunk,
   columnIndex: number,
   vectorType: new (...args: any[]) => TVector,
@@ -120,7 +94,5 @@ export function assertValues<
 }
 
 export function bigints(start: bigint, end: bigint) {
-  return Array.from({ length: Number(end - start) + 1 }).map(
-    (_, i) => start + BigInt(i),
-  );
+  return Array.from({ length: Number(end - start) + 1 }).map((_, i) => start + BigInt(i));
 }

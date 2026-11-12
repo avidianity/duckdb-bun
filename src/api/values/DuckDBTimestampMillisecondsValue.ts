@@ -1,6 +1,6 @@
-import duckdb, { TimestampMilliseconds } from "../../bindings/index.ts";
-import { getDuckDBTimestampStringFromMilliseconds } from '../conversion/dateTimeStringConversion';
-import { DuckDBTimestampSecondsValue } from './DuckDBTimestampSecondsValue';
+import duckdb, { type TimestampMilliseconds } from "../../bindings/index.ts";
+import { getDuckDBTimestampStringFromMilliseconds } from "../conversion/dateTimeStringConversion";
+import { DuckDBTimestampSecondsValue } from "./DuckDBTimestampSecondsValue";
 
 export class DuckDBTimestampMillisecondsValue implements TimestampMilliseconds {
   public readonly millis: bigint;

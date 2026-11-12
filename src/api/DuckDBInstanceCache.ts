@@ -1,6 +1,6 @@
 import duckdb from "../bindings/index.ts";
-import { DuckDBInstance } from './DuckDBInstance';
-import { createConfig } from './createConfig';
+import { createConfig } from "./createConfig";
+import { DuckDBInstance } from "./DuckDBInstance";
 
 export class DuckDBInstanceCache {
   private readonly cache: duckdb.InstanceCache;
@@ -9,10 +9,7 @@ export class DuckDBInstanceCache {
     this.cache = duckdb.create_instance_cache();
   }
 
-  public async getOrCreateInstance(
-    path?: string,
-    options?: Record<string, string>
-  ): Promise<DuckDBInstance> {
+  public async getOrCreateInstance(path?: string, options?: Record<string, string>): Promise<DuckDBInstance> {
     const config = createConfig(options);
     const db = await duckdb.get_or_create_from_cache(this.cache, path, config);
     return new DuckDBInstance(db);

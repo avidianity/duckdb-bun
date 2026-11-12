@@ -1,5 +1,5 @@
-import { displayStringForDuckDBValue } from '../conversion/displayStringForDuckDBValue';
-import { DuckDBValue } from './DuckDBValue';
+import { displayStringForDuckDBValue } from "../conversion/displayStringForDuckDBValue";
+import type { DuckDBValue } from "./DuckDBValue";
 
 export class DuckDBStructValue {
   public readonly entries: Readonly<Record<string, DuckDBValue>>;
@@ -13,7 +13,7 @@ export class DuckDBStructValue {
     for (const name in this.entries) {
       parts.push(`${displayStringForDuckDBValue(name)}: ${displayStringForDuckDBValue(this.entries[name])}`);
     }
-    return `{${parts.join(', ')}}`;
+    return `{${parts.join(", ")}}`;
   }
 }
 

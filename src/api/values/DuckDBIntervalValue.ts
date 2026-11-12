@@ -1,5 +1,5 @@
-import { Interval } from "../../bindings/index.ts";
-import { getDuckDBIntervalString } from '../conversion/dateTimeStringConversion';
+import type { Interval } from "../../bindings/index.ts";
+import { getDuckDBIntervalString } from "../conversion/dateTimeStringConversion";
 
 export class DuckDBIntervalValue implements Interval {
   public readonly months: number;

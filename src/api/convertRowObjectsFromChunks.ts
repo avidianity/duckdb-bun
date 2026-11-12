@@ -1,10 +1,10 @@
-import { DuckDBDataChunk } from './DuckDBDataChunk';
-import { DuckDBValueConverter } from './DuckDBValueConverter';
+import type { DuckDBDataChunk } from "./DuckDBDataChunk";
+import type { DuckDBValueConverter } from "./DuckDBValueConverter";
 
 export function convertRowObjectsFromChunks<T>(
   chunks: readonly DuckDBDataChunk[],
   columnNames: readonly string[],
-  converter: DuckDBValueConverter<T>
+  converter: DuckDBValueConverter<T>,
 ): Record<string, T | null>[] {
   const rowObjects: Record<string, T | null>[] = [];
   for (const chunk of chunks) {

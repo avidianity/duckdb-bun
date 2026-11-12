@@ -1,26 +1,22 @@
-import { expect, test } from '../vitest-shim.ts';
 import {
-  DuckDBBigIntType,
-  DuckDBBlobType,
-  DuckDBDoubleType,
+  type DuckDBBigIntType,
+  type DuckDBBlobType,
+  type DuckDBDoubleType,
   DuckDBInstance,
-  DuckDBIntegerType,
-  DuckDBIntervalType,
-  DuckDBListType,
-  DuckDBSQLNullType,
-  DuckDBTimestampTZType,
-  DuckDBVarCharType,
-  JS,
-  JSTypeFor,
-  Json,
-  JsonTypeFor,
-} from '../../src/api';
+  type DuckDBIntegerType,
+  type DuckDBIntervalType,
+  type DuckDBListType,
+  type DuckDBSQLNullType,
+  type DuckDBTimestampTZType,
+  type DuckDBVarCharType,
+  type JS,
+  type JSTypeFor,
+  type Json,
+  type JsonTypeFor,
+} from "../../src/api";
+import { expect, test } from "../vitest-shim.ts";
 
-type Eq<A, B> = (<G>() => G extends A ? 1 : 2) extends <G>() => G extends B
-  ? 1
-  : 2
-  ? true
-  : false;
+type Eq<A, B> = (<G>() => G extends A ? 1 : 2) extends <G>() => G extends B ? 1 : 2 ? true : false;
 type Assert<T extends true> = T;
 
 // The mappings are checked against the converter maps at their definition; these
@@ -44,16 +40,11 @@ export type _Json = [
   Assert<Eq<JsonTypeFor<DuckDBBlobType>, string>>,
   Assert<Eq<JsonTypeFor<DuckDBDoubleType>, number | string>>,
   Assert<Eq<JsonTypeFor<DuckDBListType>, (Json | null)[]>>,
-  Assert<
-    Eq<
-      JsonTypeFor<DuckDBIntervalType>,
-      { months: number; days: number; micros: string }
-    >
-  >,
+  Assert<Eq<JsonTypeFor<DuckDBIntervalType>, { months: number; days: number; micros: string }>>,
 ];
 
-test('declared JS and Json types match what the converters produce', async () => {
-  const instance = await DuckDBInstance.create(':memory:');
+test("declared JS and Json types match what the converters produce", async () => {
+  const instance = await DuckDBInstance.create(":memory:");
   const connection = await instance.connect();
   const reader = await connection.runAndReadAll(`select
     42::integer as i,
@@ -67,22 +58,22 @@ test('declared JS and Json types match what the converters produce', async () =>
     null::integer as n`);
 
   const js = reader.getRowObjectsJS()[0];
-  expect(typeof js['i']).toBe('number');
-  expect(typeof js['bi']).toBe('bigint');
-  expect(typeof js['s']).toBe('string');
-  expect(typeof js['b']).toBe('boolean');
-  expect(typeof js['d']).toBe('number');
-  expect(js['bl']).toBeInstanceOf(Uint8Array);
-  expect(js['tstz']).toBeInstanceOf(Date);
-  expect(Array.isArray(js['l'])).toBe(true);
-  expect(js['n']).toBeNull();
+  expect(typeof js.i).toBe("number");
+  expect(typeof js.bi).toBe("bigint");
+  expect(typeof js.s).toBe("string");
+  expect(typeof js.b).toBe("boolean");
+  expect(typeof js.d).toBe("number");
+  expect(js.bl).toBeInstanceOf(Uint8Array);
+  expect(js.tstz).toBeInstanceOf(Date);
+  expect(Array.isArray(js.l)).toBe(true);
+  expect(js.n).toBeNull();
 
   const json = reader.getRowObjectsJson()[0];
-  expect(typeof json['i']).toBe('number');
-  expect(typeof json['bi']).toBe('string');
-  expect(typeof json['d']).toBe('number');
-  expect(typeof json['bl']).toBe('string');
-  expect(typeof json['tstz']).toBe('string');
-  expect(Array.isArray(json['l'])).toBe(true);
-  expect(json['n']).toBeNull();
+  expect(typeof json.i).toBe("number");
+  expect(typeof json.bi).toBe("string");
+  expect(typeof json.d).toBe("number");
+  expect(typeof json.bl).toBe("string");
+  expect(typeof json.tstz).toBe("string");
+  expect(Array.isArray(json.l)).toBe(true);
+  expect(json.n).toBeNull();
 });

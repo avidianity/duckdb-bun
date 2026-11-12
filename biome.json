@@ -30,6 +30,6 @@
     }
   },
   "files": {
-    "includes": ["**", "!**/vendor/**", "!src/api/**", "!tests/api/**", "!tests/bindings/**", "!src/bindings/node-bindings.d.ts", "!bench/results/**", "!**/*.so", "!**/*.dylib", "!**/*.dll"]
+    "includes": ["**", "!**/vendor/**", "!bench/results/**", "!**/*.so", "!**/*.dylib", "!**/*.dll"]
   }
 }

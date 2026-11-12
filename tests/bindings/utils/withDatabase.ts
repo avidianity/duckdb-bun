@@ -1,4 +1,4 @@
-import duckdb from '../../../src/bindings/index.ts';
+import duckdb from "../../../src/bindings/index.ts";
 
 export async function withDatabase(
   { path, config }: { path?: string; config?: duckdb.Config },

@@ -1,5 +1,5 @@
-import duckdb from '../../src/bindings/index.ts';
-import { expect, suite, test } from '../vitest-shim.ts';
+import duckdb from "../../src/bindings/index.ts";
+import { expect, suite, test } from "../vitest-shim.ts";
 import {
   ALT,
   ARRAY,
@@ -30,175 +30,157 @@ import {
   USMALLINT,
   UTINYINT,
   VARCHAR,
-} from './utils/expectedLogicalTypes';
-import { array, data, list, map, struct, union } from './utils/expectedVectors';
-import { expectLogicalType } from './utils/expectLogicalType';
-import { expectResult } from './utils/expectResult';
-import { withConnection } from './utils/withConnection';
+} from "./utils/expectedLogicalTypes";
+import { array, data, list, map, struct, union } from "./utils/expectedVectors";
+import { expectLogicalType } from "./utils/expectLogicalType";
+import { expectResult } from "./utils/expectResult";
+import { withConnection } from "./utils/withConnection";
 
-suite('prepared statements', () => {
-  test('no parameters', async () => {
+suite("prepared statements", () => {
+  test("no parameters", async () => {
     await withConnection(async (connection) => {
-      const prepared = await duckdb.prepare(
-        connection,
-        'select 17 as seventeen'
-      );
+      const prepared = await duckdb.prepare(connection, "select 17 as seventeen");
       expect(duckdb.nparams(prepared)).toBe(0);
-      expect(duckdb.prepared_statement_type(prepared)).toBe(
-        duckdb.StatementType.SELECT
-      );
+      expect(duckdb.prepared_statement_type(prepared)).toBe(duckdb.StatementType.SELECT);
       expect(duckdb.prepared_statement_column_count(prepared)).toBe(1);
-      expect(duckdb.prepared_statement_column_name(prepared, 0)).toBe(
-        'seventeen'
-      );
-      expectLogicalType(
-        duckdb.prepared_statement_column_logical_type(prepared, 0),
-        INTEGER
-      );
-      expect(duckdb.prepared_statement_column_type(prepared, 0)).toBe(
-        duckdb.Type.INTEGER
-      );
+      expect(duckdb.prepared_statement_column_name(prepared, 0)).toBe("seventeen");
+      expectLogicalType(duckdb.prepared_statement_column_logical_type(prepared, 0), INTEGER);
+      expect(duckdb.prepared_statement_column_type(prepared, 0)).toBe(duckdb.Type.INTEGER);
       const result = await duckdb.execute_prepared(prepared);
-      await expectResult(result, {
-        chunkCount: 1,
-        rowCount: 1,
-        columns: [{ name: 'seventeen', logicalType: INTEGER }],
-        chunks: [{ rowCount: 1, vectors: [data(4, [true], [17])] }],
-      }, prepared);
+      await expectResult(
+        result,
+        {
+          chunkCount: 1,
+          rowCount: 1,
+          columns: [{ name: "seventeen", logicalType: INTEGER }],
+          chunks: [{ rowCount: 1, vectors: [data(4, [true], [17])] }],
+        },
+        prepared,
+      );
     });
   });
-  test('auto-increment parameters', async () => {
+  test("auto-increment parameters", async () => {
     await withConnection(async (connection) => {
-      const prepared = await duckdb.prepare(
-        connection,
-        'select ? as a, ? as b'
-      );
-      expect(duckdb.prepared_statement_type(prepared)).toBe(
-        duckdb.StatementType.SELECT
-      );
+      const prepared = await duckdb.prepare(connection, "select ? as a, ? as b");
+      expect(duckdb.prepared_statement_type(prepared)).toBe(duckdb.StatementType.SELECT);
       expect(duckdb.nparams(prepared)).toBe(2);
 
       // types are ambiguous
       expect(duckdb.prepared_statement_column_count(prepared)).toBe(1);
-      expect(duckdb.prepared_statement_column_type(prepared, 0)).toBe(
-        duckdb.Type.INVALID
-      );
+      expect(duckdb.prepared_statement_column_type(prepared, 0)).toBe(duckdb.Type.INVALID);
 
-      expect(duckdb.parameter_name(prepared, 1)).toBe('1');
-      expect(duckdb.bind_parameter_index(prepared, '1')).toBe(1);
+      expect(duckdb.parameter_name(prepared, 1)).toBe("1");
+      expect(duckdb.bind_parameter_index(prepared, "1")).toBe(1);
       duckdb.bind_int32(prepared, 1, 11);
       expect(duckdb.param_type(prepared, 1)).toBe(duckdb.Type.INTEGER);
 
-      expect(duckdb.parameter_name(prepared, 2)).toBe('2');
-      expect(duckdb.bind_parameter_index(prepared, '2')).toBe(2);
+      expect(duckdb.parameter_name(prepared, 2)).toBe("2");
+      expect(duckdb.bind_parameter_index(prepared, "2")).toBe(2);
       duckdb.bind_int32(prepared, 2, 22);
       expect(duckdb.param_type(prepared, 2)).toBe(duckdb.Type.INTEGER);
 
       // types are ambiguous; no change after binding
       expect(duckdb.prepared_statement_column_count(prepared)).toBe(1);
-      expect(duckdb.prepared_statement_column_type(prepared, 0)).toBe(
-        duckdb.Type.INVALID
-      );
+      expect(duckdb.prepared_statement_column_type(prepared, 0)).toBe(duckdb.Type.INVALID);
 
       const result = await duckdb.execute_prepared(prepared);
-      await expectResult(result, {
-        chunkCount: 1,
-        rowCount: 1,
-        columns: [
-          { name: 'a', logicalType: INTEGER },
-          { name: 'b', logicalType: INTEGER },
-        ],
-        chunks: [
-          {
-            rowCount: 1,
-            vectors: [data(4, [true], [11]), data(4, [true], [22])],
-          },
-        ],
-      }, prepared);
+      await expectResult(
+        result,
+        {
+          chunkCount: 1,
+          rowCount: 1,
+          columns: [
+            { name: "a", logicalType: INTEGER },
+            { name: "b", logicalType: INTEGER },
+          ],
+          chunks: [
+            {
+              rowCount: 1,
+              vectors: [data(4, [true], [11]), data(4, [true], [22])],
+            },
+          ],
+        },
+        prepared,
+      );
     });
   });
-  test('positional parameters', async () => {
+  test("positional parameters", async () => {
     await withConnection(async (connection) => {
-      const prepared = await duckdb.prepare(
-        connection,
-        'select $2 as two, $1 as one'
-      );
-      expect(duckdb.prepared_statement_type(prepared)).toBe(
-        duckdb.StatementType.SELECT
-      );
+      const prepared = await duckdb.prepare(connection, "select $2 as two, $1 as one");
+      expect(duckdb.prepared_statement_type(prepared)).toBe(duckdb.StatementType.SELECT);
       expect(duckdb.nparams(prepared)).toBe(2);
 
-      expect(duckdb.parameter_name(prepared, 1)).toBe('1');
-      expect(duckdb.bind_parameter_index(prepared, '1')).toBe(1);
+      expect(duckdb.parameter_name(prepared, 1)).toBe("1");
+      expect(duckdb.bind_parameter_index(prepared, "1")).toBe(1);
       duckdb.bind_int32(prepared, 1, 11);
       expect(duckdb.param_type(prepared, 1)).toBe(duckdb.Type.INTEGER);
 
-      expect(duckdb.parameter_name(prepared, 2)).toBe('2');
-      expect(duckdb.bind_parameter_index(prepared, '2')).toBe(2);
+      expect(duckdb.parameter_name(prepared, 2)).toBe("2");
+      expect(duckdb.bind_parameter_index(prepared, "2")).toBe(2);
       duckdb.bind_int32(prepared, 2, 22);
       expect(duckdb.param_type(prepared, 2)).toBe(duckdb.Type.INTEGER);
 
       const result = await duckdb.execute_prepared(prepared);
-      await expectResult(result, {
-        chunkCount: 1,
-        rowCount: 1,
-        columns: [
-          { name: 'two', logicalType: INTEGER },
-          { name: 'one', logicalType: INTEGER },
-        ],
-        chunks: [
-          {
-            rowCount: 1,
-            vectors: [data(4, [true], [22]), data(4, [true], [11])],
-          },
-        ],
-      }, prepared);
+      await expectResult(
+        result,
+        {
+          chunkCount: 1,
+          rowCount: 1,
+          columns: [
+            { name: "two", logicalType: INTEGER },
+            { name: "one", logicalType: INTEGER },
+          ],
+          chunks: [
+            {
+              rowCount: 1,
+              vectors: [data(4, [true], [22]), data(4, [true], [11])],
+            },
+          ],
+        },
+        prepared,
+      );
     });
   });
-  test('named parameters', async () => {
+  test("named parameters", async () => {
     await withConnection(async (connection) => {
-      const prepared = await duckdb.prepare(
-        connection,
-        'select $x as a, $y as b'
-      );
-      expect(duckdb.prepared_statement_type(prepared)).toBe(
-        duckdb.StatementType.SELECT
-      );
+      const prepared = await duckdb.prepare(connection, "select $x as a, $y as b");
+      expect(duckdb.prepared_statement_type(prepared)).toBe(duckdb.StatementType.SELECT);
       expect(duckdb.nparams(prepared)).toBe(2);
 
-      expect(duckdb.parameter_name(prepared, 1)).toBe('x');
-      expect(duckdb.bind_parameter_index(prepared, 'x')).toBe(1);
+      expect(duckdb.parameter_name(prepared, 1)).toBe("x");
+      expect(duckdb.bind_parameter_index(prepared, "x")).toBe(1);
       duckdb.bind_int32(prepared, 1, 11);
       expect(duckdb.param_type(prepared, 1)).toBe(duckdb.Type.INTEGER);
 
-      expect(duckdb.parameter_name(prepared, 2)).toBe('y');
-      expect(duckdb.bind_parameter_index(prepared, 'y')).toBe(2);
-      duckdb.bind_varchar(prepared, 2, 'a');
+      expect(duckdb.parameter_name(prepared, 2)).toBe("y");
+      expect(duckdb.bind_parameter_index(prepared, "y")).toBe(2);
+      duckdb.bind_varchar(prepared, 2, "a");
       // expect(duckdb.param_type(prepared, 2)).toBe(duckdb.Type.VARCHAR); // TODO 1.2.1 - support STRING_LITERAL
 
       const result = await duckdb.execute_prepared(prepared);
-      await expectResult(result, {
-        chunkCount: 1,
-        rowCount: 1,
-        columns: [
-          { name: 'a', logicalType: INTEGER },
-          { name: 'b', logicalType: VARCHAR },
-        ],
-        chunks: [
-          {
-            rowCount: 1,
-            vectors: [data(4, [true], [11]), data(16, [true], ['a'])],
-          },
-        ],
-      }, prepared);
+      await expectResult(
+        result,
+        {
+          chunkCount: 1,
+          rowCount: 1,
+          columns: [
+            { name: "a", logicalType: INTEGER },
+            { name: "b", logicalType: VARCHAR },
+          ],
+          chunks: [
+            {
+              rowCount: 1,
+              vectors: [data(4, [true], [11]), data(16, [true], ["a"])],
+            },
+          ],
+        },
+        prepared,
+      );
     });
   });
-  test('clear bindings', async () => {
+  test("clear bindings", async () => {
     await withConnection(async (connection) => {
-      const prepared = await duckdb.prepare(
-        connection,
-        'select ? as a, ? as b'
-      );
+      const prepared = await duckdb.prepare(connection, "select ? as a, ? as b");
       duckdb.bind_int32(prepared, 1, 11);
       expect(duckdb.param_type(prepared, 1)).toBe(duckdb.Type.INTEGER);
       duckdb.bind_int32(prepared, 2, 22);
@@ -214,45 +196,46 @@ suite('prepared statements', () => {
       expect(duckdb.param_type(prepared, 2)).toBe(duckdb.Type.INTEGER);
 
       const result = await duckdb.execute_prepared(prepared);
-      await expectResult(result, {
-        chunkCount: 1,
-        rowCount: 1,
-        columns: [
-          { name: 'a', logicalType: INTEGER },
-          { name: 'b', logicalType: INTEGER },
-        ],
-        chunks: [
-          {
-            rowCount: 1,
-            vectors: [data(4, [true], [111]), data(4, [true], [222])],
-          },
-        ],
-      }, prepared);
+      await expectResult(
+        result,
+        {
+          chunkCount: 1,
+          rowCount: 1,
+          columns: [
+            { name: "a", logicalType: INTEGER },
+            { name: "b", logicalType: INTEGER },
+          ],
+          chunks: [
+            {
+              rowCount: 1,
+              vectors: [data(4, [true], [111]), data(4, [true], [222])],
+            },
+          ],
+        },
+        prepared,
+      );
     });
   });
-  test('bind error reports which parameter', async () => {
+  test("bind error reports which parameter", async () => {
     await withConnection(async (connection) => {
-      const prepared = await duckdb.prepare(
-        connection,
-        'select ?::integer, ?::integer'
-      );
+      const prepared = await duckdb.prepare(connection, "select ?::integer, ?::integer");
       // Parameters are 1-based, so 0 and 3 are both out of range. The error
       // code alone supports no more than "Failed to bind"; the reason comes
       // from duckdb_prepare_error.
       expect(() => duckdb.bind_int32(prepared, 0, 42)).toThrowError(
-        'Can not bind to parameter number 0, statement only has 2 parameter(s)'
+        "Can not bind to parameter number 0, statement only has 2 parameter(s)",
       );
       expect(() => duckdb.bind_int32(prepared, 3, 42)).toThrowError(
-        'Can not bind to parameter number 3, statement only has 2 parameter(s)'
+        "Can not bind to parameter number 3, statement only has 2 parameter(s)",
       );
       expect(() => duckdb.bind_int32(prepared, 1, 42)).not.toThrow();
     });
   });
-  test('bind primitive types', async () => {
+  test("bind primitive types", async () => {
     await withConnection(async (connection) => {
       const prepared = await duckdb.prepare(
         connection,
-        'select \
+        "select \
         ? as boolean, \
         ? as int8, \
         ? as int16, \
@@ -274,7 +257,7 @@ suite('prepared statements', () => {
         ? as interval, \
         ? as varchar, \
         ? as blob, \
-        ? as null'
+        ? as null",
       );
 
       duckdb.bind_boolean(prepared, 1, true);
@@ -292,18 +275,10 @@ suite('prepared statements', () => {
       duckdb.bind_int64(prepared, 5, 9223372036854775807n);
       expect(duckdb.param_type(prepared, 5)).toBe(duckdb.Type.BIGINT);
 
-      duckdb.bind_hugeint(
-        prepared,
-        6,
-        170141183460469231731687303715884105727n
-      );
+      duckdb.bind_hugeint(prepared, 6, 170141183460469231731687303715884105727n);
       expect(duckdb.param_type(prepared, 6)).toBe(duckdb.Type.HUGEINT);
 
-      duckdb.bind_uhugeint(
-        prepared,
-        7,
-        340282366920938463463374607431768211455n
-      );
+      duckdb.bind_uhugeint(prepared, 7, 340282366920938463463374607431768211455n);
       expect(duckdb.param_type(prepared, 7)).toBe(duckdb.Type.UHUGEINT);
 
       duckdb.bind_decimal(prepared, 8, { width: 4, scale: 1, value: 9999n });
@@ -346,117 +321,100 @@ suite('prepared statements', () => {
       });
       expect(duckdb.param_type(prepared, 19)).toBe(duckdb.Type.INTERVAL);
 
-      duckdb.bind_varchar(prepared, 20, '🦆🦆🦆\x00🦆🦆🦆');
+      duckdb.bind_varchar(prepared, 20, "🦆🦆🦆\x00🦆🦆🦆");
       // expect(duckdb.param_type(prepared, 20)).toBe(duckdb.Type.VARCHAR); // TODO 1.2.1 - support STRING_LITERAL
 
-      duckdb.bind_blob(
-        prepared,
-        21,
-        Buffer.from('thisisalongblob\x00withnullbytes')
-      );
+      duckdb.bind_blob(prepared, 21, Buffer.from("thisisalongblob\x00withnullbytes"));
       expect(duckdb.param_type(prepared, 21)).toBe(duckdb.Type.BLOB);
 
       duckdb.bind_null(prepared, 22);
       expect(duckdb.param_type(prepared, 22)).toBe(duckdb.Type.SQLNULL);
 
       const result = await duckdb.execute_prepared(prepared);
-      await expectResult(result, {
-        chunkCount: 1,
-        rowCount: 1,
-        columns: [
-          { name: 'boolean', logicalType: BOOLEAN },
-          { name: 'int8', logicalType: TINYINT },
-          { name: 'int16', logicalType: SMALLINT },
-          { name: 'int32', logicalType: INTEGER },
-          { name: 'int64', logicalType: BIGINT },
-          { name: 'hugeint', logicalType: HUGEINT },
-          { name: 'uhugeint', logicalType: UHUGEINT },
-          { name: 'decimal', logicalType: DECIMAL(4, 1, duckdb.Type.SMALLINT) },
-          { name: 'uint8', logicalType: UTINYINT },
-          { name: 'uint16', logicalType: USMALLINT },
-          { name: 'uint32', logicalType: UINTEGER },
-          { name: 'uint64', logicalType: UBIGINT },
-          { name: 'float', logicalType: FLOAT },
-          { name: 'double', logicalType: DOUBLE },
-          { name: 'date', logicalType: DATE },
-          { name: 'time', logicalType: TIME },
-          { name: 'timestamp', logicalType: TIMESTAMP },
-          { name: 'timestamp_tz', logicalType: TIMESTAMP_TZ },
-          { name: 'interval', logicalType: INTERVAL },
-          { name: 'varchar', logicalType: VARCHAR },
-          { name: 'blob', logicalType: BLOB },
-          { name: 'null', logicalType: SQLNULL },
-        ],
-        chunks: [
-          {
-            rowCount: 1,
-            vectors: [
-              data(1, [true], [true]),
-              data(1, [true], [127]),
-              data(2, [true], [32767]),
-              data(4, [true], [2147483647]),
-              data(8, [true], [9223372036854775807n]),
-              data(16, [true], [170141183460469231731687303715884105727n]),
-              data(16, [true], [340282366920938463463374607431768211455n]),
-              data(2, [true], [9999]),
-              data(1, [true], [255]),
-              data(2, [true], [65535]),
-              data(4, [true], [4294967295]),
-              data(8, [true], [18446744073709551615n]),
-              data(4, [true], [3.4028234663852886e38]),
-              data(8, [true], [1.7976931348623157e308]),
-              data(4, [true], [2147483646]),
-              data(8, [true], [86400000000n]),
-              data(8, [true], [9223372036854775806n]),
-              data(8, [true], [9223372036854775806n]),
-              data(
-                16,
-                [true],
-                [{ months: 999, days: 999, micros: 999999999n }]
-              ),
-              data(16, [true], ['🦆🦆🦆\x00🦆🦆🦆']),
-              data(
-                16,
-                [true],
-                [Buffer.from('thisisalongblob\x00withnullbytes')]
-              ),
-              data(4, [false], [null]),
-            ],
-          },
-        ],
-      }, prepared);
+      await expectResult(
+        result,
+        {
+          chunkCount: 1,
+          rowCount: 1,
+          columns: [
+            { name: "boolean", logicalType: BOOLEAN },
+            { name: "int8", logicalType: TINYINT },
+            { name: "int16", logicalType: SMALLINT },
+            { name: "int32", logicalType: INTEGER },
+            { name: "int64", logicalType: BIGINT },
+            { name: "hugeint", logicalType: HUGEINT },
+            { name: "uhugeint", logicalType: UHUGEINT },
+            { name: "decimal", logicalType: DECIMAL(4, 1, duckdb.Type.SMALLINT) },
+            { name: "uint8", logicalType: UTINYINT },
+            { name: "uint16", logicalType: USMALLINT },
+            { name: "uint32", logicalType: UINTEGER },
+            { name: "uint64", logicalType: UBIGINT },
+            { name: "float", logicalType: FLOAT },
+            { name: "double", logicalType: DOUBLE },
+            { name: "date", logicalType: DATE },
+            { name: "time", logicalType: TIME },
+            { name: "timestamp", logicalType: TIMESTAMP },
+            { name: "timestamp_tz", logicalType: TIMESTAMP_TZ },
+            { name: "interval", logicalType: INTERVAL },
+            { name: "varchar", logicalType: VARCHAR },
+            { name: "blob", logicalType: BLOB },
+            { name: "null", logicalType: SQLNULL },
+          ],
+          chunks: [
+            {
+              rowCount: 1,
+              vectors: [
+                data(1, [true], [true]),
+                data(1, [true], [127]),
+                data(2, [true], [32767]),
+                data(4, [true], [2147483647]),
+                data(8, [true], [9223372036854775807n]),
+                data(16, [true], [170141183460469231731687303715884105727n]),
+                data(16, [true], [340282366920938463463374607431768211455n]),
+                data(2, [true], [9999]),
+                data(1, [true], [255]),
+                data(2, [true], [65535]),
+                data(4, [true], [4294967295]),
+                data(8, [true], [18446744073709551615n]),
+                data(4, [true], [3.4028234663852886e38]),
+                data(8, [true], [1.7976931348623157e308]),
+                data(4, [true], [2147483646]),
+                data(8, [true], [86400000000n]),
+                data(8, [true], [9223372036854775806n]),
+                data(8, [true], [9223372036854775806n]),
+                data(16, [true], [{ months: 999, days: 999, micros: 999999999n }]),
+                data(16, [true], ["🦆🦆🦆\x00🦆🦆🦆"]),
+                data(16, [true], [Buffer.from("thisisalongblob\x00withnullbytes")]),
+                data(4, [false], [null]),
+              ],
+            },
+          ],
+        },
+        prepared,
+      );
     });
   });
-  test('bind nested types', async () => {
+  test("bind nested types", async () => {
     await withConnection(async (connection) => {
       const prepared = await duckdb.prepare(
         connection,
-        'select \
+        "select \
         ? as struct, \
         ? as list, \
         ? as array, \
         ? as map, \
-        ? as union'
+        ? as union",
       );
       const int_type = duckdb.create_logical_type(duckdb.Type.INTEGER);
       const varchar_type = duckdb.create_logical_type(duckdb.Type.VARCHAR);
-      const struct_type = duckdb.create_struct_type(
-        [int_type, varchar_type],
-        ['a', 'b']
-      );
+      const struct_type = duckdb.create_struct_type([int_type, varchar_type], ["a", "b"]);
       const map_type = duckdb.create_map_type(int_type, varchar_type);
-      const union_type = duckdb.create_union_type(
-        [int_type, varchar_type],
-        ['num', 'str']
-      );
+      const union_type = duckdb.create_union_type([int_type, varchar_type], ["num", "str"]);
 
       const int_value = duckdb.create_int64(42n);
-      const varchar_value = duckdb.create_varchar('🦆🦆🦆🦆🦆🦆');
+      const varchar_value = duckdb.create_varchar("🦆🦆🦆🦆🦆🦆");
 
-      const struct_value = duckdb.create_struct_value(struct_type, [
-        int_value,
-        varchar_value,
-      ]);
+      const struct_value = duckdb.create_struct_value(struct_type, [int_value, varchar_value]);
       duckdb.bind_value(prepared, 1, struct_value);
       expect(duckdb.param_type(prepared, 1)).toBe(duckdb.Type.STRUCT);
 
@@ -468,122 +426,109 @@ suite('prepared statements', () => {
       duckdb.bind_value(prepared, 3, array_value);
       expect(duckdb.param_type(prepared, 3)).toBe(duckdb.Type.ARRAY);
 
-      const map_value = duckdb.create_map_value(
-        map_type,
-        [int_value],
-        [varchar_value]
-      );
+      const map_value = duckdb.create_map_value(map_type, [int_value], [varchar_value]);
       duckdb.bind_value(prepared, 4, map_value);
       expect(duckdb.param_type(prepared, 4)).toBe(duckdb.Type.MAP);
 
-      const union_value = duckdb.create_union_value(
-        union_type,
-        1,
-        varchar_value
-      );
+      const union_value = duckdb.create_union_value(union_type, 1, varchar_value);
       duckdb.bind_value(prepared, 5, union_value);
       expect(duckdb.param_type(prepared, 5)).toBe(duckdb.Type.UNION);
 
       const result = await duckdb.execute_prepared(prepared);
-      await expectResult(result, {
-        chunkCount: 1,
-        rowCount: 1,
-        columns: [
-          {
-            name: 'struct',
-            logicalType: STRUCT(ENTRY('a', INTEGER), ENTRY('b', VARCHAR)),
-          },
-          { name: 'list', logicalType: LIST(INTEGER) },
-          { name: 'array', logicalType: ARRAY(INTEGER, 1) },
-          { name: 'map', logicalType: MAP(INTEGER, VARCHAR) },
-          {
-            name: 'union',
-            logicalType: UNION(ALT('num', INTEGER), ALT('str', VARCHAR)),
-          },
-        ],
-        chunks: [
-          {
-            rowCount: 1,
-            vectors: [
-              struct(
-                1,
-                [true],
-                [data(4, [true], [42]), data(16, [true], ['🦆🦆🦆🦆🦆🦆'])]
-              ),
-              list([true], [[0n, 1n]], 1, data(4, [true], [42])),
-              array(1, [true], data(4, [true], [42])),
-              map(
-                [true],
-                [[0n, 1n]],
-                1,
-                data(4, [true], [42]),
-                data(16, [true], ['🦆🦆🦆🦆🦆🦆'])
-              ),
-              union([
-                data(1, [true], [1]), // tags
-                data(4, [false], [null]),
-                data(16, [true], ['🦆🦆🦆🦆🦆🦆']),
-              ]),
-            ],
-          },
-        ],
-      }, prepared);
-    });
-  });
-  test('streaming', async () => {
-    await withConnection(async (connection) => {
-      const prepared = await duckdb.prepare(
-        connection,
-        'select n::integer as int from range(5000) t(n)'
+      await expectResult(
+        result,
+        {
+          chunkCount: 1,
+          rowCount: 1,
+          columns: [
+            {
+              name: "struct",
+              logicalType: STRUCT(ENTRY("a", INTEGER), ENTRY("b", VARCHAR)),
+            },
+            { name: "list", logicalType: LIST(INTEGER) },
+            { name: "array", logicalType: ARRAY(INTEGER, 1) },
+            { name: "map", logicalType: MAP(INTEGER, VARCHAR) },
+            {
+              name: "union",
+              logicalType: UNION(ALT("num", INTEGER), ALT("str", VARCHAR)),
+            },
+          ],
+          chunks: [
+            {
+              rowCount: 1,
+              vectors: [
+                struct(1, [true], [data(4, [true], [42]), data(16, [true], ["🦆🦆🦆🦆🦆🦆"])]),
+                list([true], [[0n, 1n]], 1, data(4, [true], [42])),
+                array(1, [true], data(4, [true], [42])),
+                map([true], [[0n, 1n]], 1, data(4, [true], [42]), data(16, [true], ["🦆🦆🦆🦆🦆🦆"])),
+                union([
+                  data(1, [true], [1]), // tags
+                  data(4, [false], [null]),
+                  data(16, [true], ["🦆🦆🦆🦆🦆🦆"]),
+                ]),
+              ],
+            },
+          ],
+        },
+        prepared,
       );
-      const result = await duckdb.execute_prepared_streaming(prepared);
-      await expectResult(result, {
-        isStreaming: true,
-        columns: [{ name: 'int', logicalType: INTEGER }],
-        chunks: [
-          {
-            rowCount: 2048,
-            vectors: [
-              data(
-                4,
-                null,
-                Array.from({ length: 2048 }).map((_, i) => i)
-              ),
-            ],
-          },
-          {
-            rowCount: 2048,
-            vectors: [
-              data(
-                4,
-                null,
-                Array.from({ length: 2048 }).map((_, i) => 2048 + i)
-              ),
-            ],
-          },
-          {
-            rowCount: 904,
-            vectors: [
-              data(
-                4,
-                null,
-                Array.from({ length: 904 }).map((_, i) => 4096 + i)
-              ),
-            ],
-          },
-        ],
-      }, prepared);
     });
   });
-  test('bind empty nested types', async () => {
+  test("streaming", async () => {
+    await withConnection(async (connection) => {
+      const prepared = await duckdb.prepare(connection, "select n::integer as int from range(5000) t(n)");
+      const result = await duckdb.execute_prepared_streaming(prepared);
+      await expectResult(
+        result,
+        {
+          isStreaming: true,
+          columns: [{ name: "int", logicalType: INTEGER }],
+          chunks: [
+            {
+              rowCount: 2048,
+              vectors: [
+                data(
+                  4,
+                  null,
+                  Array.from({ length: 2048 }).map((_, i) => i),
+                ),
+              ],
+            },
+            {
+              rowCount: 2048,
+              vectors: [
+                data(
+                  4,
+                  null,
+                  Array.from({ length: 2048 }).map((_, i) => 2048 + i),
+                ),
+              ],
+            },
+            {
+              rowCount: 904,
+              vectors: [
+                data(
+                  4,
+                  null,
+                  Array.from({ length: 904 }).map((_, i) => 4096 + i),
+                ),
+              ],
+            },
+          ],
+        },
+        prepared,
+      );
+    });
+  });
+  test("bind empty nested types", async () => {
     await withConnection(async (connection) => {
       const prepared = await duckdb.prepare(
         connection,
-        'select \
+        "select \
         ? as struct, \
         ? as list, \
         ? as array, \
-        ? as map'
+        ? as map",
       );
       const int_type = duckdb.create_logical_type(duckdb.Type.INTEGER);
       const struct_type = duckdb.create_struct_type([], []);
@@ -606,69 +551,62 @@ suite('prepared statements', () => {
       expect(duckdb.param_type(prepared, 4)).toBe(duckdb.Type.MAP);
 
       const result = await duckdb.execute_prepared(prepared);
-      await expectResult(result, {
-        chunkCount: 1,
-        rowCount: 1,
-        columns: [
-          { name: 'struct', logicalType: STRUCT() },
-          { name: 'list', logicalType: LIST(INTEGER) },
-          { name: 'array', logicalType: ARRAY(INTEGER, 0) },
-          { name: 'map', logicalType: MAP(INTEGER, INTEGER) },
-        ],
-        chunks: [
-          {
-            rowCount: 1,
-            vectors: [
-              struct(1, [true], []),
-              list([true], [[0n, 0n]], 0, data(0, null, [])),
-              array(1, [true], data(0, null, [])),
-              map([true], [], 0, data(0, null, []), data(0, null, [])),
-            ],
-          },
-        ],
-      }, prepared);
+      await expectResult(
+        result,
+        {
+          chunkCount: 1,
+          rowCount: 1,
+          columns: [
+            { name: "struct", logicalType: STRUCT() },
+            { name: "list", logicalType: LIST(INTEGER) },
+            { name: "array", logicalType: ARRAY(INTEGER, 0) },
+            { name: "map", logicalType: MAP(INTEGER, INTEGER) },
+          ],
+          chunks: [
+            {
+              rowCount: 1,
+              vectors: [
+                struct(1, [true], []),
+                list([true], [[0n, 0n]], 0, data(0, null, [])),
+                array(1, [true], data(0, null, [])),
+                map([true], [], 0, data(0, null, []), data(0, null, [])),
+              ],
+            },
+          ],
+        },
+        prepared,
+      );
     });
   });
-  test.skip('run in parallel (throws nondeterministically, as expected)', async () => {
+  test.skip("run in parallel (throws nondeterministically, as expected)", async () => {
     await withConnection(async (connection) => {
-      const prepared = await duckdb.prepare(connection, 'select 1');
+      const prepared = await duckdb.prepare(connection, "select 1");
       for (let i = 0; i < 1000; i++) {
         duckdb.execute_prepared(prepared);
       }
     });
   });
-  test('destroy_prepare_sync', async () => {
+  test("destroy_prepare_sync", async () => {
     await withConnection(async (connection) => {
-      const prepared = await duckdb.prepare(connection, 'select 1');
+      const prepared = await duckdb.prepare(connection, "select 1");
       duckdb.destroy_prepare_sync(prepared);
     });
   });
-  test('column information', async () => {
+  test("column information", async () => {
     await withConnection(async (connection) => {
       const prepared = await duckdb.prepare(
         connection,
-        'select $1::INTEGER as a, $2::VARCHAR as b, $3::INTEGER[] as c'
+        "select $1::INTEGER as a, $2::VARCHAR as b, $3::INTEGER[] as c",
       );
       expect(duckdb.nparams(prepared)).toBe(3);
-      expect(duckdb.prepared_statement_type(prepared)).toBe(
-        duckdb.StatementType.SELECT
-      );
+      expect(duckdb.prepared_statement_type(prepared)).toBe(duckdb.StatementType.SELECT);
       expect(duckdb.prepared_statement_column_count(prepared)).toBe(3);
-      expect(duckdb.prepared_statement_column_name(prepared, 0)).toBe('a');
-      expectLogicalType(
-        duckdb.prepared_statement_column_logical_type(prepared, 0),
-        INTEGER
-      );
-      expect(duckdb.prepared_statement_column_name(prepared, 1)).toBe('b');
-      expectLogicalType(
-        duckdb.prepared_statement_column_logical_type(prepared, 1),
-        VARCHAR
-      );
-      expect(duckdb.prepared_statement_column_name(prepared, 2)).toBe('c');
-      expectLogicalType(
-        duckdb.prepared_statement_column_logical_type(prepared, 2),
-        LIST(INTEGER)
-      );
+      expect(duckdb.prepared_statement_column_name(prepared, 0)).toBe("a");
+      expectLogicalType(duckdb.prepared_statement_column_logical_type(prepared, 0), INTEGER);
+      expect(duckdb.prepared_statement_column_name(prepared, 1)).toBe("b");
+      expectLogicalType(duckdb.prepared_statement_column_logical_type(prepared, 1), VARCHAR);
+      expect(duckdb.prepared_statement_column_name(prepared, 2)).toBe("c");
+      expectLogicalType(duckdb.prepared_statement_column_logical_type(prepared, 2), LIST(INTEGER));
     });
   });
 });

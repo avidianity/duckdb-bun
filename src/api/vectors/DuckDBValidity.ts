@@ -24,29 +24,18 @@ export class DuckDBValidity {
   private data: BigUint64Array | null;
   private readonly offset: number;
   private readonly itemCount: number;
-  private constructor(
-    data: BigUint64Array | null,
-    offset: number,
-    itemCount: number
-  ) {
+  private constructor(data: BigUint64Array | null, offset: number, itemCount: number) {
     this.data = data;
     this.offset = offset;
     this.itemCount = itemCount;
   }
-  public static fromVector(
-    vector: duckdb.Vector,
-    itemCount: number
-  ): DuckDBValidity {
+  public static fromVector(vector: duckdb.Vector, itemCount: number): DuckDBValidity {
     const uint64Count = Math.ceil(itemCount / 64);
     const bytes = duckdb.vector_get_validity(vector, uint64Count * 8);
     if (!bytes) {
       return new DuckDBValidity(null, 0, itemCount);
     }
-    const bigints = new BigUint64Array(
-      bytes.buffer,
-      bytes.byteOffset,
-      uint64Count
-    );
+    const bigints = new BigUint64Array(bytes.buffer, bytes.byteOffset, uint64Count);
     return new DuckDBValidity(bigints, 0, itemCount);
   }
   public itemValid(itemIndex: number): boolean {
@@ -54,10 +43,7 @@ export class DuckDBValidity {
       return true;
     }
     const bit = this.offset + itemIndex;
-    return (
-      (this.data[Math.floor(bit / 64)] & (BigInt(1) << BigInt(bit % 64))) !==
-      BigInt(0)
-    );
+    return (this.data[Math.floor(bit / 64)] & (BigInt(1) << BigInt(bit % 64))) !== BigInt(0);
   }
   public setItemValid(itemIndex: number, valid: boolean) {
     if (!this.data && !valid) {
@@ -94,7 +80,7 @@ export class DuckDBValidity {
         0,
         this.data.buffer as ArrayBuffer,
         this.data.byteOffset,
-        this.data.byteLength
+        this.data.byteLength,
       );
     }
   }

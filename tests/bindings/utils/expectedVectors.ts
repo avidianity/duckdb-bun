@@ -1,4 +1,4 @@
-import {
+import type {
   ExpectedArrayVector,
   ExpectedDataVector,
   ExpectedListEntry,
@@ -7,28 +7,20 @@ import {
   ExpectedStructVector,
   ExpectedUnionVector,
   ExpectedVector,
-} from './ExpectedVector';
+} from "./ExpectedVector";
 
-export function array(
-  itemCount: number,
-  validity: boolean[] | null,
-  child: ExpectedVector
-): ExpectedArrayVector {
+export function array(itemCount: number, validity: boolean[] | null, child: ExpectedVector): ExpectedArrayVector {
   return {
-    kind: 'array',
+    kind: "array",
     itemCount,
     validity,
     child,
   };
 }
 
-export function data(
-  itemBytes: number,
-  validity: boolean[] | null,
-  values: any[]
-): ExpectedDataVector {
+export function data(itemBytes: number, validity: boolean[] | null, values: any[]): ExpectedDataVector {
   return {
-    kind: 'data',
+    kind: "data",
     itemBytes,
     validity,
     values,
@@ -39,10 +31,10 @@ export function list(
   validity: boolean[] | null,
   entries: (ExpectedListEntry | null)[],
   childItemCount: number,
-  child: ExpectedVector
+  child: ExpectedVector,
 ): ExpectedListVector {
   return {
-    kind: 'list',
+    kind: "list",
     validity,
     entries,
     childItemCount,
@@ -55,10 +47,10 @@ export function map(
   entries: (ExpectedListEntry | null)[],
   childItemCount: number,
   keys: ExpectedVector,
-  values: ExpectedVector
+  values: ExpectedVector,
 ): ExpectedMapVector {
   return {
-    kind: 'map',
+    kind: "map",
     validity,
     entries,
     childItemCount,
@@ -70,10 +62,10 @@ export function map(
 export function struct(
   itemCount: number,
   validity: boolean[] | null,
-  children: ExpectedVector[]
+  children: ExpectedVector[],
 ): ExpectedStructVector {
   return {
-    kind: 'struct',
+    kind: "struct",
     itemCount,
     validity,
     children,
@@ -82,7 +74,7 @@ export function struct(
 
 export function union(children: ExpectedVector[]): ExpectedUnionVector {
   return {
-    kind: 'union',
+    kind: "union",
     children,
   };
 }

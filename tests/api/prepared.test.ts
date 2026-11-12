@@ -1,11 +1,12 @@
-import { assert, beforeAll, describe, test } from '../vitest-shim.ts';
 import {
   ANY,
   ARRAY,
+  arrayValue,
   BIGINT,
   BIGNUM,
   BIT,
   BOOLEAN,
+  bitValue,
   DECIMAL,
   DOUBLE,
   DuckDBArrayVector,
@@ -13,7 +14,7 @@ import {
   DuckDBBigNumVector,
   DuckDBBitVector,
   DuckDBBooleanVector,
-  DuckDBDataChunk,
+  type DuckDBDataChunk,
   DuckDBDoubleVector,
   DuckDBEnum8Vector,
   DuckDBIntegerVector,
@@ -22,148 +23,116 @@ import {
   DuckDBPendingResultState,
   DuckDBSQLNullVector,
   DuckDBStructVector,
-  DuckDBTimeTZVector,
   DuckDBTimestampMillisecondsVector,
   DuckDBTimestampNanosecondsVector,
   DuckDBTimestampSecondsVector,
   DuckDBTimestampTZVector,
+  DuckDBTimeTZVector,
   DuckDBTypeId,
-  DuckDBUUIDVector,
   DuckDBUnionVector,
+  DuckDBUUIDVector,
   DuckDBVarCharVector,
+  decimalValue,
   ENUM,
   FLOAT,
   INTEGER,
   LIST,
+  listValue,
   MAP,
+  mapValue,
   SMALLINT,
   SQLNULL,
   STRUCT,
   StatementType,
-  TIMESTAMPTZ,
+  structValue,
   TIMESTAMP_MS,
   TIMESTAMP_NS,
   TIMESTAMP_S,
+  TIMESTAMPTZ,
   TIMETZ,
   UNION,
   UUID,
-  VARCHAR,
-  arrayValue,
-  bitValue,
-  decimalValue,
-  listValue,
-  mapValue,
-  structValue,
   unionValue,
   uuidValue,
-} from '../../src/api';
-import {
-  ColumnNameAndType,
-} from './util/testAllTypes';
-import {
-  assertColumns,
-  assertValues,
-  bigints,
-  setDefaultTimezone,
-  sleep,
-  withConnection,
-} from './util/testHelpers';
+  VARCHAR,
+} from "../../src/api";
+import { assert, beforeAll, describe, test } from "../vitest-shim.ts";
+import type { ColumnNameAndType } from "./util/testAllTypes";
+import { assertColumns, assertValues, bigints, setDefaultTimezone, sleep, withConnection } from "./util/testHelpers";
 
-describe('prepared statements', () => {
+describe("prepared statements", () => {
   beforeAll(setDefaultTimezone);
 
-  test('should support running prepared statements', async () => {
+  test("should support running prepared statements", async () => {
     await withConnection(async (connection) => {
       const params: ColumnNameAndType[] = [
-        { name: 'boolean', type: BOOLEAN },
-        { name: 'integer', type: INTEGER },
-        { name: 'varchar', type: VARCHAR },
-        { name: 'timestamp_s', type: TIMESTAMP_S },
-        { name: 'timestamp_ms', type: TIMESTAMP_MS },
-        { name: 'timestamp_ns', type: TIMESTAMP_NS },
-        { name: 'enum', type: ENUM(['fly', 'swim', 'walk']) },
-        { name: 'list_int', type: LIST(INTEGER) },
-        { name: 'list_dec', type: LIST(DECIMAL(4, 1)) },
-        { name: 'list_null', type: LIST(SQLNULL) },
-        { name: 'struct', type: STRUCT({ 'a': INTEGER, 'b': VARCHAR }) },
-        { name: 'array', type: ARRAY(INTEGER, 3) },
-        { name: 'map', type: MAP(INTEGER, VARCHAR) },
-        { name: 'union', type: UNION({ 'name': VARCHAR, 'age': SMALLINT }) },
-        { name: 'uuid', type: UUID },
-        { name: 'bit', type: BIT },
-        { name: 'timetz', type: TIMETZ },
-        { name: 'timestamptz', type: TIMESTAMPTZ },
-        { name: 'bignum', type: BIGNUM },
-        { name: 'null_value', type: SQLNULL },
+        { name: "boolean", type: BOOLEAN },
+        { name: "integer", type: INTEGER },
+        { name: "varchar", type: VARCHAR },
+        { name: "timestamp_s", type: TIMESTAMP_S },
+        { name: "timestamp_ms", type: TIMESTAMP_MS },
+        { name: "timestamp_ns", type: TIMESTAMP_NS },
+        { name: "enum", type: ENUM(["fly", "swim", "walk"]) },
+        { name: "list_int", type: LIST(INTEGER) },
+        { name: "list_dec", type: LIST(DECIMAL(4, 1)) },
+        { name: "list_null", type: LIST(SQLNULL) },
+        { name: "struct", type: STRUCT({ a: INTEGER, b: VARCHAR }) },
+        { name: "array", type: ARRAY(INTEGER, 3) },
+        { name: "map", type: MAP(INTEGER, VARCHAR) },
+        { name: "union", type: UNION({ name: VARCHAR, age: SMALLINT }) },
+        { name: "uuid", type: UUID },
+        { name: "bit", type: BIT },
+        { name: "timetz", type: TIMETZ },
+        { name: "timestamptz", type: TIMESTAMPTZ },
+        { name: "bignum", type: BIGNUM },
+        { name: "null_value", type: SQLNULL },
       ];
 
-      const sql = `select ${params
-        .map((p) => `$${p.name} as ${p.name}`)
-        .join(', ')}`;
+      const sql = `select ${params.map((p) => `$${p.name} as ${p.name}`).join(", ")}`;
       const prepared = await connection.prepare(sql);
 
       assert.strictEqual(prepared.parameterCount, params.length);
       for (let i = 0; i < params.length; i++) {
-        assert.strictEqual(
-          prepared.parameterName(i + 1),
-          params[i].name,
-          `param ${i} name mismatch`,
-        );
+        assert.strictEqual(prepared.parameterName(i + 1), params[i].name, `param ${i} name mismatch`);
       }
 
       let i = 1;
       prepared.bindBoolean(i++, true);
       prepared.bindInteger(i++, 10);
-      prepared.bindVarchar(i++, 'abc');
+      prepared.bindVarchar(i++, "abc");
       prepared.bindTimestampSeconds(i++, TIMESTAMP_S.max);
       prepared.bindTimestampMilliseconds(i++, TIMESTAMP_MS.max);
       prepared.bindTimestampNanoseconds(i++, TIMESTAMP_NS.max);
-      prepared.bindEnum(i++, 'swim', ENUM(['fly', 'swim', 'walk']));
+      prepared.bindEnum(i++, "swim", ENUM(["fly", "swim", "walk"]));
       prepared.bindList(i++, [100, 200, 300]);
-      prepared.bindList(
-        i++,
-        [decimalValue(9876n, 4, 1), decimalValue(5432n, 4, 1)],
-        LIST(DECIMAL(4, 1)),
-      );
+      prepared.bindList(i++, [decimalValue(9876n, 4, 1), decimalValue(5432n, 4, 1)], LIST(DECIMAL(4, 1)));
       prepared.bindList(i++, [null]);
-      prepared.bindStruct(i++, { 'a': 42, 'b': 'duck' });
+      prepared.bindStruct(i++, { a: 42, b: "duck" });
       prepared.bindArray(i++, [100, 200, 300]);
       prepared.bindMap(
         i++,
         mapValue([
-          { key: 100, value: 'swim' },
-          { key: 101, value: 'walk' },
-          { key: 102, value: 'fly' },
+          { key: 100, value: "swim" },
+          { key: 101, value: "walk" },
+          { key: 102, value: "fly" },
         ]),
       );
-      (prepared.bindUnion(
-        i++,
-        unionValue('age', 42),
-        UNION({ 'name': VARCHAR, 'age': SMALLINT }),
-      ),
-        prepared.bindUUID(i++, uuidValue(0xf0e1d2c3b4a596870123456789abcdefn)));
-      prepared.bindBit(i++, bitValue('0010001001011100010101011010111'));
+      prepared.bindUnion(i++, unionValue("age", 42), UNION({ name: VARCHAR, age: SMALLINT }));
+      prepared.bindUUID(i++, uuidValue(0xf0e1d2c3b4a596870123456789abcdefn));
+      prepared.bindBit(i++, bitValue("0010001001011100010101011010111"));
       prepared.bindTimeTZ(i++, TIMETZ.max);
       prepared.bindTimestampTZ(i++, TIMESTAMPTZ.max);
       prepared.bindBigNum(i++, BIGNUM.max);
       prepared.bindNull(i++);
 
       for (let i = 0; i < params.length; i++) {
-        let type = params[i].type;
+        const type = params[i].type;
         if (type.typeId === DuckDBTypeId.VARCHAR) {
           // VARCHAR type is reported incorrectly; see https://github.com/duckdb/duckdb/issues/16137
           continue;
         }
-        assert.equal(
-          prepared.parameterTypeId(i + 1),
-          type.typeId,
-          `param ${i} type id mismatch`,
-        );
-        assert.deepEqual(
-          prepared.parameterType(i + 1),
-          type,
-          `param ${i} type mismatch`,
-        );
+        assert.equal(prepared.parameterTypeId(i + 1), type.typeId, `param ${i} type id mismatch`);
+        assert.deepEqual(prepared.parameterType(i + 1), type, `param ${i} type mismatch`);
       }
 
       const result = await prepared.run();
@@ -177,63 +146,28 @@ describe('prepared statements', () => {
         assert.strictEqual(chunk.columnCount, params.length);
         assert.strictEqual(chunk.rowCount, 1);
         let i = 0;
-        assertValues<boolean, DuckDBBooleanVector>(
-          chunk,
-          i++,
-          DuckDBBooleanVector,
-          [true],
-        );
-        assertValues<number, DuckDBIntegerVector>(
-          chunk,
-          i++,
-          DuckDBIntegerVector,
-          [10],
-        );
-        assertValues<string, DuckDBVarCharVector>(
-          chunk,
-          i++,
-          DuckDBVarCharVector,
-          ['abc'],
-        );
-        assertValues(chunk, i++, DuckDBTimestampSecondsVector, [
-          TIMESTAMP_S.max,
-        ]);
-        assertValues(chunk, i++, DuckDBTimestampMillisecondsVector, [
-          TIMESTAMP_MS.max,
-        ]);
-        assertValues(chunk, i++, DuckDBTimestampNanosecondsVector, [
-          TIMESTAMP_NS.max,
-        ]);
-        assertValues<string, DuckDBEnum8Vector>(chunk, i++, DuckDBEnum8Vector, [
-          'swim',
-        ]);
-        assertValues(chunk, i++, DuckDBListVector, [
-          listValue([100, 200, 300]),
-        ]);
-        assertValues(chunk, i++, DuckDBListVector, [
-          listValue([decimalValue(9876n, 4, 1), decimalValue(5432n, 4, 1)]),
-        ]);
+        assertValues<boolean, DuckDBBooleanVector>(chunk, i++, DuckDBBooleanVector, [true]);
+        assertValues<number, DuckDBIntegerVector>(chunk, i++, DuckDBIntegerVector, [10]);
+        assertValues<string, DuckDBVarCharVector>(chunk, i++, DuckDBVarCharVector, ["abc"]);
+        assertValues(chunk, i++, DuckDBTimestampSecondsVector, [TIMESTAMP_S.max]);
+        assertValues(chunk, i++, DuckDBTimestampMillisecondsVector, [TIMESTAMP_MS.max]);
+        assertValues(chunk, i++, DuckDBTimestampNanosecondsVector, [TIMESTAMP_NS.max]);
+        assertValues<string, DuckDBEnum8Vector>(chunk, i++, DuckDBEnum8Vector, ["swim"]);
+        assertValues(chunk, i++, DuckDBListVector, [listValue([100, 200, 300])]);
+        assertValues(chunk, i++, DuckDBListVector, [listValue([decimalValue(9876n, 4, 1), decimalValue(5432n, 4, 1)])]);
         assertValues(chunk, i++, DuckDBListVector, [listValue([null])]);
-        assertValues(chunk, i++, DuckDBStructVector, [
-          structValue({ 'a': 42, 'b': 'duck' }),
-        ]);
-        assertValues(chunk, i++, DuckDBArrayVector, [
-          arrayValue([100, 200, 300]),
-        ]);
+        assertValues(chunk, i++, DuckDBStructVector, [structValue({ a: 42, b: "duck" })]);
+        assertValues(chunk, i++, DuckDBArrayVector, [arrayValue([100, 200, 300])]);
         assertValues(chunk, i++, DuckDBMapVector, [
           mapValue([
-            { key: 100, value: 'swim' },
-            { key: 101, value: 'walk' },
-            { key: 102, value: 'fly' },
+            { key: 100, value: "swim" },
+            { key: 101, value: "walk" },
+            { key: 102, value: "fly" },
           ]),
         ]);
-        assertValues(chunk, i++, DuckDBUnionVector, [unionValue('age', 42)]);
-        assertValues(chunk, i++, DuckDBUUIDVector, [
-          uuidValue(0xf0e1d2c3b4a596870123456789abcdefn),
-        ]);
-        assertValues(chunk, i++, DuckDBBitVector, [
-          bitValue('0010001001011100010101011010111'),
-        ]);
+        assertValues(chunk, i++, DuckDBUnionVector, [unionValue("age", 42)]);
+        assertValues(chunk, i++, DuckDBUUIDVector, [uuidValue(0xf0e1d2c3b4a596870123456789abcdefn)]);
+        assertValues(chunk, i++, DuckDBBitVector, [bitValue("0010001001011100010101011010111")]);
         assertValues(chunk, i++, DuckDBTimeTZVector, [TIMETZ.max]);
         assertValues(chunk, i++, DuckDBTimestampTZVector, [TIMESTAMPTZ.max]);
         assertValues(chunk, i++, DuckDBBigNumVector, [BIGNUM.max]);
@@ -241,37 +175,22 @@ describe('prepared statements', () => {
       }
     });
   });
-  test('results report the type of the statement that was prepared', async () => {
+  test("results report the type of the statement that was prepared", async () => {
     await withConnection(async (connection) => {
-      await connection.run('create table t (i integer)');
+      await connection.run("create table t (i integer)");
       const { SELECT, INSERT } = StatementType;
 
-      assert.equal(
-        (await connection.run('select ?::integer', [1])).statementType,
-        SELECT,
-      );
-      assert.equal(
-        (await connection.runAndReadAll('select ?::integer', [1])).statementType,
-        SELECT,
-      );
+      assert.equal((await connection.run("select ?::integer", [1])).statementType, SELECT);
+      assert.equal((await connection.runAndReadAll("select ?::integer", [1])).statementType, SELECT);
       // Streams are closed so they don't block the connection on DuckDB 2.0.
-      const stream = await connection.stream('select 1');
+      const stream = await connection.stream("select 1");
       assert.equal(stream.statementType, SELECT);
       stream.closeSync();
-      assert.equal(
-        (await connection.streamAndReadAll('select 1')).statementType,
-        SELECT,
-      );
-      assert.equal(
-        (await (await connection.start('select 1')).getResult()).statementType,
-        SELECT,
-      );
-      assert.equal(
-        (await connection.startThenReadAll('select 1')).statementType,
-        SELECT,
-      );
+      assert.equal((await connection.streamAndReadAll("select 1")).statementType, SELECT);
+      assert.equal((await (await connection.start("select 1")).getResult()).statementType, SELECT);
+      assert.equal((await connection.startThenReadAll("select 1")).statementType, SELECT);
 
-      const select = await connection.prepare('select 1');
+      const select = await connection.prepare("select 1");
       assert.equal((await select.run()).statementType, SELECT);
       const selectStream = await select.stream();
       assert.equal(selectStream.statementType, SELECT);
@@ -281,54 +200,40 @@ describe('prepared statements', () => {
       assert.equal(pendingStream.statementType, SELECT);
       pendingStream.closeSync();
 
-      const insert = await connection.prepare('insert into t values (?)');
+      const insert = await connection.prepare("insert into t values (?)");
       insert.bindInteger(1, 1);
       assert.equal((await insert.run()).statementType, INSERT);
     });
   });
-  test('should support prepare statement bind with list', async () => {
+  test("should support prepare statement bind with list", async () => {
     await withConnection(async (connection) => {
-      const prepared = await connection.prepare(
-        'select $1 as a, $2 as b, $3 as c',
-      );
-      prepared.bind([42, 'duck', listValue([10, 11, 12])]);
+      const prepared = await connection.prepare("select $1 as a, $2 as b, $3 as c");
+      prepared.bind([42, "duck", listValue([10, 11, 12])]);
       const result = await prepared.run();
       assertColumns(result, [
-        { name: 'a', type: INTEGER },
-        { name: 'b', type: VARCHAR },
-        { name: 'c', type: LIST(INTEGER) },
+        { name: "a", type: INTEGER },
+        { name: "b", type: VARCHAR },
+        { name: "c", type: LIST(INTEGER) },
       ]);
       const chunk = await result.fetchChunk();
       assert.isDefined(chunk);
       if (chunk) {
         assert.strictEqual(chunk.columnCount, 3);
         assert.strictEqual(chunk.rowCount, 1);
-        assertValues<number, DuckDBIntegerVector>(
-          chunk,
-          0,
-          DuckDBIntegerVector,
-          [42],
-        );
-        assertValues<string, DuckDBVarCharVector>(
-          chunk,
-          1,
-          DuckDBVarCharVector,
-          ['duck'],
-        );
+        assertValues<number, DuckDBIntegerVector>(chunk, 0, DuckDBIntegerVector, [42]);
+        assertValues<string, DuckDBVarCharVector>(chunk, 1, DuckDBVarCharVector, ["duck"]);
         assertValues(chunk, 2, DuckDBListVector, [listValue([10, 11, 12])]);
       }
     });
   });
-  test('should support prepare statement bind with object', async () => {
+  test("should support prepare statement bind with object", async () => {
     await withConnection(async (connection) => {
-      const prepared = await connection.prepare(
-        'select $a as a, $b as b, $c as c, $d as d, $e as e, $f as f',
-      );
+      const prepared = await connection.prepare("select $a as a, $b as b, $c as c, $d as d, $e as e, $f as f");
       prepared.bind(
         {
           a: 42,
           b: 42.3,
-          c: 'duck',
+          c: "duck",
           d: listValue([10, 11, 12]),
           e: arrayValue([10.1, 11.2, 12.3]),
           f: arrayValue([10, 11, 12]),
@@ -339,199 +244,127 @@ describe('prepared statements', () => {
       );
       const result = await prepared.run();
       assertColumns(result, [
-        { name: 'a', type: INTEGER },
-        { name: 'b', type: DOUBLE },
-        { name: 'c', type: VARCHAR },
-        { name: 'd', type: LIST(INTEGER) },
-        { name: 'e', type: ARRAY(DOUBLE, 3) },
-        { name: 'f', type: ARRAY(FLOAT, 3) },
+        { name: "a", type: INTEGER },
+        { name: "b", type: DOUBLE },
+        { name: "c", type: VARCHAR },
+        { name: "d", type: LIST(INTEGER) },
+        { name: "e", type: ARRAY(DOUBLE, 3) },
+        { name: "f", type: ARRAY(FLOAT, 3) },
       ]);
       const chunk = await result.fetchChunk();
       assert.isDefined(chunk);
       if (chunk) {
         assert.strictEqual(chunk.columnCount, 6);
         assert.strictEqual(chunk.rowCount, 1);
-        assertValues<number, DuckDBIntegerVector>(
-          chunk,
-          0,
-          DuckDBIntegerVector,
-          [42],
-        );
-        assertValues<number, DuckDBDoubleVector>(
-          chunk,
-          1,
-          DuckDBDoubleVector,
-          [42.3],
-        );
-        assertValues<string, DuckDBVarCharVector>(
-          chunk,
-          2,
-          DuckDBVarCharVector,
-          ['duck'],
-        );
+        assertValues<number, DuckDBIntegerVector>(chunk, 0, DuckDBIntegerVector, [42]);
+        assertValues<number, DuckDBDoubleVector>(chunk, 1, DuckDBDoubleVector, [42.3]);
+        assertValues<string, DuckDBVarCharVector>(chunk, 2, DuckDBVarCharVector, ["duck"]);
         assertValues(chunk, 3, DuckDBListVector, [listValue([10, 11, 12])]);
-        assertValues(chunk, 4, DuckDBArrayVector, [
-          arrayValue([10.1, 11.2, 12.3]),
-        ]);
+        assertValues(chunk, 4, DuckDBArrayVector, [arrayValue([10.1, 11.2, 12.3])]);
         assertValues(chunk, 5, DuckDBArrayVector, [arrayValue([10, 11, 12])]);
       }
     });
   });
-  test('should fail gracefully when binding structs contain ANY types to prepared statements', async () => {
+  test("should fail gracefully when binding structs contain ANY types to prepared statements", async () => {
     await withConnection(async (connection) => {
-      const prepared = await connection.prepare('select ?');
+      const prepared = await connection.prepare("select ?");
       try {
-        prepared.bindStruct(
-          0,
-          structValue({ 'a': null }),
-          STRUCT({ 'a': ANY }),
-        );
-        assert.fail('should throw');
+        prepared.bindStruct(0, structValue({ a: null }), STRUCT({ a: ANY }));
+        assert.fail("should throw");
       } catch (err) {
-        assert.deepEqual(
-          err,
-          new Error(
-            'Cannot create structs with an entry type of ANY. Specify a specific type.',
-          ),
-        );
+        assert.deepEqual(err, new Error("Cannot create structs with an entry type of ANY. Specify a specific type."));
       }
     });
   });
-  test('should fail gracefully when type cannot be inferred when binding lists to prepared statements', async () => {
+  test("should fail gracefully when type cannot be inferred when binding lists to prepared statements", async () => {
     await withConnection(async (connection) => {
-      const prepared = await connection.prepare('select ?');
+      const prepared = await connection.prepare("select ?");
       try {
         prepared.bind([listValue([])]);
-        assert.fail('should throw');
+        assert.fail("should throw");
       } catch (err) {
-        assert.deepEqual(
-          err,
-          new Error(
-            'Cannot create lists with item type of ANY. Specify a specific type.',
-          ),
-        );
+        assert.deepEqual(err, new Error("Cannot create lists with item type of ANY. Specify a specific type."));
       }
     });
   });
-  test('should fail gracefully when type cannot be inferred when binding arrays to prepared statements', async () => {
+  test("should fail gracefully when type cannot be inferred when binding arrays to prepared statements", async () => {
     await withConnection(async (connection) => {
-      const prepared = await connection.prepare('select ?');
+      const prepared = await connection.prepare("select ?");
       try {
         prepared.bind([arrayValue([])]);
-        assert.fail('should throw');
+        assert.fail("should throw");
       } catch (err) {
-        assert.deepEqual(
-          err,
-          new Error(
-            'Cannot create arrays with item type of ANY. Specify a specific type.',
-          ),
-        );
+        assert.deepEqual(err, new Error("Cannot create arrays with item type of ANY. Specify a specific type."));
       }
     });
   });
-  test('should fail gracefully when type cannot be inferred when binding maps to prepared statements', async () => {
+  test("should fail gracefully when type cannot be inferred when binding maps to prepared statements", async () => {
     await withConnection(async (connection) => {
-      const prepared = await connection.prepare('select ?');
+      const prepared = await connection.prepare("select ?");
       try {
         prepared.bind([mapValue([])]);
-        assert.fail('should throw');
+        assert.fail("should throw");
       } catch (err) {
-        assert.deepEqual(
-          err,
-          new Error(
-            'Cannot create maps with key type of ANY. Specify a specific type.',
-          ),
-        );
+        assert.deepEqual(err, new Error("Cannot create maps with key type of ANY. Specify a specific type."));
       }
     });
   });
-  test('should infer integer and floating-point values when binding to prepared statements', async () => {
+  test("should infer integer and floating-point values when binding to prepared statements", async () => {
     await withConnection(async (connection) => {
-      const prepared = await connection.prepare('select ? as i1, ? as i2, ? as b1, ? as b2, ? as d');
+      const prepared = await connection.prepare("select ? as i1, ? as i2, ? as b1, ? as b2, ? as d");
       prepared.bind([2_147_483_647, -2_147_483_648, 2_147_483_648, -2_147_483_649, 3.14]);
       const result = await prepared.run();
       assertColumns(result, [
-        { name: 'i1', type: INTEGER },
-        { name: 'i2', type: INTEGER },
-        { name: 'b1', type: BIGINT },
-        { name: 'b2', type: BIGINT },
-        { name: 'd', type: DOUBLE },
+        { name: "i1", type: INTEGER },
+        { name: "i2", type: INTEGER },
+        { name: "b1", type: BIGINT },
+        { name: "b2", type: BIGINT },
+        { name: "d", type: DOUBLE },
       ]);
       const chunk = await result.fetchChunk();
       assert.isDefined(chunk);
       if (chunk) {
         assert.strictEqual(chunk.columnCount, 5);
         assert.strictEqual(chunk.rowCount, 1);
-        assertValues<number, DuckDBIntegerVector>(
-          chunk,
-          0,
-          DuckDBIntegerVector,
-          [2_147_483_647],
-        );
-        assertValues<number, DuckDBIntegerVector>(
-          chunk,
-          1,
-          DuckDBIntegerVector,
-          [-2_147_483_648],
-        );
-        assertValues<bigint, DuckDBBigIntVector>(
-          chunk,
-          2,
-          DuckDBBigIntVector,
-          [2_147_483_648n],
-        );
-        assertValues<bigint, DuckDBBigIntVector>(
-          chunk,
-          3,
-          DuckDBBigIntVector,
-          [-2_147_483_649n],
-        );
-        assertValues<number, DuckDBDoubleVector>(
-          chunk,
-          4,
-          DuckDBDoubleVector,
-          [3.14],
-        );
+        assertValues<number, DuckDBIntegerVector>(chunk, 0, DuckDBIntegerVector, [2_147_483_647]);
+        assertValues<number, DuckDBIntegerVector>(chunk, 1, DuckDBIntegerVector, [-2_147_483_648]);
+        assertValues<bigint, DuckDBBigIntVector>(chunk, 2, DuckDBBigIntVector, [2_147_483_648n]);
+        assertValues<bigint, DuckDBBigIntVector>(chunk, 3, DuckDBBigIntVector, [-2_147_483_649n]);
+        assertValues<number, DuckDBDoubleVector>(chunk, 4, DuckDBDoubleVector, [3.14]);
       }
     });
   });
-  test('should support starting prepared statements and running them incrementally', async () => {
+  test("should support starting prepared statements and running them incrementally", async () => {
     await withConnection(async (connection) => {
-      const prepared = await connection.prepare(
-        'select int from test_all_types()',
-      );
+      const prepared = await connection.prepare("select int from test_all_types()");
       const pending = prepared.start();
       let taskCount = 0;
       while (pending.runTask() !== DuckDBPendingResultState.RESULT_READY) {
         taskCount++;
         // arbitrary upper bound on the number of tasks expected for this simple query
         if (taskCount > 100) {
-          assert.fail('Unexpectedly large number of tasks');
+          assert.fail("Unexpectedly large number of tasks");
         }
         await sleep(1);
       }
       // console.debug('task count: ', taskCount);
       const result = await pending.getResult();
-      assertColumns(result, [{ name: 'int', type: INTEGER }]);
+      assertColumns(result, [{ name: "int", type: INTEGER }]);
       const chunk = await result.fetchChunk();
       assert.isDefined(chunk);
       if (chunk) {
         assert.strictEqual(chunk.columnCount, 1);
         assert.strictEqual(chunk.rowCount, 3);
-        assertValues(chunk, 0, DuckDBIntegerVector, [
-          INTEGER.min,
-          INTEGER.max,
-          null,
-        ]);
+        assertValues(chunk, 0, DuckDBIntegerVector, [INTEGER.min, INTEGER.max, null]);
       }
     });
   });
-  test('should support streaming results from prepared statements', async () => {
+  test("should support streaming results from prepared statements", async () => {
     await withConnection(async (connection) => {
-      const prepared = await connection.prepare('from range(10000)');
+      const prepared = await connection.prepare("from range(10000)");
       const pending = prepared.start();
       const result = await pending.getResult();
-      assertColumns(result, [{ name: 'range', type: BIGINT }]);
+      assertColumns(result, [{ name: "range", type: BIGINT }]);
       const chunks: DuckDBDataChunk[] = [];
       let currentChunk: DuckDBDataChunk | null = null;
       currentChunk = await result.fetchChunk();
@@ -542,67 +375,43 @@ describe('prepared statements', () => {
       currentChunk = null;
       assert.strictEqual(chunks.length, 5); // ceil(10000 / 2048) = 5
       assertValues(chunks[0], 0, DuckDBBigIntVector, bigints(0n, 2048n - 1n));
-      assertValues(
-        chunks[1],
-        0,
-        DuckDBBigIntVector,
-        bigints(2048n, 2048n * 2n - 1n),
-      );
-      assertValues(
-        chunks[2],
-        0,
-        DuckDBBigIntVector,
-        bigints(2048n * 2n, 2048n * 3n - 1n),
-      );
-      assertValues(
-        chunks[3],
-        0,
-        DuckDBBigIntVector,
-        bigints(2048n * 3n, 2048n * 4n - 1n),
-      );
-      assertValues(
-        chunks[4],
-        0,
-        DuckDBBigIntVector,
-        bigints(2048n * 4n, 9999n),
-      );
+      assertValues(chunks[1], 0, DuckDBBigIntVector, bigints(2048n, 2048n * 2n - 1n));
+      assertValues(chunks[2], 0, DuckDBBigIntVector, bigints(2048n * 2n, 2048n * 3n - 1n));
+      assertValues(chunks[3], 0, DuckDBBigIntVector, bigints(2048n * 3n, 2048n * 4n - 1n));
+      assertValues(chunks[4], 0, DuckDBBigIntVector, bigints(2048n * 4n, 9999n));
     });
   });
-  test('prepared statement column info (valid)', async () => {
+  test("prepared statement column info (valid)", async () => {
     await withConnection(async (connection) => {
-      const prepared = await connection.prepare(
-        'select $1::INTEGER as a, $2::VARCHAR as b, $3::INTEGER[] as c',
-      );
+      const prepared = await connection.prepare("select $1::INTEGER as a, $2::VARCHAR as b, $3::INTEGER[] as c");
       assert.equal(prepared.columnCount, 3);
-      assert.equal(prepared.columnName(0), 'a');
+      assert.equal(prepared.columnName(0), "a");
       assert.equal(prepared.columnTypeId(0), DuckDBTypeId.INTEGER);
       assert.deepEqual(prepared.columnType(0), INTEGER);
-      assert.equal(prepared.columnName(1), 'b');
+      assert.equal(prepared.columnName(1), "b");
       assert.equal(prepared.columnTypeId(1), DuckDBTypeId.VARCHAR);
       assert.deepEqual(prepared.columnType(1), VARCHAR);
-      assert.equal(prepared.columnName(2), 'c');
+      assert.equal(prepared.columnName(2), "c");
       assert.equal(prepared.columnTypeId(2), DuckDBTypeId.LIST);
       assert.deepEqual(prepared.columnType(2), LIST(INTEGER));
     });
   });
-  test('prepared statement column info (invalid)', async () => {
+  test("prepared statement column info (invalid)", async () => {
     await withConnection(async (connection) => {
-      const prepared = await connection.prepare(
-        'select $1::INTEGER as a, $2::VARCHAR as b, $3 as c',
-      );
+      const prepared = await connection.prepare("select $1::INTEGER as a, $2::VARCHAR as b, $3 as c");
       // When any column types are ambiguous, DuckDB returns a column count of 1 with a type of INVALID.
       assert.equal(prepared.columnCount, 1);
       assert.equal(prepared.columnTypeId(0), DuckDBTypeId.INVALID);
     });
   });
-  test('runAndReadAll with params', async () => {
+  test("runAndReadAll with params", async () => {
     await withConnection(async (connection) => {
-      const reader = await connection.runAndReadAll('select ? as n', [17]);
+      const reader = await connection.runAndReadAll("select ? as n", [17]);
       const rows = reader.getRowObjects();
       assert.deepEqual(rows, [{ n: 17 }]);
     });
   });
-  test('should support PIVOT (no parameters)', async () => {
+  test("should support PIVOT (no parameters)", async () => {
     await withConnection(async (connection) => {
       await connection.run(`
 CREATE TABLE cities (
@@ -629,15 +438,15 @@ ORDER BY name
       `);
       const columns = reader.getColumnsObject();
       assert.deepEqual(columns, {
-        country: ['NL', 'US', 'US'],
-        name: ['Amsterdam', 'New York City', 'Seattle'],
-        '2000': [1005n, 8015n, 564n],
-        '2010': [1065n, 8175n, 608n],
-        '2020': [1158n, 8772n, 738n],
+        country: ["NL", "US", "US"],
+        name: ["Amsterdam", "New York City", "Seattle"],
+        "2000": [1005n, 8015n, 564n],
+        "2010": [1065n, 8175n, 608n],
+        "2020": [1158n, 8772n, 738n],
       });
     });
   });
-  test('should support PIVOT (with parameters)', async () => {
+  test("should support PIVOT (with parameters)", async () => {
     await withConnection(async (connection) => {
       await connection.run(`
 CREATE TABLE cities (
@@ -657,15 +466,14 @@ INSERT INTO cities VALUES
       // Without an IN list, PIVOT expands into several statements, which
       // cannot take parameters.
       try {
-        await connection.runAndReadAll(
-          `FROM (PIVOT cities ON year USING sum(population)) WHERE country = $country`,
-          { country: 'US' },
-        );
-        assert.fail('should throw');
+        await connection.runAndReadAll(`FROM (PIVOT cities ON year USING sum(population)) WHERE country = $country`, {
+          country: "US",
+        });
+        assert.fail("should throw");
       } catch (err) {
         assert.include(
           (err as Error).message,
-          'parameters are not supported for a statement that expands into several',
+          "parameters are not supported for a statement that expands into several",
         );
       }
       const reader = await connection.runAndReadAll(
@@ -678,20 +486,20 @@ FROM (
 WHERE country = $country
 ORDER BY name
       `,
-        { country: 'US' },
+        { country: "US" },
       );
       const columns = reader.getColumnsObject();
       assert.deepEqual(columns, {
-        country: ['US', 'US'],
-        name: ['New York City', 'Seattle'],
-        '2000': [8015n, 564n],
-        '2010': [8175n, 608n],
-        '2020': [8772n, 738n],
+        country: ["US", "US"],
+        name: ["New York City", "Seattle"],
+        "2000": [8015n, 564n],
+        "2010": [8175n, 608n],
+        "2020": [8772n, 738n],
       });
     });
   });
 
-  test('should not segfault with concurrent prepared statement creation and execution', async () => {
+  test("should not segfault with concurrent prepared statement creation and execution", async () => {
     await withConnection(async (connection) => {
       // Create test table with some data
       await connection.run(`
@@ -716,9 +524,7 @@ ORDER BY name
       const concurrency = 12;
 
       const runIteration = async (i: number) => {
-        const prepared = await connection.prepare(
-          'SELECT * FROM test_table WHERE id = $1',
-        );
+        const prepared = await connection.prepare("SELECT * FROM test_table WHERE id = $1");
         prepared.bindInteger(1, (i % 5) + 1);
 
         await prepared.run();
@@ -741,7 +547,7 @@ ORDER BY name
       }
 
       // If we reach here without segfaulting, the test passes
-      assert.isTrue(true, 'Test completed without error');
+      assert.isTrue(true, "Test completed without error");
     });
   });
 });

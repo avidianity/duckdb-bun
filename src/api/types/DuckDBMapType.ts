@@ -1,17 +1,13 @@
-import { BaseDuckDBType } from './BaseDuckDBType';
-import type { DuckDBType } from './DuckDBType';
-import { DuckDBLogicalType } from '../DuckDBLogicalType';
-import { DuckDBTypeId } from '../DuckDBTypeId';
-import { Json } from '../Json';
+import { DuckDBLogicalType } from "../DuckDBLogicalType";
+import { DuckDBTypeId } from "../DuckDBTypeId";
+import type { Json } from "../Json";
+import { BaseDuckDBType } from "./BaseDuckDBType";
+import type { DuckDBType } from "./DuckDBType";
 
 export class DuckDBMapType extends BaseDuckDBType<DuckDBTypeId.MAP> {
   public readonly keyType: DuckDBType;
   public readonly valueType: DuckDBType;
-  public constructor(
-    keyType: DuckDBType,
-    valueType: DuckDBType,
-    alias?: string
-  ) {
+  public constructor(keyType: DuckDBType, valueType: DuckDBType, alias?: string) {
     super(DuckDBTypeId.MAP, alias);
     this.keyType = keyType;
     this.valueType = valueType;
@@ -20,10 +16,7 @@ export class DuckDBMapType extends BaseDuckDBType<DuckDBTypeId.MAP> {
     return `MAP(${this.keyType}, ${this.valueType})`;
   }
   public override toLogicalType(): DuckDBLogicalType {
-    const logicalType = DuckDBLogicalType.createMap(
-      this.keyType.toLogicalType(),
-      this.valueType.toLogicalType()
-    );
+    const logicalType = DuckDBLogicalType.createMap(this.keyType.toLogicalType(), this.valueType.toLogicalType());
     if (this.alias) {
       logicalType.alias = this.alias;
     }
@@ -38,10 +31,6 @@ export class DuckDBMapType extends BaseDuckDBType<DuckDBTypeId.MAP> {
     };
   }
 }
-export function MAP(
-  keyType: DuckDBType,
-  valueType: DuckDBType,
-  alias?: string
-): DuckDBMapType {
+export function MAP(keyType: DuckDBType, valueType: DuckDBType, alias?: string): DuckDBMapType {
   return new DuckDBMapType(keyType, valueType, alias);
 }

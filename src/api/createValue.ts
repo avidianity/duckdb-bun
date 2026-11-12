@@ -1,7 +1,7 @@
-import duckdb, { Value } from "../bindings/index.ts";
-import { DuckDBType } from './DuckDBType';
-import { DuckDBTypeId } from './DuckDBTypeId';
-import { typeForValue } from './typeForValue';
+import duckdb, { type Value } from "../bindings/index.ts";
+import type { DuckDBType } from "./DuckDBType";
+import { DuckDBTypeId } from "./DuckDBTypeId";
+import { typeForValue } from "./typeForValue";
 import {
   DuckDBArrayValue,
   DuckDBBitValue,
@@ -17,17 +17,17 @@ import {
   DuckDBTimestampMillisecondsValue,
   DuckDBTimestampNanosecondsValue,
   DuckDBTimestampSecondsValue,
-  DuckDBTimestampTZValue,
   DuckDBTimestampTZNanosecondsValue,
+  DuckDBTimestampTZValue,
   DuckDBTimestampValue,
   DuckDBTimeTZValue,
   DuckDBTimeValue,
   DuckDBTupleValue,
   DuckDBUnionValue,
   DuckDBUUIDValue,
-  DuckDBValue,
+  type DuckDBValue,
   DuckDBVariantValue,
-} from './values';
+} from "./values";
 
 export function createValue(type: DuckDBType, input: DuckDBValue): Value {
   if (input === null) {
@@ -36,57 +36,57 @@ export function createValue(type: DuckDBType, input: DuckDBValue): Value {
   const { typeId } = type;
   switch (typeId) {
     case DuckDBTypeId.BOOLEAN:
-      if (typeof input === 'boolean') {
+      if (typeof input === "boolean") {
         return duckdb.create_bool(input);
       }
       throw new Error(`input is not a boolean`);
     case DuckDBTypeId.TINYINT:
-      if (typeof input === 'number') {
+      if (typeof input === "number") {
         return duckdb.create_int8(input);
       }
       throw new Error(`input is not a number`);
     case DuckDBTypeId.SMALLINT:
-      if (typeof input === 'number') {
+      if (typeof input === "number") {
         return duckdb.create_int16(input);
       }
       throw new Error(`input is not a number`);
     case DuckDBTypeId.INTEGER:
-      if (typeof input === 'number') {
+      if (typeof input === "number") {
         return duckdb.create_int32(input);
       }
       throw new Error(`input is not a number`);
     case DuckDBTypeId.BIGINT:
-      if (typeof input === 'bigint' || typeof input === 'number') {
+      if (typeof input === "bigint" || typeof input === "number") {
         return duckdb.create_int64(BigInt(input));
       }
       throw new Error(`input is not a bigint`);
     case DuckDBTypeId.UTINYINT:
-      if (typeof input === 'number') {
+      if (typeof input === "number") {
         return duckdb.create_uint8(input);
       }
       throw new Error(`input is not a number`);
     case DuckDBTypeId.USMALLINT:
-      if (typeof input === 'number') {
+      if (typeof input === "number") {
         return duckdb.create_uint16(input);
       }
       throw new Error(`input is not a number`);
     case DuckDBTypeId.UINTEGER:
-      if (typeof input === 'number') {
+      if (typeof input === "number") {
         return duckdb.create_uint32(input);
       }
       throw new Error(`input is not a number`);
     case DuckDBTypeId.UBIGINT:
-      if (typeof input === 'bigint' || typeof input === 'number') {
+      if (typeof input === "bigint" || typeof input === "number") {
         return duckdb.create_uint64(BigInt(input));
       }
       throw new Error(`input is not a bigint`);
     case DuckDBTypeId.FLOAT:
-      if (typeof input === 'number') {
+      if (typeof input === "number") {
         return duckdb.create_float(input);
       }
       throw new Error(`input is not a number`);
     case DuckDBTypeId.DOUBLE:
-      if (typeof input === 'number') {
+      if (typeof input === "number") {
         return duckdb.create_double(input);
       }
       throw new Error(`input is not a number`);
@@ -111,17 +111,17 @@ export function createValue(type: DuckDBType, input: DuckDBValue): Value {
       }
       throw new Error(`input is not a DuckDBIntervalValue`);
     case DuckDBTypeId.HUGEINT:
-      if (typeof input === 'bigint') {
+      if (typeof input === "bigint") {
         return duckdb.create_hugeint(input);
       }
       throw new Error(`input is not a bigint`);
     case DuckDBTypeId.UHUGEINT:
-      if (typeof input === 'bigint') {
+      if (typeof input === "bigint") {
         return duckdb.create_uhugeint(input);
       }
       throw new Error(`input is not a bigint`);
     case DuckDBTypeId.VARCHAR:
-      if (typeof input === 'string') {
+      if (typeof input === "string") {
         return duckdb.create_varchar(input);
       }
       throw new Error(`input is not a string`);
@@ -151,59 +151,40 @@ export function createValue(type: DuckDBType, input: DuckDBValue): Value {
       }
       throw new Error(`input is not a DuckDBTimestampNanosecondsValue`);
     case DuckDBTypeId.ENUM:
-      if (typeof input === 'string') {
-        return duckdb.create_enum_value(
-          type.toLogicalType().logical_type,
-          type.indexForValue(input)
-        );
+      if (typeof input === "string") {
+        return duckdb.create_enum_value(type.toLogicalType().logical_type, type.indexForValue(input));
       }
       throw new Error(`input is not a string`);
     case DuckDBTypeId.LIST:
       if (input instanceof DuckDBListValue) {
         if (type.valueType.typeId === DuckDBTypeId.ANY) {
-          throw new Error(
-            'Cannot create lists with item type of ANY. Specify a specific type.'
-          );
+          throw new Error("Cannot create lists with item type of ANY. Specify a specific type.");
         }
         return duckdb.create_list_value(
           type.valueType.toLogicalType().logical_type,
-          input.items.map((item) => createValue(type.valueType, item))
+          input.items.map((item) => createValue(type.valueType, item)),
         );
       }
       throw new Error(`input is not a DuckDBListValue`);
     case DuckDBTypeId.STRUCT:
       if (type.isTuple) {
         if (input instanceof DuckDBTupleValue) {
-          if (
-            type.entryTypes.find(
-              (entryType) => entryType.typeId === DuckDBTypeId.ANY
-            )
-          ) {
-            throw new Error(
-              'Cannot create tuples with an entry type of ANY. Specify a specific type.'
-            );
+          if (type.entryTypes.find((entryType) => entryType.typeId === DuckDBTypeId.ANY)) {
+            throw new Error("Cannot create tuples with an entry type of ANY. Specify a specific type.");
           }
           if (input.items.length !== type.entryCount) {
-            throw new Error(
-              `Expected ${type.entryCount} items for ${type}, got ${input.items.length}`
-            );
+            throw new Error(`Expected ${type.entryCount} items for ${type}, got ${input.items.length}`);
           }
           return duckdb.create_struct_value(
             type.toLogicalType().logical_type,
-            input.items.map((item, i) => createValue(type.entryTypes[i], item))
+            input.items.map((item, i) => createValue(type.entryTypes[i], item)),
           );
         }
         throw new Error(`input is not a DuckDBTupleValue`);
       }
       if (input instanceof DuckDBStructValue) {
-        if (
-          type.entryTypes.find(
-            (entryType) => entryType.typeId === DuckDBTypeId.ANY
-          )
-        ) {
-          throw new Error(
-            'Cannot create structs with an entry type of ANY. Specify a specific type.'
-          );
+        if (type.entryTypes.find((entryType) => entryType.typeId === DuckDBTypeId.ANY)) {
+          throw new Error("Cannot create structs with an entry type of ANY. Specify a specific type.");
         }
         // Pair entries by name rather than positionally so that
         // `structValue({b: 'x', a: 1})` against `STRUCT({a: INTEGER, b:
@@ -213,44 +194,36 @@ export function createValue(type: DuckDBType, input: DuckDBValue): Value {
           type.toLogicalType().logical_type,
           type.entryNames.map((name, i) => {
             if (!(name in input.entries)) {
-              throw new Error(
-                `STRUCT entry '${name}' is missing from input`
-              );
+              throw new Error(`STRUCT entry '${name}' is missing from input`);
             }
             return createValue(type.entryTypes[i], input.entries[name]);
-          })
+          }),
         );
       }
       throw new Error(`input is not a DuckDBStructValue`);
     case DuckDBTypeId.MAP:
       if (input instanceof DuckDBMapValue) {
         if (type.keyType.typeId === DuckDBTypeId.ANY) {
-          throw new Error(
-            'Cannot create maps with key type of ANY. Specify a specific type.'
-          );
+          throw new Error("Cannot create maps with key type of ANY. Specify a specific type.");
         }
         if (type.valueType.typeId === DuckDBTypeId.ANY) {
-          throw new Error(
-            'Cannot create maps with value type of ANY. Specify a specific type.'
-          );
+          throw new Error("Cannot create maps with value type of ANY. Specify a specific type.");
         }
         return duckdb.create_map_value(
           type.toLogicalType().logical_type,
           input.entries.map((entry) => createValue(type.keyType, entry.key)),
-          input.entries.map((entry) => createValue(type.valueType, entry.value))
+          input.entries.map((entry) => createValue(type.valueType, entry.value)),
         );
       }
       throw new Error(`input is not a DuckDBMapValue`);
     case DuckDBTypeId.ARRAY:
       if (input instanceof DuckDBArrayValue) {
         if (type.valueType.typeId === DuckDBTypeId.ANY) {
-          throw new Error(
-            'Cannot create arrays with item type of ANY. Specify a specific type.'
-          );
+          throw new Error("Cannot create arrays with item type of ANY. Specify a specific type.");
         }
         return duckdb.create_array_value(
           type.valueType.toLogicalType().logical_type,
-          input.items.map((item) => createValue(type.valueType, item))
+          input.items.map((item) => createValue(type.valueType, item)),
         );
       }
       throw new Error(`input is not a DuckDBArrayValue`);
@@ -264,12 +237,12 @@ export function createValue(type: DuckDBType, input: DuckDBValue): Value {
         const tagIndex = type.memberIndexForTag(input.tag);
         const memberType = type.memberTypes[tagIndex];
         if (memberType.typeId === DuckDBTypeId.ANY) {
-          throw new Error('Cannot create union values with type of ANY.');
+          throw new Error("Cannot create union values with type of ANY.");
         }
         return duckdb.create_union_value(
           type.toLogicalType().logical_type,
           tagIndex,
-          createValue(memberType, input.value)
+          createValue(memberType, input.value),
         );
       }
       throw new Error(`input is not a DuckDBUnionValue`);
@@ -294,11 +267,9 @@ export function createValue(type: DuckDBType, input: DuckDBValue): Value {
       }
       throw new Error(`input is not a DuckDBTimestampTZNanosecondsValue`);
     case DuckDBTypeId.ANY:
-      throw new Error(
-        `Cannot create values of type ANY. Specify a specific type.`
-      );
+      throw new Error(`Cannot create values of type ANY. Specify a specific type.`);
     case DuckDBTypeId.BIGNUM:
-      if (typeof input === 'bigint') {
+      if (typeof input === "bigint") {
         return duckdb.create_bignum(input);
       }
       throw new Error(`input is not a bigint`);
@@ -333,20 +304,12 @@ export function createValue(type: DuckDBType, input: DuckDBValue): Value {
       // mismatched wrapper (e.g. `variantValue('hello', INTEGER)`)
       // surfaces a VARIANT-flavored error rather than a confusing
       // `input is not a number` from a sibling case.
-      const inner =
-        input instanceof DuckDBVariantValue ? input.value : input;
-      const innerType =
-        input instanceof DuckDBVariantValue && input.type
-          ? input.type
-          : typeForValue(inner);
+      const inner = input instanceof DuckDBVariantValue ? input.value : input;
+      const innerType = input instanceof DuckDBVariantValue && input.type ? input.type : typeForValue(inner);
       try {
         return createValue(innerType, inner);
       } catch (err) {
-        throw new Error(
-          `Failed to create VARIANT value (inner type ${innerType}): ${
-            (err as Error).message
-          }`
-        );
+        throw new Error(`Failed to create VARIANT value (inner type ${innerType}): ${(err as Error).message}`);
       }
     }
     default:

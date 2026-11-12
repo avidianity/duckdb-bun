@@ -1,13 +1,8 @@
 import duckdb from "../../bindings/index.ts";
-import {
-  DuckDBStructType,
-} from '../DuckDBType';
-import {
-  DuckDBTupleValue,
-  DuckDBValue,
-} from '../values';
-import { DuckDBVector } from './DuckDBVector';
-import { DuckDBValidity } from './DuckDBValidity';
+import type { DuckDBStructType } from "../DuckDBType";
+import { DuckDBTupleValue, type DuckDBValue } from "../values";
+import { DuckDBValidity } from "./DuckDBValidity";
+import { DuckDBVector } from "./DuckDBVector";
 
 /**
  * A vector of a tuple type: a STRUCT whose entry names are all empty (see
@@ -24,7 +19,7 @@ export class DuckDBTupleVector extends DuckDBVector<DuckDBTupleValue> {
     itemCount: number,
     entryVectors: readonly DuckDBVector[],
     validity: DuckDBValidity,
-    vector: duckdb.Vector
+    vector: duckdb.Vector,
   ) {
     super();
     this.tupleType = tupleType;
@@ -33,27 +28,15 @@ export class DuckDBTupleVector extends DuckDBVector<DuckDBTupleValue> {
     this.validity = validity;
     this.vector = vector;
   }
-  static fromRawVector(
-    tupleType: DuckDBStructType,
-    vector: duckdb.Vector,
-    itemCount: number
-  ): DuckDBTupleVector {
+  static fromRawVector(tupleType: DuckDBStructType, vector: duckdb.Vector, itemCount: number): DuckDBTupleVector {
     const entryCount = tupleType.entryCount;
     const entryVectors: DuckDBVector[] = [];
     for (let i = 0; i < entryCount; i++) {
       const child_vector = duckdb.struct_vector_get_child(vector, i);
-      entryVectors.push(
-        DuckDBVector.create(child_vector, itemCount, tupleType.entryTypes[i])
-      );
+      entryVectors.push(DuckDBVector.create(child_vector, itemCount, tupleType.entryTypes[i]));
     }
     const validity = DuckDBValidity.fromVector(vector, itemCount);
-    return new DuckDBTupleVector(
-      tupleType,
-      itemCount,
-      entryVectors,
-      validity,
-      vector
-    );
+    return new DuckDBTupleVector(tupleType, itemCount, entryVectors, validity, vector);
   }
   public override get type(): DuckDBStructType {
     return this.tupleType;
@@ -65,14 +48,9 @@ export class DuckDBTupleVector extends DuckDBVector<DuckDBTupleValue> {
     if (!this.validity.itemValid(itemIndex)) {
       return null;
     }
-    return new DuckDBTupleValue(
-      this.entryVectors.map((entryVector) => entryVector.getItem(itemIndex))
-    );
+    return new DuckDBTupleValue(this.entryVectors.map((entryVector) => entryVector.getItem(itemIndex)));
   }
-  public getItemValue(
-    itemIndex: number,
-    entryIndex: number
-  ): DuckDBValue | null {
+  public getItemValue(itemIndex: number, entryIndex: number): DuckDBValue | null {
     if (!this.validity.itemValid(itemIndex)) {
       return null;
     }
@@ -85,9 +63,7 @@ export class DuckDBTupleVector extends DuckDBVector<DuckDBTupleValue> {
       }
       const entryCount = this.tupleType.entryCount;
       if (value.items.length !== entryCount) {
-        throw new Error(
-          `Expected ${entryCount} items for ${this.tupleType}, got ${value.items.length}`
-        );
+        throw new Error(`Expected ${entryCount} items for ${this.tupleType}, got ${value.items.length}`);
       }
       for (let i = 0; i < entryCount; i++) {
         this.entryVectors[i].setItem(itemIndex, value.items[i]);
@@ -100,11 +76,7 @@ export class DuckDBTupleVector extends DuckDBVector<DuckDBTupleValue> {
       this.validity.setItemValid(itemIndex, false);
     }
   }
-  public setItemValue(
-    itemIndex: number,
-    entryIndex: number,
-    value: DuckDBValue
-  ) {
+  public setItemValue(itemIndex: number, entryIndex: number, value: DuckDBValue) {
     return this.entryVectors[entryIndex].setItem(itemIndex, value);
   }
   public override flush() {
@@ -119,7 +91,7 @@ export class DuckDBTupleVector extends DuckDBVector<DuckDBTupleValue> {
       length,
       this.entryVectors.map((entryVector) => entryVector.slice(offset, length)),
       this.validity.slice(offset, length),
-      this.vector
+      this.vector,
     );
   }
 }

@@ -1,13 +1,13 @@
-import { BaseDuckDBType } from './BaseDuckDBType';
-import { DuckDBTypeId } from '../DuckDBTypeId';
-import { DuckDBTimestampTZNanosecondsValue } from '../values';
+import { DuckDBTypeId } from "../DuckDBTypeId";
+import { DuckDBTimestampTZNanosecondsValue } from "../values";
+import { BaseDuckDBType } from "./BaseDuckDBType";
 
 export class DuckDBTimestampTZNanosecondsType extends BaseDuckDBType<DuckDBTypeId.TIMESTAMP_TZ_NS> {
   public constructor(alias?: string) {
     super(DuckDBTypeId.TIMESTAMP_TZ_NS, alias);
   }
   public toString(): string {
-    return 'TIMESTAMPTZ_NS';
+    return "TIMESTAMPTZ_NS";
   }
   public static readonly instance = new DuckDBTimestampTZNanosecondsType();
   public static create(alias?: string): DuckDBTimestampTZNanosecondsType {

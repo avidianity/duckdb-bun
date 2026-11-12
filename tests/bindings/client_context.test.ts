@@ -1,9 +1,9 @@
-import duckdb from '../../src/bindings/index.ts';
-import { expect, suite, test } from '../vitest-shim.ts';
-import { withConnection } from './utils/withConnection';
+import duckdb from "../../src/bindings/index.ts";
+import { expect, suite, test } from "../vitest-shim.ts";
+import { withConnection } from "./utils/withConnection";
 
-suite('client_context', () => {
-  test('connection_id', async () => {
+suite("client_context", () => {
+  test("connection_id", async () => {
     await withConnection(async (connection) => {
       const client_context = duckdb.connection_get_client_context(connection);
       expect(client_context).toBeDefined();

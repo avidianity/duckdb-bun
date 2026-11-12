@@ -1,33 +1,22 @@
-import { assert, beforeAll, describe, test } from '../vitest-shim.ts';
-import {
-  ResultReturnType,
-  StatementType,
-} from '../../src/api';
-import {
-  setDefaultTimezone,
-} from './util/testHelpers';
+import { ResultReturnType, StatementType } from "../../src/api";
+import { assert, beforeAll, describe, test } from "../vitest-shim.ts";
+import { setDefaultTimezone } from "./util/testHelpers";
 
-describe('enums', () => {
+describe("enums", () => {
   beforeAll(setDefaultTimezone);
 
-  test('ReturnResultType enum', () => {
+  test("ReturnResultType enum", () => {
     assert.equal(ResultReturnType.INVALID, 0);
     assert.equal(ResultReturnType.CHANGED_ROWS, 1);
     assert.equal(ResultReturnType.NOTHING, 2);
     assert.equal(ResultReturnType.QUERY_RESULT, 3);
 
-    assert.equal(ResultReturnType[ResultReturnType.INVALID], 'INVALID');
-    assert.equal(
-      ResultReturnType[ResultReturnType.CHANGED_ROWS],
-      'CHANGED_ROWS',
-    );
-    assert.equal(ResultReturnType[ResultReturnType.NOTHING], 'NOTHING');
-    assert.equal(
-      ResultReturnType[ResultReturnType.QUERY_RESULT],
-      'QUERY_RESULT',
-    );
+    assert.equal(ResultReturnType[ResultReturnType.INVALID], "INVALID");
+    assert.equal(ResultReturnType[ResultReturnType.CHANGED_ROWS], "CHANGED_ROWS");
+    assert.equal(ResultReturnType[ResultReturnType.NOTHING], "NOTHING");
+    assert.equal(ResultReturnType[ResultReturnType.QUERY_RESULT], "QUERY_RESULT");
   });
-  test('StatementType enum', () => {
+  test("StatementType enum", () => {
     assert.equal(StatementType.INVALID, 0);
     assert.equal(StatementType.SELECT, 1);
     assert.equal(StatementType.INSERT, 2);
@@ -60,36 +49,36 @@ describe('enums', () => {
     assert.equal(StatementType.UPDATE_EXTENSIONS, 29);
     assert.equal(StatementType.MERGE_INTO, 30);
 
-    assert.equal(StatementType[StatementType.INVALID], 'INVALID');
-    assert.equal(StatementType[StatementType.SELECT], 'SELECT');
-    assert.equal(StatementType[StatementType.INSERT], 'INSERT');
-    assert.equal(StatementType[StatementType.UPDATE], 'UPDATE');
-    assert.equal(StatementType[StatementType.EXPLAIN], 'EXPLAIN');
-    assert.equal(StatementType[StatementType.DELETE], 'DELETE');
-    assert.equal(StatementType[StatementType.PREPARE], 'PREPARE');
-    assert.equal(StatementType[StatementType.CREATE], 'CREATE');
-    assert.equal(StatementType[StatementType.EXECUTE], 'EXECUTE');
-    assert.equal(StatementType[StatementType.ALTER], 'ALTER');
-    assert.equal(StatementType[StatementType.TRANSACTION], 'TRANSACTION');
-    assert.equal(StatementType[StatementType.COPY], 'COPY');
-    assert.equal(StatementType[StatementType.ANALYZE], 'ANALYZE');
-    assert.equal(StatementType[StatementType.VARIABLE_SET], 'VARIABLE_SET');
-    assert.equal(StatementType[StatementType.CREATE_FUNC], 'CREATE_FUNC');
-    assert.equal(StatementType[StatementType.DROP], 'DROP');
-    assert.equal(StatementType[StatementType.EXPORT], 'EXPORT');
-    assert.equal(StatementType[StatementType.PRAGMA], 'PRAGMA');
-    assert.equal(StatementType[StatementType.VACUUM], 'VACUUM');
-    assert.equal(StatementType[StatementType.CALL], 'CALL');
-    assert.equal(StatementType[StatementType.SET], 'SET');
-    assert.equal(StatementType[StatementType.LOAD], 'LOAD');
-    assert.equal(StatementType[StatementType.RELATION], 'RELATION');
-    assert.equal(StatementType[StatementType.EXTENSION], 'EXTENSION');
-    assert.equal(StatementType[StatementType.LOGICAL_PLAN], 'LOGICAL_PLAN');
-    assert.equal(StatementType[StatementType.ATTACH], 'ATTACH');
-    assert.equal(StatementType[StatementType.DETACH], 'DETACH');
-    assert.equal(StatementType[StatementType.MULTI], 'MULTI');
-    assert.equal(StatementType[StatementType.COPY_DATABASE], 'COPY_DATABASE');
-    assert.equal(StatementType[StatementType.UPDATE_EXTENSIONS], 'UPDATE_EXTENSIONS');
-    assert.equal(StatementType[StatementType.MERGE_INTO], 'MERGE_INTO');
+    assert.equal(StatementType[StatementType.INVALID], "INVALID");
+    assert.equal(StatementType[StatementType.SELECT], "SELECT");
+    assert.equal(StatementType[StatementType.INSERT], "INSERT");
+    assert.equal(StatementType[StatementType.UPDATE], "UPDATE");
+    assert.equal(StatementType[StatementType.EXPLAIN], "EXPLAIN");
+    assert.equal(StatementType[StatementType.DELETE], "DELETE");
+    assert.equal(StatementType[StatementType.PREPARE], "PREPARE");
+    assert.equal(StatementType[StatementType.CREATE], "CREATE");
+    assert.equal(StatementType[StatementType.EXECUTE], "EXECUTE");
+    assert.equal(StatementType[StatementType.ALTER], "ALTER");
+    assert.equal(StatementType[StatementType.TRANSACTION], "TRANSACTION");
+    assert.equal(StatementType[StatementType.COPY], "COPY");
+    assert.equal(StatementType[StatementType.ANALYZE], "ANALYZE");
+    assert.equal(StatementType[StatementType.VARIABLE_SET], "VARIABLE_SET");
+    assert.equal(StatementType[StatementType.CREATE_FUNC], "CREATE_FUNC");
+    assert.equal(StatementType[StatementType.DROP], "DROP");
+    assert.equal(StatementType[StatementType.EXPORT], "EXPORT");
+    assert.equal(StatementType[StatementType.PRAGMA], "PRAGMA");
+    assert.equal(StatementType[StatementType.VACUUM], "VACUUM");
+    assert.equal(StatementType[StatementType.CALL], "CALL");
+    assert.equal(StatementType[StatementType.SET], "SET");
+    assert.equal(StatementType[StatementType.LOAD], "LOAD");
+    assert.equal(StatementType[StatementType.RELATION], "RELATION");
+    assert.equal(StatementType[StatementType.EXTENSION], "EXTENSION");
+    assert.equal(StatementType[StatementType.LOGICAL_PLAN], "LOGICAL_PLAN");
+    assert.equal(StatementType[StatementType.ATTACH], "ATTACH");
+    assert.equal(StatementType[StatementType.DETACH], "DETACH");
+    assert.equal(StatementType[StatementType.MULTI], "MULTI");
+    assert.equal(StatementType[StatementType.COPY_DATABASE], "COPY_DATABASE");
+    assert.equal(StatementType[StatementType.UPDATE_EXTENSIONS], "UPDATE_EXTENSIONS");
+    assert.equal(StatementType[StatementType.MERGE_INTO], "MERGE_INTO");
   });
 });

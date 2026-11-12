@@ -1,10 +1,9 @@
-import duckdb, { Timestamp, TimestampParts } from "../../bindings/index.ts";
-import { getDuckDBTimestampStringFromMicroseconds } from '../conversion/dateTimeStringConversion';
-import { DuckDBTimestampValue } from './DuckDBTimestampValue';
+import duckdb, { type Timestamp, type TimestampParts } from "../../bindings/index.ts";
+import { getDuckDBTimestampStringFromMicroseconds } from "../conversion/dateTimeStringConversion";
+import { DuckDBTimestampValue } from "./DuckDBTimestampValue";
 
 export class DuckDBTimestampTZValue implements Timestamp {
-  public static timezoneOffsetInMinutes: number =
-    -new Date().getTimezoneOffset();
+  public static timezoneOffsetInMinutes: number = -new Date().getTimezoneOffset();
 
   public readonly micros: bigint;
 
@@ -17,10 +16,7 @@ export class DuckDBTimestampTZValue implements Timestamp {
   }
 
   public toString(): string {
-    return getDuckDBTimestampStringFromMicroseconds(
-      this.micros,
-      DuckDBTimestampTZValue.timezoneOffsetInMinutes
-    );
+    return getDuckDBTimestampStringFromMicroseconds(this.micros, DuckDBTimestampTZValue.timezoneOffsetInMinutes);
   }
 
   public toParts(): TimestampParts {
@@ -32,22 +28,14 @@ export class DuckDBTimestampTZValue implements Timestamp {
   }
 
   public static readonly Epoch = new DuckDBTimestampTZValue(0n);
-  public static readonly Max = new DuckDBTimestampTZValue(
-    DuckDBTimestampValue.Max.micros
-  );
-  public static readonly Min = new DuckDBTimestampTZValue(
-    DuckDBTimestampValue.Min.micros
-  );
-  public static readonly PosInf = new DuckDBTimestampTZValue(
-    DuckDBTimestampValue.PosInf.micros
-  );
-  public static readonly NegInf = new DuckDBTimestampTZValue(
-    DuckDBTimestampValue.NegInf.micros
-  );
+  public static readonly Max = new DuckDBTimestampTZValue(DuckDBTimestampValue.Max.micros);
+  public static readonly Min = new DuckDBTimestampTZValue(DuckDBTimestampValue.Min.micros);
+  public static readonly PosInf = new DuckDBTimestampTZValue(DuckDBTimestampValue.PosInf.micros);
+  public static readonly NegInf = new DuckDBTimestampTZValue(DuckDBTimestampValue.NegInf.micros);
 }
 
 export function timestampTZValue(microsOrParts: bigint | TimestampParts): DuckDBTimestampTZValue {
-  if (typeof microsOrParts === 'bigint') {
+  if (typeof microsOrParts === "bigint") {
     return new DuckDBTimestampTZValue(microsOrParts);
   }
   return DuckDBTimestampTZValue.fromParts(microsOrParts);

@@ -1,30 +1,24 @@
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
-import { afterAll, assert, beforeAll, describe, test } from '../vitest-shim.ts';
-import { DuckDBConnection, DuckDBInstance } from '../../src/api';
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { type DuckDBConnection, DuckDBInstance } from "../../src/api";
+import { afterAll, assert, beforeAll, describe, test } from "../vitest-shim.ts";
 
 // The extensions built into libduckdb, which must load with no install or
 // autoload: Node Neo links the prebuilt shared library and registers nothing.
-const builtInExtensions = [
-  'autocomplete',
-  'core_functions',
-  'icu',
-  'json',
-  'parquet',
-];
+const builtInExtensions = ["autocomplete", "core_functions", "icu", "json", "parquet"];
 
-describe('built-in extensions', () => {
+describe("built-in extensions", () => {
   let tempDir: string;
   let connection: DuckDBConnection;
 
   beforeAll(async () => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'node-neo-extensions-'));
-    const extensionDir = path.join(tempDir, 'extensions');
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "node-neo-extensions-"));
+    const extensionDir = path.join(tempDir, "extensions");
     fs.mkdirSync(extensionDir);
-    const instance = await DuckDBInstance.create(':memory:', {
-      autoinstall_known_extensions: 'false',
-      autoload_known_extensions: 'false',
+    const instance = await DuckDBInstance.create(":memory:", {
+      autoinstall_known_extensions: "false",
+      autoload_known_extensions: "false",
       extension_directory: extensionDir,
     });
     connection = await instance.connect();
@@ -35,7 +29,7 @@ describe('built-in extensions', () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  test('are statically linked and loaded', async () => {
+  test("are statically linked and loaded", async () => {
     const reader = await connection.runAndReadAll(
       `select extension_name, loaded, install_mode from duckdb_extensions()
        where loaded order by extension_name`,
@@ -44,17 +38,15 @@ describe('built-in extensions', () => {
     for (const name of builtInExtensions) {
       assert.deepInclude(
         rows,
-        { extension_name: name, loaded: true, install_mode: 'STATICALLY_LINKED' },
+        { extension_name: name, loaded: true, install_mode: "STATICALLY_LINKED" },
         `${name} should be statically linked and loaded`,
       );
     }
   });
 
-  test('provide their functions', async () => {
-    const parquetFile = path.join(tempDir, 'x.parquet').replaceAll('\\', '/');
-    await connection.run(
-      `copy (select 1 as x) to '${parquetFile}' (format parquet)`,
-    );
+  test("provide their functions", async () => {
+    const parquetFile = path.join(tempDir, "x.parquet").replaceAll("\\", "/");
+    await connection.run(`copy (select 1 as x) to '${parquetFile}' (format parquet)`);
     const reader = await connection.runAndReadAll(`
       select
         list_sum([1, 2, 3]) as core_functions,
@@ -65,8 +57,6 @@ describe('built-in extensions', () => {
           '%H:%M'
         ) as icu
     `);
-    assert.deepEqual(reader.getRowObjectsJS(), [
-      { core_functions: 6n, json: 1, parquet: 1, icu: '09:00' },
-    ]);
+    assert.deepEqual(reader.getRowObjectsJS(), [{ core_functions: 6n, json: 1, parquet: 1, icu: "09:00" }]);
   });
 });

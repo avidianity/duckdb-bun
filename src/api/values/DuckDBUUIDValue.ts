@@ -5,7 +5,7 @@ export class DuckDBUUIDValue {
     this.hugeint = hugeint;
   }
 
-    /** Return the UUID as an unsigned 128-bit integer in a JS BigInt. */
+  /** Return the UUID as an unsigned 128-bit integer in a JS BigInt. */
   public toUint128(): bigint {
     // UUID values are stored with their MSB flipped so their numeric ordering matches their string ordering.
     return (this.hugeint ^ 0x80000000000000000000000000000000n) & 0xffffffffffffffffffffffffffffffffn;
@@ -24,9 +24,7 @@ export class DuckDBUUIDValue {
     // flipped (so numeric ordering matches string ordering) and held as a
     // signed int128 (the same form `DuckDBUUIDVector` produces via
     // `getInt128`).
-    return new DuckDBUUIDValue(
-      BigInt.asIntN(128, uint128 ^ 0x80000000000000000000000000000000n),
-    );
+    return new DuckDBUUIDValue(BigInt.asIntN(128, uint128 ^ 0x80000000000000000000000000000000n));
   }
 
   /**

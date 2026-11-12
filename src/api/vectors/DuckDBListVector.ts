@@ -1,15 +1,9 @@
 import duckdb from "../../bindings/index.ts";
-import {
-  DuckDBListType,
-} from '../DuckDBType';
-import {
-  DuckDBListValue,
-} from '../values';
-import { DuckDBVector } from './DuckDBVector';
-import { DuckDBValidity } from './DuckDBValidity';
-import {
-  vectorData,
-} from './dataAccessors';
+import type { DuckDBListType } from "../DuckDBType";
+import { DuckDBListValue } from "../values";
+import { DuckDBValidity } from "./DuckDBValidity";
+import { DuckDBVector } from "./DuckDBVector";
+import { vectorData } from "./dataAccessors";
 
 export class DuckDBListVector extends DuckDBVector<DuckDBListValue> {
   private readonly parentList: DuckDBListVector | null;
@@ -29,7 +23,7 @@ export class DuckDBListVector extends DuckDBVector<DuckDBListValue> {
     vector: duckdb.Vector,
     childData: DuckDBVector,
     itemOffset: number,
-    itemCount: number
+    itemCount: number,
   ) {
     super();
     this.parentList = parentList;
@@ -42,41 +36,17 @@ export class DuckDBListVector extends DuckDBVector<DuckDBListValue> {
     this._itemCount = itemCount;
     this.itemCache = [];
   }
-  static fromRawVector(
-    listType: DuckDBListType,
-    vector: duckdb.Vector,
-    itemCount: number
-  ): DuckDBListVector {
-    const data = vectorData(
-      vector,
-      itemCount * BigUint64Array.BYTES_PER_ELEMENT * 2
-    );
-    const entryData = new BigUint64Array(
-      data.buffer,
-      data.byteOffset,
-      itemCount * 2
-    );
+  static fromRawVector(listType: DuckDBListType, vector: duckdb.Vector, itemCount: number): DuckDBListVector {
+    const data = vectorData(vector, itemCount * BigUint64Array.BYTES_PER_ELEMENT * 2);
+    const entryData = new BigUint64Array(data.buffer, data.byteOffset, itemCount * 2);
 
     const validity = DuckDBValidity.fromVector(vector, itemCount);
 
     const child_vector = duckdb.list_vector_get_child(vector);
     const child_vector_size = duckdb.list_vector_get_size(vector);
-    const childData = DuckDBVector.create(
-      child_vector,
-      child_vector_size,
-      listType.valueType
-    );
+    const childData = DuckDBVector.create(child_vector, child_vector_size, listType.valueType);
 
-    return new DuckDBListVector(
-      null,
-      listType,
-      entryData,
-      validity,
-      vector,
-      childData,
-      0,
-      itemCount
-    );
+    return new DuckDBListVector(null, listType, entryData, validity, vector, childData, 0, itemCount);
   }
   public override get type(): DuckDBListType {
     return this.listType;
@@ -162,26 +132,15 @@ export class DuckDBListVector extends DuckDBVector<DuckDBListValue> {
       // recreate childData after resize
       const child_vector = duckdb.list_vector_get_child(this.vector);
       const child_vector_size = duckdb.list_vector_get_size(this.vector);
-      this.childData = DuckDBVector.create(
-        child_vector,
-        child_vector_size,
-        this.listType.valueType
-      );
+      this.childData = DuckDBVector.create(child_vector, child_vector_size, this.listType.valueType);
 
       // set all childData items
       let childItemAbsoluteIndex = 0;
       for (let listIndex = 0; listIndex < this._itemCount; listIndex++) {
         const list = this.getItem(listIndex);
         if (list) {
-          for (
-            let childItemRelativeIndex = 0;
-            childItemRelativeIndex < list.items.length;
-            childItemRelativeIndex++
-          ) {
-            this.childData.setItem(
-              childItemAbsoluteIndex++,
-              list.items[childItemRelativeIndex]
-            );
+          for (let childItemRelativeIndex = 0; childItemRelativeIndex < list.items.length; childItemRelativeIndex++) {
+            this.childData.setItem(childItemAbsoluteIndex++, list.items[childItemRelativeIndex]);
           }
         }
       }
@@ -195,7 +154,7 @@ export class DuckDBListVector extends DuckDBVector<DuckDBListValue> {
         0,
         this.entryData.buffer as ArrayBuffer,
         this.entryData.byteOffset,
-        this.entryData.byteLength
+        this.entryData.byteLength,
       );
 
       // flush validity
@@ -207,15 +166,12 @@ export class DuckDBListVector extends DuckDBVector<DuckDBListValue> {
     return new DuckDBListVector(
       this,
       this.listType,
-      this.entryData.slice(
-        entryDataStartIndex,
-        entryDataStartIndex + length * 2
-      ),
+      this.entryData.slice(entryDataStartIndex, entryDataStartIndex + length * 2),
       this.validity.slice(offset, length),
       this.vector,
       this.childData,
       offset,
-      length
+      length,
     );
   }
 }

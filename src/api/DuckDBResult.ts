@@ -1,23 +1,23 @@
 import duckdb from "../bindings/index.ts";
-import { DuckDBDataChunk } from './DuckDBDataChunk';
-import { DuckDBLogicalType } from './DuckDBLogicalType';
-import { DuckDBType } from './DuckDBType';
-import { DuckDBTypeId } from './DuckDBTypeId';
-import { DuckDBValueConverter } from './DuckDBValueConverter';
-import { JS } from './JS';
-import { JSDuckDBValueConverter } from './JSDuckDBValueConverter';
-import { Json } from './Json';
-import { JsonDuckDBValueConverter } from './JsonDuckDBValueConverter';
-import { convertColumnsFromChunks } from './convertColumnsFromChunks';
-import { convertColumnsObjectFromChunks } from './convertColumnsObjectFromChunks';
-import { convertRowObjectsFromChunks } from './convertRowObjectsFromChunks';
-import { convertRowsFromChunks } from './convertRowsFromChunks';
-import { ResultReturnType, StatementType } from './enums';
-import { getColumnsFromChunks } from './getColumnsFromChunks';
-import { getColumnsObjectFromChunks } from './getColumnsObjectFromChunks';
-import { getRowObjectsFromChunks } from './getRowObjectsFromChunks';
-import { getRowsFromChunks } from './getRowsFromChunks';
-import { DuckDBValue } from './values';
+import { convertColumnsFromChunks } from "./convertColumnsFromChunks";
+import { convertColumnsObjectFromChunks } from "./convertColumnsObjectFromChunks";
+import { convertRowObjectsFromChunks } from "./convertRowObjectsFromChunks";
+import { convertRowsFromChunks } from "./convertRowsFromChunks";
+import { DuckDBDataChunk } from "./DuckDBDataChunk";
+import { DuckDBLogicalType } from "./DuckDBLogicalType";
+import type { DuckDBType } from "./DuckDBType";
+import type { DuckDBTypeId } from "./DuckDBTypeId";
+import type { DuckDBValueConverter } from "./DuckDBValueConverter";
+import { type ResultReturnType, StatementType } from "./enums";
+import { getColumnsFromChunks } from "./getColumnsFromChunks";
+import { getColumnsObjectFromChunks } from "./getColumnsObjectFromChunks";
+import { getRowObjectsFromChunks } from "./getRowObjectsFromChunks";
+import { getRowsFromChunks } from "./getRowsFromChunks";
+import type { JS } from "./JS";
+import { JSDuckDBValueConverter } from "./JSDuckDBValueConverter";
+import type { Json } from "./Json";
+import { JsonDuckDBValueConverter } from "./JsonDuckDBValueConverter";
+import type { DuckDBValue } from "./values";
 
 interface ClosedResultMetadata {
   returnType: ResultReturnType;
@@ -88,10 +88,7 @@ export class DuckDBResult {
     const statementType = duckdb.result_statement_type(this.result);
     // On DuckDB 2.0, results of prepared statements report EXECUTE; see
     // https://github.com/duckdb/duckdb/issues/27415
-    if (
-      statementType === StatementType.EXECUTE &&
-      this.preparedStatementType !== undefined
-    ) {
+    if (statementType === StatementType.EXECUTE && this.preparedStatementType !== undefined) {
       return this.preparedStatementType;
     }
     return statementType;
@@ -106,9 +103,7 @@ export class DuckDBResult {
 
   public columnName(columnIndex: number): string {
     if (this.closedMetadata) {
-      return this.closedMetadata.columnNames[
-        this.checkClosedColumnIndex(columnIndex)
-      ];
+      return this.closedMetadata.columnNames[this.checkClosedColumnIndex(columnIndex)];
     }
     return duckdb.column_name(this.result, columnIndex);
   }
@@ -143,26 +138,19 @@ export class DuckDBResult {
     if (this.closedMetadata) {
       return this.columnType(columnIndex).typeId;
     }
-    return duckdb.column_type(
-      this.result,
-      columnIndex
-    ) as number as DuckDBTypeId;
+    return duckdb.column_type(this.result, columnIndex) as number as DuckDBTypeId;
   }
 
   public columnLogicalType(columnIndex: number): DuckDBLogicalType {
     if (this.closedMetadata) {
       return this.columnType(columnIndex).toLogicalType();
     }
-    return DuckDBLogicalType.create(
-      duckdb.column_logical_type(this.result, columnIndex)
-    );
+    return DuckDBLogicalType.create(duckdb.column_logical_type(this.result, columnIndex));
   }
 
   public columnType(columnIndex: number): DuckDBType {
     if (this.closedMetadata) {
-      return this.closedMetadata.columnTypes[
-        this.checkClosedColumnIndex(columnIndex)
-      ];
+      return this.closedMetadata.columnTypes[this.checkClosedColumnIndex(columnIndex)];
     }
     return this.columnLogicalType(columnIndex).asType();
   }
@@ -243,9 +231,7 @@ export class DuckDBResult {
     return getColumnsFromChunks(chunks, this.columnCount);
   }
 
-  public async convertColumns<T>(
-    converter: DuckDBValueConverter<T>
-  ): Promise<(T | null)[][]> {
+  public async convertColumns<T>(converter: DuckDBValueConverter<T>): Promise<(T | null)[][]> {
     const chunks = await this.fetchAllChunks();
     return convertColumnsFromChunks(chunks, this.columnCount, converter);
   }
@@ -263,15 +249,9 @@ export class DuckDBResult {
     return getColumnsObjectFromChunks(chunks, this.deduplicatedColumnNames());
   }
 
-  public async convertColumnsObject<T>(
-    converter: DuckDBValueConverter<T>
-  ): Promise<Record<string, (T | null)[]>> {
+  public async convertColumnsObject<T>(converter: DuckDBValueConverter<T>): Promise<Record<string, (T | null)[]>> {
     const chunks = await this.fetchAllChunks();
-    return convertColumnsObjectFromChunks(
-      chunks,
-      this.deduplicatedColumnNames(),
-      converter
-    );
+    return convertColumnsObjectFromChunks(chunks, this.deduplicatedColumnNames(), converter);
   }
 
   public async getColumnsObjectJS(): Promise<Record<string, JS[]>> {
@@ -287,9 +267,7 @@ export class DuckDBResult {
     return getRowsFromChunks(chunks);
   }
 
-  public async convertRows<T>(
-    converter: DuckDBValueConverter<T>
-  ): Promise<(T | null)[][]> {
+  public async convertRows<T>(converter: DuckDBValueConverter<T>): Promise<(T | null)[][]> {
     const chunks = await this.fetchAllChunks();
     return convertRowsFromChunks(chunks, converter);
   }
@@ -307,15 +285,9 @@ export class DuckDBResult {
     return getRowObjectsFromChunks(chunks, this.deduplicatedColumnNames());
   }
 
-  public async convertRowObjects<T>(
-    converter: DuckDBValueConverter<T>
-  ): Promise<Record<string, T | null>[]> {
+  public async convertRowObjects<T>(converter: DuckDBValueConverter<T>): Promise<Record<string, T | null>[]> {
     const chunks = await this.fetchAllChunks();
-    return convertRowObjectsFromChunks(
-      chunks,
-      this.deduplicatedColumnNames(),
-      converter
-    );
+    return convertRowObjectsFromChunks(chunks, this.deduplicatedColumnNames(), converter);
   }
 
   public async getRowObjectsJS(): Promise<Record<string, JS>[]> {
@@ -343,33 +315,25 @@ export class DuckDBResult {
     }
   }
 
-  public async *yieldRowObjects(): AsyncIterableIterator<
-    Record<string, DuckDBValue>[]
-  > {
+  public async *yieldRowObjects(): AsyncIterableIterator<Record<string, DuckDBValue>[]> {
     const deduplicatedColumnNames = this.deduplicatedColumnNames();
     for await (const chunk of this) {
       yield getRowObjectsFromChunks([chunk], deduplicatedColumnNames);
     }
   }
 
-  public async *yieldConvertedRows<T>(
-    converter: DuckDBValueConverter<T>
-  ): AsyncIterableIterator<(T | null)[][]> {
+  public async *yieldConvertedRows<T>(converter: DuckDBValueConverter<T>): AsyncIterableIterator<(T | null)[][]> {
     for await (const chunk of this) {
       yield convertRowsFromChunks([chunk], converter);
     }
   }
 
   public async *yieldConvertedRowObjects<T>(
-    converter: DuckDBValueConverter<T>
+    converter: DuckDBValueConverter<T>,
   ): AsyncIterableIterator<Record<string, T | null>[]> {
     const deduplicatedColumnNames = this.deduplicatedColumnNames();
     for await (const chunk of this) {
-      yield convertRowObjectsFromChunks(
-        [chunk],
-        deduplicatedColumnNames,
-        converter
-      );
+      yield convertRowObjectsFromChunks([chunk], deduplicatedColumnNames, converter);
     }
   }
 
@@ -394,9 +358,7 @@ export class DuckDBResult {
     const index = columnIndex >>> 0;
     const columnCount = this.closedMetadata?.columnNames.length ?? 0;
     if (index >= columnCount) {
-      throw new RangeError(
-        `column index ${index} is out of range (count: ${columnCount})`
-      );
+      throw new RangeError(`column index ${index} is out of range (count: ${columnCount})`);
     }
     return index;
   }

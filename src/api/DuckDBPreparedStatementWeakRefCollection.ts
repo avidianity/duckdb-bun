@@ -1,9 +1,7 @@
-import { DuckDBPreparedStatement } from './DuckDBPreparedStatement';
-import { DuckDBPreparedStatementCollection } from './DuckDBPreparedStatementCollection';
+import type { DuckDBPreparedStatement } from "./DuckDBPreparedStatement";
+import type { DuckDBPreparedStatementCollection } from "./DuckDBPreparedStatementCollection";
 
-export class DuckDBPreparedStatementWeakRefCollection
-  implements DuckDBPreparedStatementCollection
-{
+export class DuckDBPreparedStatementWeakRefCollection implements DuckDBPreparedStatementCollection {
   preparedStatements: WeakRef<DuckDBPreparedStatement>[] = [];
   lastPruneTime: number = 0;
   public add(prepared: DuckDBPreparedStatement) {
@@ -24,8 +22,6 @@ export class DuckDBPreparedStatementWeakRefCollection
     this.preparedStatements = [];
   }
   private prune() {
-    this.preparedStatements = this.preparedStatements.filter(
-      (ref) => !!ref.deref()
-    );
+    this.preparedStatements = this.preparedStatements.filter((ref) => !!ref.deref());
   }
 }

@@ -1,5 +1,5 @@
-import { displayStringForDuckDBValue } from '../conversion/displayStringForDuckDBValue';
-import { DuckDBValue } from './DuckDBValue';
+import { displayStringForDuckDBValue } from "../conversion/displayStringForDuckDBValue";
+import type { DuckDBValue } from "./DuckDBValue";
 
 export class DuckDBListValue {
   public readonly items: readonly DuckDBValue[];
@@ -9,7 +9,7 @@ export class DuckDBListValue {
   }
 
   public toString(): string {
-    return `[${this.items.map(displayStringForDuckDBValue).join(', ')}]`;
+    return `[${this.items.map(displayStringForDuckDBValue).join(", ")}]`;
   }
 }
 

@@ -4,20 +4,20 @@ import {
   BIGINT,
   BIGNUM,
   BIT,
-  bitValue,
   BLOB,
-  blobValue,
   BOOLEAN,
+  bitValue,
+  blobValue,
   DATE,
-  dateValue,
   DECIMAL,
-  decimalValue,
   DOUBLE,
-  DuckDBType,
-  DuckDBValue,
+  type DuckDBType,
+  type DuckDBValue,
+  dateValue,
+  decimalValue,
+  ENUM8,
   ENUM16,
   ENUM32,
-  ENUM8,
   FLOAT,
   GEOMETRY,
   geometryValue,
@@ -25,7 +25,7 @@ import {
   INTEGER,
   INTERVAL,
   intervalValue,
-  Json,
+  type Json,
   LIST,
   listValue,
   MAP,
@@ -41,33 +41,31 @@ import {
   TIMESTAMP_S,
   TIMESTAMPTZ,
   TIMESTAMPTZ_NS,
-  timestampTZValue,
-  timestampValue,
   TIMETZ,
   TINYINT,
   TUPLE,
+  timestampTZValue,
+  timestampValue,
   tupleValue,
   UBIGINT,
   UHUGEINT,
   UINTEGER,
   UNION,
-  unionValue,
   USMALLINT,
   UTINYINT,
   UUID,
+  unionValue,
   VARCHAR,
-} from '../../../src/api';
+} from "../../../src/api";
 
 const BI_10_8 = 100000000n;
 const BI_10_10 = 10000000000n;
 const BI_18_9s = BI_10_8 * BI_10_10 - 1n;
 const BI_38_9s = BI_10_8 * BI_10_10 * BI_10_10 * BI_10_10 - 1n;
 
-const smallEnumValues = ['DUCK_DUCK_ENUM', 'GOOSE'];
+const smallEnumValues = ["DUCK_DUCK_ENUM", "GOOSE"];
 const mediumEnumValues = Array.from({ length: 300 }).map((_, i) => `enum_${i}`);
-const largeEnumValues = Array.from({ length: 70000 }).map(
-  (_, i) => `enum_${i}`
-);
+const largeEnumValues = Array.from({ length: 70000 }).map((_, i) => `enum_${i}`);
 
 export interface ColumnNameAndType {
   readonly name: string;
@@ -87,7 +85,7 @@ function col(
   type: DuckDBType,
   typeJson: Json,
   values: readonly DuckDBValue[],
-  valuesJson: readonly Json[]
+  valuesJson: readonly Json[],
 ): ColumnNameTypeAndValues {
   return { name, type, typeJson, values, valuesJson };
 }
@@ -95,315 +93,207 @@ function col(
 /** The columns of `test_all_types()`. */
 export function createTestAllTypesData(): ColumnNameTypeAndValues[] {
   return [
+    col("bool", BOOLEAN, { typeId: 1 }, [false, true, null], [false, true, null]),
+    col("tinyint", TINYINT, { typeId: 2 }, [TINYINT.min, TINYINT.max, null], [TINYINT.min, TINYINT.max, null]),
+    col("smallint", SMALLINT, { typeId: 3 }, [SMALLINT.min, SMALLINT.max, null], [SMALLINT.min, SMALLINT.max, null]),
+    col("int", INTEGER, { typeId: 4 }, [INTEGER.min, INTEGER.max, null], [INTEGER.min, INTEGER.max, null]),
     col(
-      'bool',
-      BOOLEAN,
-      { typeId: 1 },
-      [false, true, null],
-      [false, true, null]
-    ),
-    col(
-      'tinyint',
-      TINYINT,
-      { typeId: 2 },
-      [TINYINT.min, TINYINT.max, null],
-      [TINYINT.min, TINYINT.max, null]
-    ),
-    col(
-      'smallint',
-      SMALLINT,
-      { typeId: 3 },
-      [SMALLINT.min, SMALLINT.max, null],
-      [SMALLINT.min, SMALLINT.max, null]
-    ),
-    col(
-      'int',
-      INTEGER,
-      { typeId: 4 },
-      [INTEGER.min, INTEGER.max, null],
-      [INTEGER.min, INTEGER.max, null]
-    ),
-    col(
-      'bigint',
+      "bigint",
       BIGINT,
       { typeId: 5 },
       [BIGINT.min, BIGINT.max, null],
-      [String(BIGINT.min), String(BIGINT.max), null]
+      [String(BIGINT.min), String(BIGINT.max), null],
     ),
     col(
-      'hugeint',
+      "hugeint",
       HUGEINT,
       { typeId: 16 },
       [HUGEINT.min, HUGEINT.max, null],
-      [String(HUGEINT.min), String(HUGEINT.max), null]
+      [String(HUGEINT.min), String(HUGEINT.max), null],
     ),
     col(
-      'uhugeint',
+      "uhugeint",
       UHUGEINT,
       { typeId: 32 },
       [UHUGEINT.min, UHUGEINT.max, null],
-      [String(UHUGEINT.min), String(UHUGEINT.max), null]
+      [String(UHUGEINT.min), String(UHUGEINT.max), null],
     ),
+    col("utinyint", UTINYINT, { typeId: 6 }, [UTINYINT.min, UTINYINT.max, null], [UTINYINT.min, UTINYINT.max, null]),
     col(
-      'utinyint',
-      UTINYINT,
-      { typeId: 6 },
-      [UTINYINT.min, UTINYINT.max, null],
-      [UTINYINT.min, UTINYINT.max, null]
-    ),
-    col(
-      'usmallint',
+      "usmallint",
       USMALLINT,
       { typeId: 7 },
       [USMALLINT.min, USMALLINT.max, null],
-      [USMALLINT.min, USMALLINT.max, null]
+      [USMALLINT.min, USMALLINT.max, null],
     ),
+    col("uint", UINTEGER, { typeId: 8 }, [UINTEGER.min, UINTEGER.max, null], [UINTEGER.min, UINTEGER.max, null]),
     col(
-      'uint',
-      UINTEGER,
-      { typeId: 8 },
-      [UINTEGER.min, UINTEGER.max, null],
-      [UINTEGER.min, UINTEGER.max, null]
-    ),
-    col(
-      'ubigint',
+      "ubigint",
       UBIGINT,
       { typeId: 9 },
       [UBIGINT.min, UBIGINT.max, null],
-      [String(UBIGINT.min), String(UBIGINT.max), null]
+      [String(UBIGINT.min), String(UBIGINT.max), null],
     ),
     col(
-      'bignum',
+      "bignum",
       BIGNUM,
       { typeId: 35 },
       [BIGNUM.min, BIGNUM.max, null],
-      [String(BIGNUM.min), String(BIGNUM.max), null]
+      [String(BIGNUM.min), String(BIGNUM.max), null],
     ),
+    col("date", DATE, { typeId: 13 }, [DATE.min, DATE.max, null], [String(DATE.min), String(DATE.max), null]),
+    col("time", TIME, { typeId: 14 }, [TIME.min, TIME.max, null], [String(TIME.min), String(TIME.max), null]),
     col(
-      'date',
-      DATE,
-      { typeId: 13 },
-      [DATE.min, DATE.max, null],
-      [String(DATE.min), String(DATE.max), null]
-    ),
-    col(
-      'time',
-      TIME,
-      { typeId: 14 },
-      [TIME.min, TIME.max, null],
-      [String(TIME.min), String(TIME.max), null]
-    ),
-    col(
-      'timestamp',
+      "timestamp",
       TIMESTAMP,
       { typeId: 12 },
       [TIMESTAMP.min, TIMESTAMP.max, null],
-      [String(TIMESTAMP.min), String(TIMESTAMP.max), null]
+      [String(TIMESTAMP.min), String(TIMESTAMP.max), null],
     ),
     col(
-      'timestamp_s',
+      "timestamp_s",
       TIMESTAMP_S,
       { typeId: 20 },
       [TIMESTAMP_S.min, TIMESTAMP_S.max, null],
-      [String(TIMESTAMP_S.min), String(TIMESTAMP_S.max), null]
+      [String(TIMESTAMP_S.min), String(TIMESTAMP_S.max), null],
     ),
     col(
-      'timestamp_ms',
+      "timestamp_ms",
       TIMESTAMP_MS,
       { typeId: 21 },
       [TIMESTAMP_MS.min, TIMESTAMP_MS.max, null],
-      [String(TIMESTAMP_MS.min), String(TIMESTAMP_MS.max), null]
+      [String(TIMESTAMP_MS.min), String(TIMESTAMP_MS.max), null],
     ),
     col(
-      'timestamp_ns',
+      "timestamp_ns",
       TIMESTAMP_NS,
       { typeId: 22 },
       [TIMESTAMP_NS.min, TIMESTAMP_NS.max, null],
-      [String(TIMESTAMP_NS.min), String(TIMESTAMP_NS.max), null]
+      [String(TIMESTAMP_NS.min), String(TIMESTAMP_NS.max), null],
     ),
     col(
-      'time_tz',
+      "time_tz",
       TIMETZ,
       { typeId: 30 },
       [TIMETZ.min, TIMETZ.max, null],
-      [String(TIMETZ.min), String(TIMETZ.max), null]
+      [String(TIMETZ.min), String(TIMETZ.max), null],
     ),
     col(
-      'timestamp_tz',
+      "timestamp_tz",
       TIMESTAMPTZ,
       { typeId: 31 },
       [TIMESTAMPTZ.min, TIMESTAMPTZ.max, null],
-      [String(TIMESTAMPTZ.min), String(TIMESTAMPTZ.max), null]
+      [String(TIMESTAMPTZ.min), String(TIMESTAMPTZ.max), null],
     ),
     col(
-      'timestamp_tz_ns',
+      "timestamp_tz_ns",
       TIMESTAMPTZ_NS,
       { typeId: 42 },
       [TIMESTAMPTZ_NS.min, TIMESTAMPTZ_NS.max, null],
-      [String(TIMESTAMPTZ_NS.min), String(TIMESTAMPTZ_NS.max), null]
+      [String(TIMESTAMPTZ_NS.min), String(TIMESTAMPTZ_NS.max), null],
     ),
+    col("float", FLOAT, { typeId: 10 }, [FLOAT.min, FLOAT.max, null], [FLOAT.min, FLOAT.max, null]),
+    col("double", DOUBLE, { typeId: 11 }, [DOUBLE.min, DOUBLE.max, null], [DOUBLE.min, DOUBLE.max, null]),
     col(
-      'float',
-      FLOAT,
-      { typeId: 10 },
-      [FLOAT.min, FLOAT.max, null],
-      [FLOAT.min, FLOAT.max, null]
-    ),
-    col(
-      'double',
-      DOUBLE,
-      { typeId: 11 },
-      [DOUBLE.min, DOUBLE.max, null],
-      [DOUBLE.min, DOUBLE.max, null]
-    ),
-    col(
-      'dec_4_1',
+      "dec_4_1",
       DECIMAL(4, 1),
       { typeId: 19, width: 4, scale: 1 },
       [decimalValue(-9999n, 4, 1), decimalValue(9999n, 4, 1), null],
-      ['-999.9', '999.9', null]
+      ["-999.9", "999.9", null],
     ),
     col(
-      'dec_9_4',
+      "dec_9_4",
       DECIMAL(9, 4),
       { typeId: 19, width: 9, scale: 4 },
       [decimalValue(-999999999n, 9, 4), decimalValue(999999999n, 9, 4), null],
-      ['-99999.9999', '99999.9999', null]
+      ["-99999.9999", "99999.9999", null],
     ),
     col(
-      'dec_18_6',
+      "dec_18_6",
       DECIMAL(18, 6),
       { typeId: 19, width: 18, scale: 6 },
       [decimalValue(-BI_18_9s, 18, 6), decimalValue(BI_18_9s, 18, 6), null],
-      ['-999999999999.999999', '999999999999.999999', null]
+      ["-999999999999.999999", "999999999999.999999", null],
     ),
     col(
-      'dec38_10',
+      "dec38_10",
       DECIMAL(38, 10),
       { typeId: 19, width: 38, scale: 10 },
       [decimalValue(-BI_38_9s, 38, 10), decimalValue(BI_38_9s, 38, 10), null],
-      [
-        '-9999999999999999999999999999.9999999999',
-        '9999999999999999999999999999.9999999999',
-        null,
-      ]
+      ["-9999999999999999999999999999.9999999999", "9999999999999999999999999999.9999999999", null],
     ),
+    col("uuid", UUID, { typeId: 27 }, [UUID.min, UUID.max, null], [String(UUID.min), String(UUID.max), null]),
     col(
-      'uuid',
-      UUID,
-      { typeId: 27 },
-      [UUID.min, UUID.max, null],
-      [String(UUID.min), String(UUID.max), null]
-    ),
-    col(
-      'interval',
+      "interval",
       INTERVAL,
       { typeId: 15 },
       [intervalValue(0, 0, 0n), intervalValue(999, 999, 999999999n), null],
-      [
-        { months: 0, days: 0, micros: '0' },
-        { months: 999, days: 999, micros: '999999999' },
-        null,
-      ]
+      [{ months: 0, days: 0, micros: "0" }, { months: 999, days: 999, micros: "999999999" }, null],
     ),
+    col("varchar", VARCHAR, { typeId: 17 }, ["🦆🦆🦆🦆🦆🦆", "goo\0se", null], ["🦆🦆🦆🦆🦆🦆", "goo\0se", null]),
     col(
-      'varchar',
-      VARCHAR,
-      { typeId: 17 },
-      ['🦆🦆🦆🦆🦆🦆', 'goo\0se', null],
-      ['🦆🦆🦆🦆🦆🦆', 'goo\0se', null]
-    ),
-    col(
-      'blob',
+      "blob",
       BLOB,
       { typeId: 18 },
-      [
-        blobValue('thisisalongblob\x00withnullbytes'),
-        blobValue('\x00\x00\x00a'),
-        null,
-      ],
-      ['thisisalongblob\\x00withnullbytes', '\\x00\\x00\\x00a', null]
+      [blobValue("thisisalongblob\x00withnullbytes"), blobValue("\x00\x00\x00a"), null],
+      ["thisisalongblob\\x00withnullbytes", "\\x00\\x00\\x00a", null],
     ),
     col(
-      'bit',
+      "bit",
       BIT,
       { typeId: 29 },
-      [bitValue('0010001001011100010101011010111'), bitValue('10101'), null],
-      ['0010001001011100010101011010111', '10101', null]
+      [bitValue("0010001001011100010101011010111"), bitValue("10101"), null],
+      ["0010001001011100010101011010111", "10101", null],
     ),
     col(
-      'small_enum',
+      "small_enum",
       ENUM8(smallEnumValues),
       { typeId: 23, values: smallEnumValues, internalTypeId: 6 },
       [smallEnumValues[0], smallEnumValues[smallEnumValues.length - 1], null],
-      [smallEnumValues[0], smallEnumValues[smallEnumValues.length - 1], null]
+      [smallEnumValues[0], smallEnumValues[smallEnumValues.length - 1], null],
     ),
     col(
-      'medium_enum',
+      "medium_enum",
       ENUM16(mediumEnumValues),
       { typeId: 23, values: mediumEnumValues, internalTypeId: 7 },
-      [
-        mediumEnumValues[0],
-        mediumEnumValues[mediumEnumValues.length - 1],
-        null,
-      ],
-      [mediumEnumValues[0], mediumEnumValues[mediumEnumValues.length - 1], null]
+      [mediumEnumValues[0], mediumEnumValues[mediumEnumValues.length - 1], null],
+      [mediumEnumValues[0], mediumEnumValues[mediumEnumValues.length - 1], null],
     ),
     col(
-      'large_enum',
+      "large_enum",
       ENUM32(largeEnumValues),
       { typeId: 23, values: largeEnumValues, internalTypeId: 8 },
       [largeEnumValues[0], largeEnumValues[largeEnumValues.length - 1], null],
-      [largeEnumValues[0], largeEnumValues[largeEnumValues.length - 1], null]
+      [largeEnumValues[0], largeEnumValues[largeEnumValues.length - 1], null],
     ),
     col(
-      'int_array',
+      "int_array",
       LIST(INTEGER),
       { typeId: 24, valueType: { typeId: 4 } },
       [listValue([]), listValue([42, 999, null, null, -42]), null],
-      [[], [42, 999, null, null, -42], null]
+      [[], [42, 999, null, null, -42], null],
     ),
     col(
-      'double_array',
+      "double_array",
       LIST(DOUBLE),
       { typeId: 24, valueType: { typeId: 11 } },
-      [
-        listValue([]),
-        listValue([42.0, NaN, Infinity, -Infinity, null, -42.0]),
-        null,
-      ],
-      [[], [42, 'NaN', 'Infinity', '-Infinity', null, -42], null]
+      [listValue([]), listValue([42.0, NaN, Infinity, -Infinity, null, -42.0]), null],
+      [[], [42, "NaN", "Infinity", "-Infinity", null, -42], null],
     ),
     col(
-      'date_array',
+      "date_array",
       LIST(DATE),
       { typeId: 24, valueType: { typeId: 13 } },
       [
         listValue([]),
         // 19124 days from the epoch is 2022-05-12
-        listValue([
-          DATE.epoch,
-          DATE.posInf,
-          DATE.negInf,
-          null,
-          dateValue(19124),
-        ]),
+        listValue([DATE.epoch, DATE.posInf, DATE.negInf, null, dateValue(19124)]),
         null,
       ],
-      [
-        [],
-        [
-          '1970-01-01',
-          '5881580-07-11',
-          '5877642-06-24 (BC)',
-          null,
-          '2022-05-12',
-        ],
-        null,
-      ]
+      [[], ["1970-01-01", "5881580-07-11", "5877642-06-24 (BC)", null, "2022-05-12"], null],
     ),
     col(
-      'timestamp_array',
+      "timestamp_array",
       LIST(TIMESTAMP),
       { typeId: 24, valueType: { typeId: 12 } },
       [
@@ -418,20 +308,10 @@ export function createTestAllTypesData(): ColumnNameTypeAndValues[] {
         ]),
         null,
       ],
-      [
-        [],
-        [
-          '1970-01-01 00:00:00',
-          'infinity',
-          '-infinity',
-          null,
-          '2022-05-12 16:23:45',
-        ],
-        null,
-      ]
+      [[], ["1970-01-01 00:00:00", "infinity", "-infinity", null, "2022-05-12 16:23:45"], null],
     ),
     col(
-      'timestamptz_array',
+      "timestamptz_array",
       LIST(TIMESTAMPTZ),
       { typeId: 24, valueType: { typeId: 31 } },
       [
@@ -451,28 +331,28 @@ export function createTestAllTypesData(): ColumnNameTypeAndValues[] {
         [],
         [
           String(TIMESTAMPTZ.epoch),
-          'infinity',
-          '-infinity',
+          "infinity",
+          "-infinity",
           null,
           String(timestampTZValue(1652397825n * 1000n * 1000n)),
         ],
         null,
-      ]
+      ],
     ),
     col(
-      'varchar_array',
+      "varchar_array",
       LIST(VARCHAR),
       { typeId: 24, valueType: { typeId: 17 } },
       [
         listValue([]),
         // Note that the string 'goose' in varchar_array does NOT have an embedded null character.
-        listValue(['🦆🦆🦆🦆🦆🦆', 'goose', null, '']),
+        listValue(["🦆🦆🦆🦆🦆🦆", "goose", null, ""]),
         null,
       ],
-      [[], ['🦆🦆🦆🦆🦆🦆', 'goose', null, ''], null]
+      [[], ["🦆🦆🦆🦆🦆🦆", "goose", null, ""], null],
     ),
     col(
-      'nested_int_array',
+      "nested_int_array",
       LIST(LIST(INTEGER)),
       { typeId: 24, valueType: { typeId: 24, valueType: { typeId: 4 } } },
       [
@@ -486,29 +366,21 @@ export function createTestAllTypesData(): ColumnNameTypeAndValues[] {
         ]),
         null,
       ],
-      [
-        [],
-        [[], [42, 999, null, null, -42], null, [], [42, 999, null, null, -42]],
-        null,
-      ]
+      [[], [[], [42, 999, null, null, -42], null, [], [42, 999, null, null, -42]], null],
     ),
     col(
-      'struct',
-      STRUCT({ 'a': INTEGER, 'b': VARCHAR }),
+      "struct",
+      STRUCT({ a: INTEGER, b: VARCHAR }),
       {
         typeId: 25,
-        entryNames: ['a', 'b'],
+        entryNames: ["a", "b"],
         entryTypes: [{ typeId: 4 }, { typeId: 17 }],
       },
-      [
-        structValue({ 'a': null, 'b': null }),
-        structValue({ 'a': 42, 'b': '🦆🦆🦆🦆🦆🦆' }),
-        null,
-      ],
-      [{ 'a': null, 'b': null }, { 'a': 42, 'b': '🦆🦆🦆🦆🦆🦆' }, null]
+      [structValue({ a: null, b: null }), structValue({ a: 42, b: "🦆🦆🦆🦆🦆🦆" }), null],
+      [{ a: null, b: null }, { a: 42, b: "🦆🦆🦆🦆🦆🦆" }, null],
     ),
     col(
-      'empty_struct',
+      "empty_struct",
       STRUCT({}),
       {
         typeId: 25,
@@ -516,110 +388,102 @@ export function createTestAllTypesData(): ColumnNameTypeAndValues[] {
         entryTypes: [],
       },
       [structValue({}), structValue({}), null],
-      [{}, {}, null]
+      [{}, {}, null],
     ),
     col(
-      'struct_of_arrays',
-      STRUCT({ 'a': LIST(INTEGER), 'b': LIST(VARCHAR) }),
+      "struct_of_arrays",
+      STRUCT({ a: LIST(INTEGER), b: LIST(VARCHAR) }),
       {
         typeId: 25,
-        entryNames: ['a', 'b'],
+        entryNames: ["a", "b"],
         entryTypes: [
           { typeId: 24, valueType: { typeId: 4 } },
           { typeId: 24, valueType: { typeId: 17 } },
         ],
       },
       [
-        structValue({ 'a': null, 'b': null }),
+        structValue({ a: null, b: null }),
         structValue({
-          'a': listValue([42, 999, null, null, -42]),
-          'b': listValue(['🦆🦆🦆🦆🦆🦆', 'goose', null, '']),
+          a: listValue([42, 999, null, null, -42]),
+          b: listValue(["🦆🦆🦆🦆🦆🦆", "goose", null, ""]),
         }),
         null,
       ],
       [
-        { 'a': null, 'b': null },
+        { a: null, b: null },
         {
-          'a': [42, 999, null, null, -42],
-          'b': ['🦆🦆🦆🦆🦆🦆', 'goose', null, ''],
+          a: [42, 999, null, null, -42],
+          b: ["🦆🦆🦆🦆🦆🦆", "goose", null, ""],
         },
         null,
-      ]
+      ],
     ),
     col(
-      'array_of_structs',
-      LIST(STRUCT({ 'a': INTEGER, 'b': VARCHAR })),
+      "array_of_structs",
+      LIST(STRUCT({ a: INTEGER, b: VARCHAR })),
       {
         typeId: 24,
         valueType: {
           typeId: 25,
-          entryNames: ['a', 'b'],
+          entryNames: ["a", "b"],
           entryTypes: [{ typeId: 4 }, { typeId: 17 }],
         },
       },
       [
         listValue([]),
-        listValue([
-          structValue({ 'a': null, 'b': null }),
-          structValue({ 'a': 42, 'b': '🦆🦆🦆🦆🦆🦆' }),
-          null,
-        ]),
+        listValue([structValue({ a: null, b: null }), structValue({ a: 42, b: "🦆🦆🦆🦆🦆🦆" }), null]),
         null,
       ],
-      [
-        [],
-        [{ 'a': null, 'b': null }, { 'a': 42, 'b': '🦆🦆🦆🦆🦆🦆' }, null],
-        null,
-      ]
+      [[], [{ a: null, b: null }, { a: 42, b: "🦆🦆🦆🦆🦆🦆" }, null], null],
     ),
     col(
-      'map',
+      "map",
       MAP(VARCHAR, VARCHAR),
       { typeId: 26, keyType: { typeId: 17 }, valueType: { typeId: 17 } },
       [
         mapValue([]),
         mapValue([
-          { key: 'key1', value: '🦆🦆🦆🦆🦆🦆' },
-          { key: 'key2', value: 'goose' },
+          { key: "key1", value: "🦆🦆🦆🦆🦆🦆" },
+          { key: "key2", value: "goose" },
         ]),
         null,
       ],
       [
         [],
         [
-          { 'key': 'key1', 'value': '🦆🦆🦆🦆🦆🦆' },
-          { 'key': 'key2', 'value': 'goose' },
+          { key: "key1", value: "🦆🦆🦆🦆🦆🦆" },
+          { key: "key2", value: "goose" },
         ],
         null,
-      ]
+      ],
     ),
     col(
-      'union',
-      UNION({ 'name': VARCHAR, 'age': SMALLINT }),
+      "union",
+      UNION({ name: VARCHAR, age: SMALLINT }),
       {
         typeId: 28,
-        memberTags: ['name', 'age'],
+        memberTags: ["name", "age"],
         memberTypes: [{ typeId: 17 }, { typeId: 3 }],
       },
-      [unionValue('name', 'Frank'), unionValue('age', 5), null],
-      [{ 'tag': 'name', 'value': 'Frank' }, { 'tag': 'age', 'value': 5 }, null]
+      [unionValue("name", "Frank"), unionValue("age", 5), null],
+      [{ tag: "name", value: "Frank" }, { tag: "age", value: 5 }, null],
     ),
     col(
-      'fixed_int_array',
+      "fixed_int_array",
       ARRAY(INTEGER, 3),
       { typeId: 33, valueType: { typeId: 4 }, length: 3 },
       [arrayValue([null, 2, 3]), arrayValue([4, 5, 6]), null],
-      [[null, 2, 3], [4, 5, 6], null]
+      [[null, 2, 3], [4, 5, 6], null],
     ),
     col(
-      'fixed_varchar_array',
+      "fixed_varchar_array",
       ARRAY(VARCHAR, 3),
       { typeId: 33, valueType: { typeId: 17 }, length: 3 },
-      [arrayValue(['a', null, 'c']), arrayValue(['d', 'e', 'f']), null],
-      [['a', null, 'c'], ['d', 'e', 'f'], null]
+      [arrayValue(["a", null, "c"]), arrayValue(["d", "e", "f"]), null],
+      [["a", null, "c"], ["d", "e", "f"], null],
     ),
     col(
-      'fixed_nested_int_array',
+      "fixed_nested_int_array",
       ARRAY(ARRAY(INTEGER, 3), 3),
       {
         typeId: 33,
@@ -628,11 +492,7 @@ export function createTestAllTypesData(): ColumnNameTypeAndValues[] {
       },
       [
         arrayValue([arrayValue([null, 2, 3]), null, arrayValue([null, 2, 3])]),
-        arrayValue([
-          arrayValue([4, 5, 6]),
-          arrayValue([null, 2, 3]),
-          arrayValue([4, 5, 6]),
-        ]),
+        arrayValue([arrayValue([4, 5, 6]), arrayValue([null, 2, 3]), arrayValue([4, 5, 6])]),
         null,
       ],
       [
@@ -643,10 +503,10 @@ export function createTestAllTypesData(): ColumnNameTypeAndValues[] {
           [4, 5, 6],
         ],
         null,
-      ]
+      ],
     ),
     col(
-      'fixed_nested_varchar_array',
+      "fixed_nested_varchar_array",
       ARRAY(ARRAY(VARCHAR, 3), 3),
       {
         typeId: 33,
@@ -654,73 +514,65 @@ export function createTestAllTypesData(): ColumnNameTypeAndValues[] {
         length: 3,
       },
       [
-        arrayValue([
-          arrayValue(['a', null, 'c']),
-          null,
-          arrayValue(['a', null, 'c']),
-        ]),
-        arrayValue([
-          arrayValue(['d', 'e', 'f']),
-          arrayValue(['a', null, 'c']),
-          arrayValue(['d', 'e', 'f']),
-        ]),
+        arrayValue([arrayValue(["a", null, "c"]), null, arrayValue(["a", null, "c"])]),
+        arrayValue([arrayValue(["d", "e", "f"]), arrayValue(["a", null, "c"]), arrayValue(["d", "e", "f"])]),
         null,
       ],
       [
-        [['a', null, 'c'], null, ['a', null, 'c']],
+        [["a", null, "c"], null, ["a", null, "c"]],
         [
-          ['d', 'e', 'f'],
-          ['a', null, 'c'],
-          ['d', 'e', 'f'],
+          ["d", "e", "f"],
+          ["a", null, "c"],
+          ["d", "e", "f"],
         ],
         null,
-      ]
+      ],
     ),
     col(
-      'fixed_struct_array',
-      ARRAY(STRUCT({ 'a': INTEGER, 'b': VARCHAR }), 3),
+      "fixed_struct_array",
+      ARRAY(STRUCT({ a: INTEGER, b: VARCHAR }), 3),
       {
         typeId: 33,
         valueType: {
           typeId: 25,
-          entryNames: ['a', 'b'],
+          entryNames: ["a", "b"],
           entryTypes: [{ typeId: 4 }, { typeId: 17 }],
         },
         length: 3,
       },
       [
         arrayValue([
-          structValue({ 'a': null, 'b': null }),
-          structValue({ 'a': 42, 'b': '🦆🦆🦆🦆🦆🦆' }),
-          structValue({ 'a': null, 'b': null }),
+          structValue({ a: null, b: null }),
+          structValue({ a: 42, b: "🦆🦆🦆🦆🦆🦆" }),
+          structValue({ a: null, b: null }),
         ]),
         arrayValue([
-          structValue({ 'a': 42, 'b': '🦆🦆🦆🦆🦆🦆' }),
-          structValue({ 'a': null, 'b': null }),
-          structValue({ 'a': 42, 'b': '🦆🦆🦆🦆🦆🦆' }),
+          structValue({ a: 42, b: "🦆🦆🦆🦆🦆🦆" }),
+          structValue({ a: null, b: null }),
+          structValue({ a: 42, b: "🦆🦆🦆🦆🦆🦆" }),
         ]),
         null,
       ],
       [
         [
-          { 'a': null, 'b': null },
-          { 'a': 42, 'b': '🦆🦆🦆🦆🦆🦆' },
-          { 'a': null, 'b': null },
+          { a: null, b: null },
+          { a: 42, b: "🦆🦆🦆🦆🦆🦆" },
+          { a: null, b: null },
         ],
         [
-          { 'a': 42, 'b': '🦆🦆🦆🦆🦆🦆' },
-          { 'a': null, 'b': null },
-          { 'a': 42, 'b': '🦆🦆🦆🦆🦆🦆' },
+          { a: 42, b: "🦆🦆🦆🦆🦆🦆" },
+          { a: null, b: null },
+          { a: 42, b: "🦆🦆🦆🦆🦆🦆" },
         ],
         null,
-      ]
+      ],
     ),
     col(
-      'struct_of_fixed_array',
-      STRUCT({ 'a': ARRAY(INTEGER, 3), 'b': ARRAY(VARCHAR, 3) }),
+      "struct_of_fixed_array",
+      STRUCT({ a: ARRAY(INTEGER, 3), b: ARRAY(VARCHAR, 3) }),
       {
         typeId: 25,
-        entryNames: ['a', 'b'],
+        entryNames: ["a", "b"],
         entryTypes: [
           { typeId: 33, valueType: { typeId: 4 }, length: 3 },
           { typeId: 33, valueType: { typeId: 17 }, length: 3 },
@@ -728,23 +580,19 @@ export function createTestAllTypesData(): ColumnNameTypeAndValues[] {
       },
       [
         structValue({
-          'a': arrayValue([null, 2, 3]),
-          'b': arrayValue(['a', null, 'c']),
+          a: arrayValue([null, 2, 3]),
+          b: arrayValue(["a", null, "c"]),
         }),
         structValue({
-          'a': arrayValue([4, 5, 6]),
-          'b': arrayValue(['d', 'e', 'f']),
+          a: arrayValue([4, 5, 6]),
+          b: arrayValue(["d", "e", "f"]),
         }),
         null,
       ],
-      [
-        { 'a': [null, 2, 3], 'b': ['a', null, 'c'] },
-        { 'a': [4, 5, 6], 'b': ['d', 'e', 'f'] },
-        null,
-      ]
+      [{ a: [null, 2, 3], b: ["a", null, "c"] }, { a: [4, 5, 6], b: ["d", "e", "f"] }, null],
     ),
     col(
-      'fixed_array_of_int_list',
+      "fixed_array_of_int_list",
       ARRAY(LIST(INTEGER), 3),
       {
         typeId: 33,
@@ -752,42 +600,22 @@ export function createTestAllTypesData(): ColumnNameTypeAndValues[] {
         length: 3,
       },
       [
-        arrayValue([
-          listValue([]),
-          listValue([42, 999, null, null, -42]),
-          listValue([]),
-        ]),
-        arrayValue([
-          listValue([42, 999, null, null, -42]),
-          listValue([]),
-          listValue([42, 999, null, null, -42]),
-        ]),
+        arrayValue([listValue([]), listValue([42, 999, null, null, -42]), listValue([])]),
+        arrayValue([listValue([42, 999, null, null, -42]), listValue([]), listValue([42, 999, null, null, -42])]),
         null,
       ],
-      [
-        [[], [42, 999, null, null, -42], []],
-        [[42, 999, null, null, -42], [], [42, 999, null, null, -42]],
-        null,
-      ]
+      [[[], [42, 999, null, null, -42], []], [[42, 999, null, null, -42], [], [42, 999, null, null, -42]], null],
     ),
     col(
-      'list_of_fixed_int_array',
+      "list_of_fixed_int_array",
       LIST(ARRAY(INTEGER, 3)),
       {
         typeId: 24,
         valueType: { typeId: 33, valueType: { typeId: 4 }, length: 3 },
       },
       [
-        listValue([
-          arrayValue([null, 2, 3]),
-          arrayValue([4, 5, 6]),
-          arrayValue([null, 2, 3]),
-        ]),
-        listValue([
-          arrayValue([4, 5, 6]),
-          arrayValue([null, 2, 3]),
-          arrayValue([4, 5, 6]),
-        ]),
+        listValue([arrayValue([null, 2, 3]), arrayValue([4, 5, 6]), arrayValue([null, 2, 3])]),
+        listValue([arrayValue([4, 5, 6]), arrayValue([null, 2, 3]), arrayValue([4, 5, 6])]),
         null,
       ],
       [
@@ -802,44 +630,45 @@ export function createTestAllTypesData(): ColumnNameTypeAndValues[] {
           [4, 5, 6],
         ],
         null,
-      ]
+      ],
     ),
     col(
-      'time_ns',
+      "time_ns",
       TIME_NS,
       { typeId: 39 },
       [TIME_NS.min, TIME_NS.max, null],
-      [String(TIME_NS.min), String(TIME_NS.max), null]
+      [String(TIME_NS.min), String(TIME_NS.max), null],
     ),
     col(
-      'geometry',
+      "geometry",
       GEOMETRY,
       { typeId: 40 },
       [
-        geometryValue(Buffer.from('0101000000000000000000F87F000000000000F87F', 'hex')),
-        geometryValue(Buffer.from('01070000000D0000000101000000000000000000F03F00000000000000400101000000000000000000F87F000000000000F87F01020000000200000000000000000000000000000000000000000000000000F03F000000000000F03F01020000000000000001030000000100000005000000000000000000000000000000000000000000000000000000000000000000F03F000000000000F03F000000000000F03F000000000000F03F0000000000000000000000000000000000000000000000000103000000000000000104000000020000000101000000000000000000144000000000000018400101000000000000000000F87F000000000000F87F01050000000400000001020000000200000000000000000000000000000000000000000000000000F03F000000000000F03F010200000000000000010200000002000000000000000000004000000000000000400000000000000840000000000000084001020000000000000001050000000000000001060000000400000001030000000100000005000000000000000000000000000000000000000000000000000000000000000000F03F000000000000F03F000000000000F03F000000000000F03F000000000000000000000000000000000000000000000000010300000000000000010300000001000000050000000000000000000000000000000000000000000000000000000000000000000040000000000000004000000000000000400000000000000040000000000000000000000000000000000000000000000000010300000000000000010600000000000000010700000001000000010100000000000000000014400000000000001840010700000000000000', 'hex')),
+        geometryValue(Buffer.from("0101000000000000000000F87F000000000000F87F", "hex")),
+        geometryValue(
+          Buffer.from(
+            "01070000000D0000000101000000000000000000F03F00000000000000400101000000000000000000F87F000000000000F87F01020000000200000000000000000000000000000000000000000000000000F03F000000000000F03F01020000000000000001030000000100000005000000000000000000000000000000000000000000000000000000000000000000F03F000000000000F03F000000000000F03F000000000000F03F0000000000000000000000000000000000000000000000000103000000000000000104000000020000000101000000000000000000144000000000000018400101000000000000000000F87F000000000000F87F01050000000400000001020000000200000000000000000000000000000000000000000000000000F03F000000000000F03F010200000000000000010200000002000000000000000000004000000000000000400000000000000840000000000000084001020000000000000001050000000000000001060000000400000001030000000100000005000000000000000000000000000000000000000000000000000000000000000000F03F000000000000F03F000000000000F03F000000000000F03F000000000000000000000000000000000000000000000000010300000000000000010300000001000000050000000000000000000000000000000000000000000000000000000000000000000040000000000000004000000000000000400000000000000040000000000000000000000000000000000000000000000000010300000000000000010600000000000000010700000001000000010100000000000000000014400000000000001840010700000000000000",
+            "hex",
+          ),
+        ),
         null,
       ],
       [
-        '\\x01\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\xF8\\x7F\\x00\\x00\\x00\\x00\\x00\\x00\\xF8\\x7F',
-        '\\x01\\x07\\x00\\x00\\x00\\x0D\\x00\\x00\\x00\\x01\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x00\\x00\\x00\\x00\\x00\\x00\\x00@\\x01\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\xF8\\x7F\\x00\\x00\\x00\\x00\\x00\\x00\\xF8\\x7F\\x01\\x02\\x00\\x00\\x00\\x02\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x01\\x02\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01\\x03\\x00\\x00\\x00\\x01\\x00\\x00\\x00\\x05\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01\\x03\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01\\x04\\x00\\x00\\x00\\x02\\x00\\x00\\x00\\x01\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x14@\\x00\\x00\\x00\\x00\\x00\\x00\\x18@\\x01\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\xF8\\x7F\\x00\\x00\\x00\\x00\\x00\\x00\\xF8\\x7F\\x01\\x05\\x00\\x00\\x00\\x04\\x00\\x00\\x00\\x01\\x02\\x00\\x00\\x00\\x02\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x01\\x02\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01\\x02\\x00\\x00\\x00\\x02\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00@\\x00\\x00\\x00\\x00\\x00\\x00\\x00@\\x00\\x00\\x00\\x00\\x00\\x00\\x08@\\x00\\x00\\x00\\x00\\x00\\x00\\x08@\\x01\\x02\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01\\x05\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01\\x06\\x00\\x00\\x00\\x04\\x00\\x00\\x00\\x01\\x03\\x00\\x00\\x00\\x01\\x00\\x00\\x00\\x05\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01\\x03\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01\\x03\\x00\\x00\\x00\\x01\\x00\\x00\\x00\\x05\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00@\\x00\\x00\\x00\\x00\\x00\\x00\\x00@\\x00\\x00\\x00\\x00\\x00\\x00\\x00@\\x00\\x00\\x00\\x00\\x00\\x00\\x00@\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01\\x03\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01\\x06\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01\\x07\\x00\\x00\\x00\\x01\\x00\\x00\\x00\\x01\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x14@\\x00\\x00\\x00\\x00\\x00\\x00\\x18@\\x01\\x07\\x00\\x00\\x00\\x00\\x00\\x00\\x00',
-        null
-      ]
+        "\\x01\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\xF8\\x7F\\x00\\x00\\x00\\x00\\x00\\x00\\xF8\\x7F",
+        "\\x01\\x07\\x00\\x00\\x00\\x0D\\x00\\x00\\x00\\x01\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x00\\x00\\x00\\x00\\x00\\x00\\x00@\\x01\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\xF8\\x7F\\x00\\x00\\x00\\x00\\x00\\x00\\xF8\\x7F\\x01\\x02\\x00\\x00\\x00\\x02\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x01\\x02\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01\\x03\\x00\\x00\\x00\\x01\\x00\\x00\\x00\\x05\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01\\x03\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01\\x04\\x00\\x00\\x00\\x02\\x00\\x00\\x00\\x01\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x14@\\x00\\x00\\x00\\x00\\x00\\x00\\x18@\\x01\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\xF8\\x7F\\x00\\x00\\x00\\x00\\x00\\x00\\xF8\\x7F\\x01\\x05\\x00\\x00\\x00\\x04\\x00\\x00\\x00\\x01\\x02\\x00\\x00\\x00\\x02\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x01\\x02\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01\\x02\\x00\\x00\\x00\\x02\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00@\\x00\\x00\\x00\\x00\\x00\\x00\\x00@\\x00\\x00\\x00\\x00\\x00\\x00\\x08@\\x00\\x00\\x00\\x00\\x00\\x00\\x08@\\x01\\x02\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01\\x05\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01\\x06\\x00\\x00\\x00\\x04\\x00\\x00\\x00\\x01\\x03\\x00\\x00\\x00\\x01\\x00\\x00\\x00\\x05\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x00\\x00\\x00\\x00\\x00\\x00\\xF0?\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01\\x03\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01\\x03\\x00\\x00\\x00\\x01\\x00\\x00\\x00\\x05\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00@\\x00\\x00\\x00\\x00\\x00\\x00\\x00@\\x00\\x00\\x00\\x00\\x00\\x00\\x00@\\x00\\x00\\x00\\x00\\x00\\x00\\x00@\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01\\x03\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01\\x06\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01\\x07\\x00\\x00\\x00\\x01\\x00\\x00\\x00\\x01\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x14@\\x00\\x00\\x00\\x00\\x00\\x00\\x18@\\x01\\x07\\x00\\x00\\x00\\x00\\x00\\x00\\x00",
+        null,
+      ],
     ),
     col(
-      'tuple',
+      "tuple",
       TUPLE([INTEGER, VARCHAR]),
       {
         typeId: 25,
-        entryNames: ['', ''],
+        entryNames: ["", ""],
         entryTypes: [{ typeId: 4 }, { typeId: 17 }],
       },
-      [
-        tupleValue([null, null]),
-        tupleValue([42, '🦆🦆🦆🦆🦆🦆']),
-        null,
-      ],
-      [[null, null], [42, '🦆🦆🦆🦆🦆🦆'], null]
+      [tupleValue([null, null]), tupleValue([42, "🦆🦆🦆🦆🦆🦆"]), null],
+      [[null, null], [42, "🦆🦆🦆🦆🦆🦆"], null],
     ),
   ];
 }
@@ -882,10 +711,7 @@ export function createTestAllTypesColumnsJson(): readonly (readonly Json[])[] {
   return createTestAllTypesData().map(({ valuesJson }) => valuesJson);
 }
 
-export function createTestAllTypesColumnsObjectJson(): Record<
-  string,
-  readonly Json[]
-> {
+export function createTestAllTypesColumnsObjectJson(): Record<string, readonly Json[]> {
   const columnsObject: Record<string, readonly Json[]> = {};
   const data = createTestAllTypesData();
   for (const columnData of data) {
@@ -903,10 +729,7 @@ export function createTestAllTypesRowsJson(): readonly (readonly Json[])[] {
   ];
 }
 
-export function createTestAllTypesRowObjectsJson(): readonly Record<
-  string,
-  Json
->[] {
+export function createTestAllTypesRowObjectsJson(): readonly Record<string, Json>[] {
   const rowObjects: Record<string, Json>[] = [{}, {}, {}];
   const data = createTestAllTypesData();
   for (const columnData of data) {

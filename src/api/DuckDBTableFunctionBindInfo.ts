@@ -1,8 +1,8 @@
 import duckdb from "../bindings/index.ts";
-import { DuckDBClientContext } from './DuckDBClientContext';
-import { DuckDBType } from './DuckDBType';
-import { readValue } from './readValue';
-import { DuckDBValue } from './values';
+import { DuckDBClientContext } from "./DuckDBClientContext";
+import type { DuckDBType } from "./DuckDBType";
+import { readValue } from "./readValue";
+import type { DuckDBValue } from "./values";
 
 export class DuckDBTableFunctionBindInfo {
   private readonly bind_info: duckdb.TableFunctionBindInfo;
@@ -13,9 +13,7 @@ export class DuckDBTableFunctionBindInfo {
     return this.getClientContext();
   }
   public getClientContext(): DuckDBClientContext {
-    return new DuckDBClientContext(
-      duckdb.table_function_get_client_context(this.bind_info),
-    );
+    return new DuckDBClientContext(duckdb.table_function_get_client_context(this.bind_info));
   }
   public get extraInfo(): object | undefined {
     return this.getExtraInfo();
@@ -38,11 +36,7 @@ export class DuckDBTableFunctionBindInfo {
     return value === null ? null : readValue(value);
   }
   public addResultColumn(name: string, type: DuckDBType) {
-    duckdb.bind_add_result_column(
-      this.bind_info,
-      name,
-      type.toLogicalType().logical_type,
-    );
+    duckdb.bind_add_result_column(this.bind_info, name, type.toLogicalType().logical_type);
   }
   public setBindData(bindData: object) {
     duckdb.bind_set_bind_data(this.bind_info, bindData);

@@ -1,31 +1,20 @@
 import duckdb from "../../bindings/index.ts";
-import {
-  DuckDBFloatType,
-} from '../DuckDBType';
-import { DuckDBVector } from './DuckDBVector';
-import { DuckDBValidity } from './DuckDBValidity';
-import {
-  vectorData,
-} from './dataAccessors';
+import { DuckDBFloatType } from "../DuckDBType";
+import { DuckDBValidity } from "./DuckDBValidity";
+import { DuckDBVector } from "./DuckDBVector";
+import { vectorData } from "./dataAccessors";
 
 export class DuckDBFloatVector extends DuckDBVector<number> {
   private readonly items: Float32Array;
   private readonly validity: DuckDBValidity;
   private readonly vector: duckdb.Vector;
-  constructor(
-    items: Float32Array,
-    validity: DuckDBValidity,
-    vector: duckdb.Vector
-  ) {
+  constructor(items: Float32Array, validity: DuckDBValidity, vector: duckdb.Vector) {
     super();
     this.items = items;
     this.validity = validity;
     this.vector = vector;
   }
-  static fromRawVector(
-    vector: duckdb.Vector,
-    itemCount: number
-  ): DuckDBFloatVector {
+  static fromRawVector(vector: duckdb.Vector, itemCount: number): DuckDBFloatVector {
     const data = vectorData(vector, itemCount * Float32Array.BYTES_PER_ELEMENT);
     const items = new Float32Array(data.buffer, data.byteOffset, itemCount);
     const validity = DuckDBValidity.fromVector(vector, itemCount);
@@ -54,7 +43,7 @@ export class DuckDBFloatVector extends DuckDBVector<number> {
       0,
       this.items.buffer as ArrayBuffer,
       this.items.byteOffset,
-      this.items.byteLength
+      this.items.byteLength,
     );
     this.validity.flush(this.vector);
   }
@@ -62,7 +51,7 @@ export class DuckDBFloatVector extends DuckDBVector<number> {
     return new DuckDBFloatVector(
       this.items.slice(offset, offset + length),
       this.validity.slice(offset, length),
-      this.vector
+      this.vector,
     );
   }
 }

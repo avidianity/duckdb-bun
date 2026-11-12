@@ -3,14 +3,14 @@
 These trees are copied **verbatim** from the official DuckDB Node "Neo" monorepo.
 We reimplement the bindings over `bun:ffi` and prove parity against the official test suites.
 
-|                                 |                                                                       |
-| ------------------------------- | --------------------------------------------------------------------- |
-| Upstream repo                   | https://github.com/duckdb/duckdb-node-neo                             |
-| Tag                             | `v2.0.0-r.1`                                                          |
-| Commit                          | `769e55196b7e68c953c72618adbce553d54b777d`                            |
-| `@duckdb/node-api` version      | `2.0.0-r.1`                                                           |
-| `@duckdb/node-bindings` version | `2.0.0-r.1` (DuckDB core v2.0.0)                                      |
-| License                         | MIT, see `./LICENSE` and `../node-bindings/LICENSE`                   |
+|                                 |                                                     |
+| ------------------------------- | --------------------------------------------------- |
+| Upstream repo                   | https://github.com/duckdb/duckdb-node-neo           |
+| Tag                             | `v2.0.0-r.1`                                        |
+| Commit                          | `769e55196b7e68c953c72618adbce553d54b777d`          |
+| `@duckdb/node-api` version      | `2.0.0-r.1`                                         |
+| `@duckdb/node-bindings` version | `2.0.0-r.1` (DuckDB core v2.0.0)                    |
+| License                         | MIT, see `./LICENSE` and `../node-bindings/LICENSE` |
 
 ## Layout
 

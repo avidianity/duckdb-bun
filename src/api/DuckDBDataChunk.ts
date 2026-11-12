@@ -1,9 +1,9 @@
 import duckdb from "../bindings/index.ts";
-import { DuckDBType } from './DuckDBType';
-import { DuckDBValueConverter } from './DuckDBValueConverter';
-import { ToDuckDBValueConverter } from './ToDuckDBValueConverter';
-import { DuckDBVector } from './DuckDBVector';
-import { DuckDBValue } from './values';
+import type { DuckDBType } from "./DuckDBType";
+import type { DuckDBValueConverter } from "./DuckDBValueConverter";
+import { DuckDBVector } from "./DuckDBVector";
+import type { ToDuckDBValueConverter } from "./ToDuckDBValueConverter";
+import type { DuckDBValue } from "./values";
 
 export class DuckDBDataChunk {
   public readonly chunk: duckdb.DataChunk;
@@ -11,27 +11,17 @@ export class DuckDBDataChunk {
   constructor(chunk: duckdb.DataChunk) {
     this.chunk = chunk;
   }
-  public static create(
-    types: readonly DuckDBType[],
-    rowCount?: number
-  ): DuckDBDataChunk {
+  public static create(types: readonly DuckDBType[], rowCount?: number): DuckDBDataChunk {
     let chunk: DuckDBDataChunk;
     try {
-      chunk = new DuckDBDataChunk(
-        duckdb.create_data_chunk(
-          types.map((t) => t.toLogicalType().logical_type)
-        )
-      );
+      chunk = new DuckDBDataChunk(duckdb.create_data_chunk(types.map((t) => t.toLogicalType().logical_type)));
     } catch (cause) {
       // The binding knows the chunk was refused but not which type did it, so
       // name them here. Zero columns is a legitimate chunk, so there is
       // nothing to check on the way out; only the refusal is an error.
-      throw new Error(
-        `Cannot create a data chunk with these column types: ${types.join(', ')}`,
-        { cause }
-      );
+      throw new Error(`Cannot create a data chunk with these column types: ${types.join(", ")}`, { cause });
     }
-    if (rowCount != undefined) {
+    if (rowCount != null) {
       chunk.rowCount = rowCount;
     }
     return chunk;
@@ -66,30 +56,20 @@ export class DuckDBDataChunk {
   private assertColumnCount(count: number) {
     const columnCount = this.columnCount;
     if (count !== columnCount) {
-      throw new Error(
-        `Provided number of columns (${count}) does not match chunk column count (${columnCount})`
-      );
+      throw new Error(`Provided number of columns (${count}) does not match chunk column count (${columnCount})`);
     }
   }
   public getColumnVector(columnIndex: number): DuckDBVector {
     if (this.vectors[columnIndex]) {
       return this.vectors[columnIndex];
     }
-    const vector = DuckDBVector.create(
-      duckdb.data_chunk_get_vector(this.chunk, columnIndex),
-      this.rowCount
-    );
+    const vector = DuckDBVector.create(duckdb.data_chunk_get_vector(this.chunk, columnIndex), this.rowCount);
     this.vectors[columnIndex] = vector;
     return vector;
   }
   public visitColumnValues(
     columnIndex: number,
-    visitValue: (
-      value: DuckDBValue,
-      rowIndex: number,
-      columnIndex: number,
-      type: DuckDBType
-    ) => void
+    visitValue: (value: DuckDBValue, rowIndex: number, columnIndex: number, type: DuckDBType) => void,
   ) {
     const vector = this.getColumnVector(columnIndex);
     const type = vector.type;
@@ -105,13 +85,10 @@ export class DuckDBDataChunk {
     this.appendColumnValues(columnIndex, values);
     return values;
   }
-  public convertColumnValues<T>(
-    columnIndex: number,
-    converter: DuckDBValueConverter<T>
-  ): (T | null)[] {
+  public convertColumnValues<T>(columnIndex: number, converter: DuckDBValueConverter<T>): (T | null)[] {
     const convertedValues: (T | null)[] = [];
     this.visitColumnValues(columnIndex, (value, _r, _c, type) =>
-      convertedValues.push(converter(value, type, converter))
+      convertedValues.push(converter(value, type, converter)),
     );
     return convertedValues;
   }
@@ -135,7 +112,7 @@ export class DuckDBDataChunk {
   public setColumnValuesConverted<T>(
     columnIndex: number,
     values: readonly (T | null)[],
-    converter: ToDuckDBValueConverter<T>
+    converter: ToDuckDBValueConverter<T>,
   ) {
     const vector = this.getColumnVector(columnIndex);
     if (vector.itemCount !== values.length) {
@@ -153,20 +130,10 @@ export class DuckDBDataChunk {
     }
     vector.flush();
   }
-  public visitColumns(
-    visitColumn: (
-      column: DuckDBValue[],
-      columnIndex: number,
-      type: DuckDBType
-    ) => void
-  ) {
+  public visitColumns(visitColumn: (column: DuckDBValue[], columnIndex: number, type: DuckDBType) => void) {
     const columnCount = this.columnCount;
     for (let columnIndex = 0; columnIndex < columnCount; columnIndex++) {
-      visitColumn(
-        this.getColumnValues(columnIndex),
-        columnIndex,
-        this.getColumnVector(columnIndex).type
-      );
+      visitColumn(this.getColumnValues(columnIndex), columnIndex, this.getColumnVector(columnIndex).type);
     }
   }
   public appendToColumns(columns: (DuckDBValue[] | undefined)[]) {
@@ -206,30 +173,23 @@ export class DuckDBDataChunk {
    * `setColumns` with each value converted on the way in: the write
    * counterpart of `convertColumns`.
    */
-  public setColumnsConverted<T>(
-    columns: readonly (readonly (T | null)[])[],
-    converter: ToDuckDBValueConverter<T>
-  ) {
+  public setColumnsConverted<T>(columns: readonly (readonly (T | null)[])[], converter: ToDuckDBValueConverter<T>) {
     this.assertColumnCount(columns.length);
     if (columns.length > 0) {
       this.rowCount = columns[0].length;
     }
     for (let columnIndex = 0; columnIndex < columns.length; columnIndex++) {
-      this.setColumnValuesConverted(
-        columnIndex,
-        columns[columnIndex],
-        converter
-      );
+      this.setColumnValuesConverted(columnIndex, columns[columnIndex], converter);
     }
   }
   public appendToColumnsObject(
     columnNames: readonly string[],
-    columnsObject: Record<string, DuckDBValue[] | undefined>
+    columnsObject: Record<string, DuckDBValue[] | undefined>,
   ) {
     const columnCount = this.columnCount;
     if (columnNames.length !== columnCount) {
       throw new Error(
-        `Provided number of column names (${columnNames.length}) does not match column count (${this.columnCount})`
+        `Provided number of column names (${columnNames.length}) does not match column count (${this.columnCount})`,
       );
     }
     for (let columnIndex = 0; columnIndex < columnCount; columnIndex++) {
@@ -242,20 +202,13 @@ export class DuckDBDataChunk {
       this.appendColumnValues(columnIndex, columnValues);
     }
   }
-  public getColumnsObject(
-    columnNames: readonly string[]
-  ): Record<string, DuckDBValue[]> {
+  public getColumnsObject(columnNames: readonly string[]): Record<string, DuckDBValue[]> {
     const columnsObject: Record<string, DuckDBValue[]> = {};
     this.appendToColumnsObject(columnNames, columnsObject);
     return columnsObject;
   }
   public visitColumnMajor(
-    visitValue: (
-      value: DuckDBValue,
-      rowIndex: number,
-      columnIndex: number,
-      type: DuckDBType
-    ) => void
+    visitValue: (value: DuckDBValue, rowIndex: number, columnIndex: number, type: DuckDBType) => void,
   ) {
     const columnCount = this.columnCount;
     for (let columnIndex = 0; columnIndex < columnCount; columnIndex++) {
@@ -264,12 +217,7 @@ export class DuckDBDataChunk {
   }
   public visitRowValues(
     rowIndex: number,
-    visitValue: (
-      value: DuckDBValue,
-      rowIndex: number,
-      columnIndex: number,
-      type: DuckDBType
-    ) => void
+    visitValue: (value: DuckDBValue, rowIndex: number, columnIndex: number, type: DuckDBType) => void,
   ) {
     const columnCount = this.columnCount;
     for (let columnIndex = 0; columnIndex < columnCount; columnIndex++) {
@@ -285,15 +233,10 @@ export class DuckDBDataChunk {
     this.appendRowValues(rowIndex, values);
     return values;
   }
-  public convertRowValues<T>(
-    rowIndex: number,
-    converter: DuckDBValueConverter<T>
-  ): (T | null)[] {
+  public convertRowValues<T>(rowIndex: number, converter: DuckDBValueConverter<T>): (T | null)[] {
     const convertedValues: (T | null)[] = [];
     this.visitRowValues(rowIndex, (value, _, columnIndex) =>
-      convertedValues.push(
-        converter(value, this.getColumnVector(columnIndex).type, converter)
-      )
+      convertedValues.push(converter(value, this.getColumnVector(columnIndex).type, converter)),
     );
     return convertedValues;
   }
@@ -337,10 +280,7 @@ export class DuckDBDataChunk {
    * Each column's type comes from its vector, so the converter is the only
    * thing the caller supplies.
    */
-  public setRowsConverted<T>(
-    rows: readonly (readonly (T | null)[])[],
-    converter: ToDuckDBValueConverter<T>
-  ) {
+  public setRowsConverted<T>(rows: readonly (readonly (T | null)[])[], converter: ToDuckDBValueConverter<T>) {
     this.rowCount = rows.length;
     const columnCount = this.columnCount;
     for (let columnIndex = 0; columnIndex < columnCount; columnIndex++) {
@@ -350,10 +290,7 @@ export class DuckDBDataChunk {
       // the column it came from without a try/catch in the inner loop.
       try {
         for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
-          vector.setItem(
-            rowIndex,
-            converter(rows[rowIndex][columnIndex] as T, type, converter)
-          );
+          vector.setItem(rowIndex, converter(rows[rowIndex][columnIndex] as T, type, converter));
         }
       } catch (cause) {
         throw new Error(`Failed to set column ${columnIndex} (${type})`, {
@@ -363,19 +300,16 @@ export class DuckDBDataChunk {
       vector.flush();
     }
   }
-  public appendToRowObjects(
-    columnNames: readonly string[],
-    rowObjects: Record<string, DuckDBValue>[]
-  ) {
+  public appendToRowObjects(columnNames: readonly string[], rowObjects: Record<string, DuckDBValue>[]) {
     const columnCount = this.columnCount;
     if (columnNames.length !== columnCount) {
       throw new Error(
-        `Provided number of column names (${columnNames.length}) does not match column count (${this.columnCount})`
+        `Provided number of column names (${columnNames.length}) does not match column count (${this.columnCount})`,
       );
     }
     const rowCount = this.rowCount;
     for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
-      let rowObject: Record<string, DuckDBValue> = {};
+      const rowObject: Record<string, DuckDBValue> = {};
       this.visitRowValues(rowIndex, (value, _, columnIndex) => {
         rowObject[columnNames[columnIndex]] = value;
       });
@@ -388,24 +322,14 @@ export class DuckDBDataChunk {
     return rowObjects;
   }
   public visitRowMajor(
-    visitValue: (
-      value: DuckDBValue,
-      rowIndex: number,
-      columnIndex: number,
-      type: DuckDBType
-    ) => void
+    visitValue: (value: DuckDBValue, rowIndex: number, columnIndex: number, type: DuckDBType) => void,
   ) {
     const rowCount = this.rowCount;
     const columnCount = this.columnCount;
     for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
       for (let columnIndex = 0; columnIndex < columnCount; columnIndex++) {
         const vector = this.getColumnVector(columnIndex);
-        visitValue(
-          vector.getItem(rowIndex),
-          rowIndex,
-          columnIndex,
-          vector.type
-        );
+        visitValue(vector.getItem(rowIndex), rowIndex, columnIndex, vector.type);
       }
     }
   }

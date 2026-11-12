@@ -1,8 +1,7 @@
-import duckdb from '../../../src/bindings/index.ts';
-import { expect } from '../../vitest-shim.ts';
-import { ExpectedLogicalType } from './ExpectedLogicalType';
-import { UTINYINT } from './expectedLogicalTypes';
-import {
+import duckdb from "../../../src/bindings/index.ts";
+import { expect } from "../../vitest-shim.ts";
+import type { ExpectedLogicalType } from "./ExpectedLogicalType";
+import type {
   ExpectedArrayVector,
   ExpectedDataVector,
   ExpectedListVector,
@@ -10,34 +9,43 @@ import {
   ExpectedStructVector,
   ExpectedUnionVector,
   ExpectedVector,
-} from './ExpectedVector';
-import { expectValidity } from './expectValidity';
-import { getListEntry, getValue } from './getValue';
+} from "./ExpectedVector";
+import { UTINYINT } from "./expectedLogicalTypes";
+import { expectValidity } from "./expectValidity";
+import { getListEntry, getValue } from "./getValue";
 
-export function expectVector(vector: duckdb.Vector, expectedVector: ExpectedVector, expectedLogicalType: ExpectedLogicalType, vectorName: string) {
+export function expectVector(
+  vector: duckdb.Vector,
+  expectedVector: ExpectedVector,
+  expectedLogicalType: ExpectedLogicalType,
+  vectorName: string,
+) {
   switch (expectedVector.kind) {
-    case 'array':
+    case "array":
       expectArrayVector(vector, expectedVector, expectedLogicalType, vectorName);
       break;
-    case 'data':
+    case "data":
       expectDataVector(vector, expectedVector, expectedLogicalType, vectorName);
       break;
-    case 'list':
+    case "list":
       expectListVector(vector, expectedVector, expectedLogicalType, vectorName);
       break;
-    case 'map':
+    case "map":
       expectMapVector(vector, expectedVector, expectedLogicalType, vectorName);
       break;
-    case 'struct':
+    case "struct":
       expectStructVector(vector, expectedVector, expectedLogicalType, vectorName);
       break;
-    case 'union':
+    case "union":
       expectUnionVector(vector, expectedVector, expectedLogicalType, vectorName);
       break;
   }
 }
 
-function getVectorValidity(vector: duckdb.Vector, itemCount: number): { validity: BigUint64Array | null, validityBytes: Uint8Array | null } {
+function getVectorValidity(
+  vector: duckdb.Vector,
+  itemCount: number,
+): { validity: BigUint64Array | null; validityBytes: Uint8Array | null } {
   const validityUInt64Count = Math.ceil(itemCount / 64);
   const validityByteCount = validityUInt64Count * 8;
   const validityBytes = duckdb.vector_get_validity(vector, validityByteCount);
@@ -53,7 +61,12 @@ function getVectorData(vector: duckdb.Vector, itemCount: number, itemBytes: numb
   return new DataView(bytes.buffer);
 }
 
-function expectArrayVector(vector: duckdb.Vector, expectedVector: ExpectedArrayVector, expectedLogicalType: ExpectedLogicalType, vectorName: string) {
+function expectArrayVector(
+  vector: duckdb.Vector,
+  expectedVector: ExpectedArrayVector,
+  expectedLogicalType: ExpectedLogicalType,
+  vectorName: string,
+) {
   expect(expectedLogicalType.typeId).toBe(duckdb.Type.ARRAY);
   if (expectedLogicalType.typeId !== duckdb.Type.ARRAY) {
     return;
@@ -62,24 +75,48 @@ function expectArrayVector(vector: duckdb.Vector, expectedVector: ExpectedArrayV
   const itemCount = expectedVector.itemCount;
   const { validity, validityBytes } = getVectorValidity(vector, itemCount);
   for (let row = 0; row < itemCount; row++) {
-    expectValidity(validityBytes, validity, row, expectedVector.validity ? expectedVector.validity[row] : true, `${vectorName} row[${row}]`);
+    expectValidity(
+      validityBytes,
+      validity,
+      row,
+      expectedVector.validity ? expectedVector.validity[row] : true,
+      `${vectorName} row[${row}]`,
+    );
   }
 
   const childVector = duckdb.array_vector_get_child(vector);
   expectVector(childVector, expectedVector.child, expectedLogicalType.valueType, `${vectorName} array_child`);
 }
 
-function expectDataVector(vector: duckdb.Vector, expectedVector: ExpectedDataVector, expectedLogicalType: ExpectedLogicalType, vectorName: string) {
+function expectDataVector(
+  vector: duckdb.Vector,
+  expectedVector: ExpectedDataVector,
+  expectedLogicalType: ExpectedLogicalType,
+  vectorName: string,
+) {
   const itemCount = expectedVector.values.length;
   const { validity, validityBytes } = getVectorValidity(vector, itemCount);
   const dv = getVectorData(vector, itemCount, expectedVector.itemBytes);
   for (let row = 0; row < itemCount; row++) {
-    expectValidity(validityBytes, validity, row, expectedVector.validity ? expectedVector.validity[row] : true, `${vectorName} row[${row}]`);
-    expect(getValue(expectedLogicalType, validity, dv, row), `${vectorName} row[${row}]`).toStrictEqual(expectedVector.values[row]);
+    expectValidity(
+      validityBytes,
+      validity,
+      row,
+      expectedVector.validity ? expectedVector.validity[row] : true,
+      `${vectorName} row[${row}]`,
+    );
+    expect(getValue(expectedLogicalType, validity, dv, row), `${vectorName} row[${row}]`).toStrictEqual(
+      expectedVector.values[row],
+    );
   }
 }
 
-function expectListVector(vector: duckdb.Vector, expectedVector: ExpectedListVector, expectedLogicalType: ExpectedLogicalType, vectorName: string) {
+function expectListVector(
+  vector: duckdb.Vector,
+  expectedVector: ExpectedListVector,
+  expectedLogicalType: ExpectedLogicalType,
+  vectorName: string,
+) {
   expect(expectedLogicalType.typeId).toBe(duckdb.Type.LIST);
   if (expectedLogicalType.typeId !== duckdb.Type.LIST) {
     return;
@@ -89,7 +126,13 @@ function expectListVector(vector: duckdb.Vector, expectedVector: ExpectedListVec
   const { validity, validityBytes } = getVectorValidity(vector, itemCount);
   const entriesDV = getVectorData(vector, itemCount, 16);
   for (let row = 0; row < itemCount; row++) {
-    expectValidity(validityBytes, validity, row, expectedVector.validity ? expectedVector.validity[row] : true, `${vectorName} row[${row}]`);
+    expectValidity(
+      validityBytes,
+      validity,
+      row,
+      expectedVector.validity ? expectedVector.validity[row] : true,
+      `${vectorName} row[${row}]`,
+    );
     expect(getListEntry(validity, entriesDV, row)).toStrictEqual(expectedVector.entries[row]);
   }
 
@@ -99,7 +142,12 @@ function expectListVector(vector: duckdb.Vector, expectedVector: ExpectedListVec
   expectVector(childVector, expectedVector.child, expectedLogicalType.valueType, `${vectorName} list_child`);
 }
 
-function expectMapVector(vector: duckdb.Vector, expectedVector: ExpectedMapVector, expectedLogicalType: ExpectedLogicalType, vectorName: string) {
+function expectMapVector(
+  vector: duckdb.Vector,
+  expectedVector: ExpectedMapVector,
+  expectedLogicalType: ExpectedLogicalType,
+  vectorName: string,
+) {
   expect(expectedLogicalType.typeId).toBe(duckdb.Type.MAP);
   if (expectedLogicalType.typeId !== duckdb.Type.MAP) {
     return;
@@ -109,7 +157,13 @@ function expectMapVector(vector: duckdb.Vector, expectedVector: ExpectedMapVecto
   const { validity, validityBytes } = getVectorValidity(vector, itemCount);
   const entriesDV = getVectorData(vector, itemCount, 16);
   for (let row = 0; row < itemCount; row++) {
-    expectValidity(validityBytes, validity, row, expectedVector.validity ? expectedVector.validity[row] : true, `${vectorName} row[${row}]`);
+    expectValidity(
+      validityBytes,
+      validity,
+      row,
+      expectedVector.validity ? expectedVector.validity[row] : true,
+      `${vectorName} row[${row}]`,
+    );
     expect(getListEntry(validity, entriesDV, row)).toStrictEqual(expectedVector.entries[row]);
   }
 
@@ -122,7 +176,12 @@ function expectMapVector(vector: duckdb.Vector, expectedVector: ExpectedMapVecto
   expectVector(valuesVector, expectedVector.values, expectedLogicalType.valueType, `${vectorName} map_values`);
 }
 
-function expectStructVector(vector: duckdb.Vector, expectedVector: ExpectedStructVector, expectedLogicalType: ExpectedLogicalType, vectorName: string) {
+function expectStructVector(
+  vector: duckdb.Vector,
+  expectedVector: ExpectedStructVector,
+  expectedLogicalType: ExpectedLogicalType,
+  vectorName: string,
+) {
   expect(expectedLogicalType.typeId).toBe(duckdb.Type.STRUCT);
   if (expectedLogicalType.typeId !== duckdb.Type.STRUCT) {
     return;
@@ -131,16 +190,32 @@ function expectStructVector(vector: duckdb.Vector, expectedVector: ExpectedStruc
   const itemCount = expectedVector.itemCount;
   const { validity, validityBytes } = getVectorValidity(vector, itemCount);
   for (let row = 0; row < itemCount; row++) {
-    expectValidity(validityBytes, validity, row, expectedVector.validity ? expectedVector.validity[row] : true, `${vectorName} row[${row}]`);
+    expectValidity(
+      validityBytes,
+      validity,
+      row,
+      expectedVector.validity ? expectedVector.validity[row] : true,
+      `${vectorName} row[${row}]`,
+    );
   }
 
   for (let i = 0; i < expectedVector.children.length; i++) {
     const childVector = duckdb.struct_vector_get_child(vector, i);
-    expectVector(childVector, expectedVector.children[i], expectedLogicalType.entries[i].type, `${vectorName} struct_child[${i}]`);
+    expectVector(
+      childVector,
+      expectedVector.children[i],
+      expectedLogicalType.entries[i].type,
+      `${vectorName} struct_child[${i}]`,
+    );
   }
 }
 
-function expectUnionVector(vector: duckdb.Vector, expectedVector: ExpectedUnionVector, expectedLogicalType: ExpectedLogicalType, vectorName: string) {
+function expectUnionVector(
+  vector: duckdb.Vector,
+  expectedVector: ExpectedUnionVector,
+  expectedLogicalType: ExpectedLogicalType,
+  vectorName: string,
+) {
   expect(expectedLogicalType.typeId).toBe(duckdb.Type.UNION);
   if (expectedLogicalType.typeId !== duckdb.Type.UNION) {
     return;
@@ -150,6 +225,11 @@ function expectUnionVector(vector: duckdb.Vector, expectedVector: ExpectedUnionV
   expectVector(tagsVector, expectedVector.children[0], UTINYINT, `${vectorName} union_tags`);
   for (let i = 1; i < expectedVector.children.length; i++) {
     const childVector = duckdb.struct_vector_get_child(vector, i);
-    expectVector(childVector, expectedVector.children[i], expectedLogicalType.alternatives[i-1].type, `${vectorName} union_child[${i}]`);
+    expectVector(
+      childVector,
+      expectedVector.children[i],
+      expectedLogicalType.alternatives[i - 1].type,
+      `${vectorName} union_child[${i}]`,
+    );
   }
 }

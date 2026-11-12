@@ -1,7 +1,7 @@
 import duckdb from "../bindings/index.ts";
-import { DuckDBDataChunk } from './DuckDBDataChunk';
-import { DuckDBResult } from './DuckDBResult';
-import { StatementType } from './enums';
+import { DuckDBDataChunk } from "./DuckDBDataChunk";
+import { DuckDBResult } from "./DuckDBResult";
+import type { StatementType } from "./enums";
 
 export class DuckDBMaterializedResult extends DuckDBResult {
   private closedCounts: { rowCount: number; chunkCount: number } | undefined;

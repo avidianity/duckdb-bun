@@ -1,6 +1,6 @@
-import duckdb, { Value } from "../bindings/index.ts";
-import { DuckDBVector } from './DuckDBVector';
-import { DuckDBValue } from './values';
+import duckdb, { type Value } from "../bindings/index.ts";
+import { DuckDBVector } from "./DuckDBVector";
+import type { DuckDBValue } from "./values";
 
 /**
  * Converts a `duckdb.Value` into a `DuckDBValue`.

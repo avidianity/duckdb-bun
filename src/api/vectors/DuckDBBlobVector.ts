@@ -1,17 +1,9 @@
 import duckdb from "../../bindings/index.ts";
-import {
-  DuckDBBlobType,
-} from '../DuckDBType';
-import {
-  DuckDBBlobValue,
-} from '../values';
-import { DuckDBVector } from './DuckDBVector';
-import { DuckDBValidity } from './DuckDBValidity';
-import {
-  getBuffer,
-  getStringBytes,
-  vectorData,
-} from './dataAccessors';
+import { DuckDBBlobType } from "../DuckDBType";
+import { DuckDBBlobValue } from "../values";
+import { DuckDBValidity } from "./DuckDBValidity";
+import { DuckDBVector } from "./DuckDBVector";
+import { getBuffer, getStringBytes, vectorData } from "./dataAccessors";
 
 export class DuckDBBlobVector extends DuckDBVector<DuckDBBlobValue> {
   private readonly dataView: DataView;
@@ -26,7 +18,7 @@ export class DuckDBBlobVector extends DuckDBVector<DuckDBBlobValue> {
     validity: DuckDBValidity,
     vector: duckdb.Vector,
     itemOffset: number,
-    itemCount: number
+    itemCount: number,
   ) {
     super();
     this.dataView = dataView;
@@ -37,16 +29,9 @@ export class DuckDBBlobVector extends DuckDBVector<DuckDBBlobValue> {
     this.itemCache = [];
     this.itemCacheDirty = [];
   }
-  static fromRawVector(
-    vector: duckdb.Vector,
-    itemCount: number
-  ): DuckDBBlobVector {
+  static fromRawVector(vector: duckdb.Vector, itemCount: number): DuckDBBlobVector {
     const data = vectorData(vector, itemCount * 16);
-    const dataView = new DataView(
-      data.buffer,
-      data.byteOffset,
-      data.byteLength
-    );
+    const dataView = new DataView(data.buffer, data.byteOffset, data.byteLength);
     const validity = DuckDBValidity.fromVector(vector, itemCount);
     return new DuckDBBlobVector(dataView, validity, vector, 0, itemCount);
   }
@@ -57,9 +42,7 @@ export class DuckDBBlobVector extends DuckDBVector<DuckDBBlobValue> {
     return this._itemCount;
   }
   public override getItem(itemIndex: number): DuckDBBlobValue | null {
-    return this.validity.itemValid(itemIndex)
-      ? new DuckDBBlobValue(getBuffer(this.dataView, itemIndex * 16))
-      : null;
+    return this.validity.itemValid(itemIndex) ? new DuckDBBlobValue(getBuffer(this.dataView, itemIndex * 16)) : null;
   }
   /**
    * Returns the raw bytes for the item at `itemIndex`, or null if the item
@@ -71,9 +54,7 @@ export class DuckDBBlobVector extends DuckDBVector<DuckDBBlobValue> {
    * result as read-only either way.
    */
   public getItemBytes(itemIndex: number): Uint8Array | null {
-    return this.validity.itemValid(itemIndex)
-      ? getStringBytes(this.dataView, itemIndex * 16)
-      : null;
+    return this.validity.itemValid(itemIndex) ? getStringBytes(this.dataView, itemIndex * 16) : null;
   }
   public override setItem(itemIndex: number, value: DuckDBBlobValue | null) {
     this.itemCache[itemIndex] = value;
@@ -85,11 +66,7 @@ export class DuckDBBlobVector extends DuckDBVector<DuckDBBlobValue> {
       if (this.itemCacheDirty[itemIndex]) {
         const cachedItem = this.itemCache[itemIndex];
         if (cachedItem !== undefined && cachedItem !== null) {
-          duckdb.vector_assign_string_element_len(
-            this.vector,
-            this.itemOffset + itemIndex,
-            cachedItem.bytes
-          );
+          duckdb.vector_assign_string_element_len(this.vector, this.itemOffset + itemIndex, cachedItem.bytes);
         }
         this.itemCacheDirty[itemIndex] = false;
       }
@@ -98,15 +75,11 @@ export class DuckDBBlobVector extends DuckDBVector<DuckDBBlobValue> {
   }
   public override slice(offset: number, length: number): DuckDBBlobVector {
     return new DuckDBBlobVector(
-      new DataView(
-        this.dataView.buffer,
-        this.dataView.byteOffset + offset * 16,
-        length * 16
-      ),
+      new DataView(this.dataView.buffer, this.dataView.byteOffset + offset * 16, length * 16),
       this.validity.slice(offset, length),
       this.vector,
       offset,
-      length
+      length,
     );
   }
 }

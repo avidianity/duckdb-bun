@@ -1,9 +1,9 @@
-import duckdb from '../../../src/bindings/index.ts';
-import os from 'os';
-import { ExpectedLogicalType } from './ExpectedLogicalType';
-import { isValid } from './isValid';
+import os from "node:os";
+import duckdb from "../../../src/bindings/index.ts";
+import type { ExpectedLogicalType } from "./ExpectedLogicalType";
+import { isValid } from "./isValid";
 
-const littleEndian = os.endianness() === 'LE';
+const littleEndian = os.endianness() === "LE";
 
 function getInt8(dataView: DataView, offset: number): number {
   return dataView.getInt8(offset);
@@ -54,7 +54,7 @@ function getInt128(dataView: DataView, offset: number): bigint {
 function getUInt128(dataView: DataView, offset: number): bigint {
   const lower = getUInt64(dataView, offset);
   const upper = getUInt64(dataView, offset + 8);
-  return BigInt.asUintN(64, upper) << BigInt(64) | BigInt.asUintN(64, lower);
+  return (BigInt.asUintN(64, upper) << BigInt(64)) | BigInt.asUintN(64, lower);
 }
 
 /**
@@ -84,7 +84,12 @@ function getBuffer(dv: DataView, offset: number): Buffer {
   return Buffer.from(getStringBytes(dv, offset));
 }
 
-export function getValue(logicalType: ExpectedLogicalType, validity: BigUint64Array | null, dv: DataView, index: number): any {
+export function getValue(
+  logicalType: ExpectedLogicalType,
+  validity: BigUint64Array | null,
+  dv: DataView,
+  index: number,
+): any {
   if (!isValid(validity, index)) {
     return null;
   }
@@ -100,7 +105,7 @@ export function getValue(logicalType: ExpectedLogicalType, validity: BigUint64Ar
       return getInt32(dv, index * 4);
     case duckdb.Type.BIGINT:
       return getInt64(dv, index * 8);
-    
+
     case duckdb.Type.UTINYINT:
       return getUInt8(dv, index);
     case duckdb.Type.USMALLINT:
@@ -109,12 +114,12 @@ export function getValue(logicalType: ExpectedLogicalType, validity: BigUint64Ar
       return getUInt32(dv, index * 4);
     case duckdb.Type.UBIGINT:
       return getUInt64(dv, index * 8);
-    
+
     case duckdb.Type.FLOAT:
       return getFloat32(dv, index * 4);
     case duckdb.Type.DOUBLE:
       return getFloat64(dv, index * 8);
-    
+
     case duckdb.Type.TIMESTAMP:
       return getInt64(dv, index * 8);
     case duckdb.Type.DATE:
@@ -127,7 +132,7 @@ export function getValue(logicalType: ExpectedLogicalType, validity: BigUint64Ar
         days: getInt32(dv, index * 16 + 4),
         micros: getInt64(dv, index * 16 + 8),
       };
-    
+
     case duckdb.Type.HUGEINT:
       return getInt128(dv, index * 16);
     case duckdb.Type.UHUGEINT:
@@ -158,7 +163,7 @@ export function getValue(logicalType: ExpectedLogicalType, validity: BigUint64Ar
       return getInt64(dv, index * 8);
     case duckdb.Type.TIMESTAMP_NS:
       return getInt64(dv, index * 8);
-    
+
     case duckdb.Type.ENUM:
       switch (logicalType.internalType) {
         case duckdb.Type.UTINYINT:
@@ -170,7 +175,7 @@ export function getValue(logicalType: ExpectedLogicalType, validity: BigUint64Ar
         default:
           throw new Error(`unsupported ENUM internal type: ${duckdb.Type[logicalType.typeId]}`);
       }
-    
+
     // LIST
     // STRUCT
     // MAP
@@ -178,9 +183,9 @@ export function getValue(logicalType: ExpectedLogicalType, validity: BigUint64Ar
 
     case duckdb.Type.UUID:
       return getInt128(dv, index * 16);
-    
+
     // UNION
-    
+
     case duckdb.Type.BIT:
       return getBuffer(dv, index * 16);
 
@@ -191,7 +196,7 @@ export function getValue(logicalType: ExpectedLogicalType, validity: BigUint64Ar
 
     case duckdb.Type.BIGNUM:
       return getBuffer(dv, index * 16);
-    
+
     case duckdb.Type.SQLNULL:
       return null;
 
@@ -200,13 +205,13 @@ export function getValue(logicalType: ExpectedLogicalType, validity: BigUint64Ar
 
     case duckdb.Type.TIME_NS:
       return getInt64(dv, index * 8);
-    
+
     case duckdb.Type.GEOMETRY:
       return getBuffer(dv, index * 16);
-    
+
     case duckdb.Type.TIMESTAMP_TZ_NS:
       return getInt64(dv, index * 8);
-    
+
     default:
       throw new Error(`getValue not implemented for type: ${duckdb.Type[logicalType.typeId]}`);
   }

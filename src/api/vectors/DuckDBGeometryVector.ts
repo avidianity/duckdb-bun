@@ -1,16 +1,9 @@
 import duckdb from "../../bindings/index.ts";
-import {
-  DuckDBGeometryType,
-} from '../DuckDBType';
-import {
-  DuckDBGeometryValue,
-} from '../values';
-import { DuckDBVector } from './DuckDBVector';
-import { DuckDBValidity } from './DuckDBValidity';
-import {
-  getBuffer,
-  vectorData,
-} from './dataAccessors';
+import { DuckDBGeometryType } from "../DuckDBType";
+import { DuckDBGeometryValue } from "../values";
+import { DuckDBValidity } from "./DuckDBValidity";
+import { DuckDBVector } from "./DuckDBVector";
+import { getBuffer, vectorData } from "./dataAccessors";
 
 export class DuckDBGeometryVector extends DuckDBVector<DuckDBGeometryValue> {
   private readonly dataView: DataView;
@@ -25,7 +18,7 @@ export class DuckDBGeometryVector extends DuckDBVector<DuckDBGeometryValue> {
     validity: DuckDBValidity,
     vector: duckdb.Vector,
     itemOffset: number,
-    itemCount: number
+    itemCount: number,
   ) {
     super();
     this.dataView = dataView;
@@ -36,16 +29,9 @@ export class DuckDBGeometryVector extends DuckDBVector<DuckDBGeometryValue> {
     this.itemCache = [];
     this.itemCacheDirty = [];
   }
-  static fromRawVector(
-    vector: duckdb.Vector,
-    itemCount: number
-  ): DuckDBGeometryVector {
+  static fromRawVector(vector: duckdb.Vector, itemCount: number): DuckDBGeometryVector {
     const data = vectorData(vector, itemCount * 16);
-    const dataView = new DataView(
-      data.buffer,
-      data.byteOffset,
-      data.byteLength
-    );
+    const dataView = new DataView(data.buffer, data.byteOffset, data.byteLength);
     const validity = DuckDBValidity.fromVector(vector, itemCount);
     return new DuckDBGeometryVector(dataView, validity, vector, 0, itemCount);
   }
@@ -70,11 +56,7 @@ export class DuckDBGeometryVector extends DuckDBVector<DuckDBGeometryValue> {
       if (this.itemCacheDirty[itemIndex]) {
         const cachedItem = this.itemCache[itemIndex];
         if (cachedItem !== undefined && cachedItem !== null) {
-          duckdb.vector_assign_string_element_len(
-            this.vector,
-            this.itemOffset + itemIndex,
-            cachedItem.bytes
-          );
+          duckdb.vector_assign_string_element_len(this.vector, this.itemOffset + itemIndex, cachedItem.bytes);
         }
         this.itemCacheDirty[itemIndex] = false;
       }
@@ -83,15 +65,11 @@ export class DuckDBGeometryVector extends DuckDBVector<DuckDBGeometryValue> {
   }
   public override slice(offset: number, length: number): DuckDBGeometryVector {
     return new DuckDBGeometryVector(
-      new DataView(
-        this.dataView.buffer,
-        this.dataView.byteOffset + offset * 16,
-        length * 16
-      ),
+      new DataView(this.dataView.buffer, this.dataView.byteOffset + offset * 16, length * 16),
       this.validity.slice(offset, length),
       this.vector,
       offset,
-      length
+      length,
     );
   }
 }

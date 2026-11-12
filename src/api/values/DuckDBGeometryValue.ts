@@ -1,5 +1,5 @@
-import { bytesFromString } from '../conversion/bytesFromString';
-import { stringFromBlob } from '../conversion/stringFromBlob';
+import { bytesFromString } from "../conversion/bytesFromString";
+import { stringFromBlob } from "../conversion/stringFromBlob";
 
 export class DuckDBGeometryValue {
   /** In WKB. */
@@ -23,7 +23,7 @@ export class DuckDBGeometryValue {
 
 /** Takes WKB, either raw or in string form matching DuckDB's BLOB-to-VARCHAR. */
 export function geometryValue(input: Uint8Array | string): DuckDBGeometryValue {
-  if (typeof input === 'string') {
+  if (typeof input === "string") {
     return DuckDBGeometryValue.fromString(input);
   }
   return new DuckDBGeometryValue(input);

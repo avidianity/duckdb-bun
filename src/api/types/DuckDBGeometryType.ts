@@ -1,7 +1,7 @@
-import { BaseDuckDBType } from './BaseDuckDBType';
-import { DuckDBTypeId } from '../DuckDBTypeId';
-import { Json } from '../Json';
-import { quotedString } from '../sql';
+import { DuckDBTypeId } from "../DuckDBTypeId";
+import type { Json } from "../Json";
+import { quotedString } from "../sql";
+import { BaseDuckDBType } from "./BaseDuckDBType";
 
 export class DuckDBGeometryType extends BaseDuckDBType<DuckDBTypeId.GEOMETRY> {
   /**
@@ -17,7 +17,7 @@ export class DuckDBGeometryType extends BaseDuckDBType<DuckDBTypeId.GEOMETRY> {
     this.crs = crs;
   }
   public override toString(): string {
-    return this.crs ? `GEOMETRY(${quotedString(this.crs)})` : 'GEOMETRY';
+    return this.crs ? `GEOMETRY(${quotedString(this.crs)})` : "GEOMETRY";
   }
   public override toJson(): Json {
     return {
@@ -28,9 +28,7 @@ export class DuckDBGeometryType extends BaseDuckDBType<DuckDBTypeId.GEOMETRY> {
   }
   public static readonly instance = new DuckDBGeometryType();
   public static create(alias?: string, crs?: string): DuckDBGeometryType {
-    return alias || crs
-      ? new DuckDBGeometryType(alias, crs)
-      : DuckDBGeometryType.instance;
+    return alias || crs ? new DuckDBGeometryType(alias, crs) : DuckDBGeometryType.instance;
   }
 }
 export const GEOMETRY = DuckDBGeometryType.instance;

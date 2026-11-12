@@ -1,35 +1,21 @@
 import duckdb from "../../bindings/index.ts";
-import {
-  DuckDBBigIntType,
-} from '../DuckDBType';
-import { DuckDBVector } from './DuckDBVector';
-import { DuckDBValidity } from './DuckDBValidity';
-import {
-  vectorData,
-} from './dataAccessors';
+import { DuckDBBigIntType } from "../DuckDBType";
+import { DuckDBValidity } from "./DuckDBValidity";
+import { DuckDBVector } from "./DuckDBVector";
+import { vectorData } from "./dataAccessors";
 
 export class DuckDBBigIntVector extends DuckDBVector<bigint> {
   private readonly items: BigInt64Array;
   private readonly validity: DuckDBValidity;
   private readonly vector: duckdb.Vector;
-  constructor(
-    items: BigInt64Array,
-    validity: DuckDBValidity,
-    vector: duckdb.Vector
-  ) {
+  constructor(items: BigInt64Array, validity: DuckDBValidity, vector: duckdb.Vector) {
     super();
     this.items = items;
     this.validity = validity;
     this.vector = vector;
   }
-  static fromRawVector(
-    vector: duckdb.Vector,
-    itemCount: number
-  ): DuckDBBigIntVector {
-    const data = vectorData(
-      vector,
-      itemCount * BigInt64Array.BYTES_PER_ELEMENT
-    );
+  static fromRawVector(vector: duckdb.Vector, itemCount: number): DuckDBBigIntVector {
+    const data = vectorData(vector, itemCount * BigInt64Array.BYTES_PER_ELEMENT);
     const items = new BigInt64Array(data.buffer, data.byteOffset, itemCount);
     const validity = DuckDBValidity.fromVector(vector, itemCount);
     return new DuckDBBigIntVector(items, validity, vector);
@@ -61,7 +47,7 @@ export class DuckDBBigIntVector extends DuckDBVector<bigint> {
       0,
       this.items.buffer as ArrayBuffer,
       this.items.byteOffset,
-      this.items.byteLength
+      this.items.byteLength,
     );
     this.validity.flush(this.vector);
   }
@@ -69,7 +55,7 @@ export class DuckDBBigIntVector extends DuckDBVector<bigint> {
     return new DuckDBBigIntVector(
       this.items.slice(offset, offset + length),
       this.validity.slice(offset, length),
-      this.vector
+      this.vector,
     );
   }
 }

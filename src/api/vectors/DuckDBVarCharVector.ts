@@ -1,13 +1,8 @@
 import duckdb from "../../bindings/index.ts";
-import {
-  DuckDBVarCharType,
-} from '../DuckDBType';
-import { DuckDBVector } from './DuckDBVector';
-import { DuckDBValidity } from './DuckDBValidity';
-import {
-  getString,
-  vectorData,
-} from './dataAccessors';
+import { DuckDBVarCharType } from "../DuckDBType";
+import { DuckDBValidity } from "./DuckDBValidity";
+import { DuckDBVector } from "./DuckDBVector";
+import { getString, vectorData } from "./dataAccessors";
 
 export class DuckDBVarCharVector extends DuckDBVector<string> {
   private readonly dataView: DataView;
@@ -22,7 +17,7 @@ export class DuckDBVarCharVector extends DuckDBVector<string> {
     validity: DuckDBValidity,
     vector: duckdb.Vector,
     itemOffset: number,
-    itemCount: number
+    itemCount: number,
   ) {
     super();
     this.dataView = dataView;
@@ -33,16 +28,9 @@ export class DuckDBVarCharVector extends DuckDBVector<string> {
     this.itemCache = [];
     this.itemCacheDirty = [];
   }
-  static fromRawVector(
-    vector: duckdb.Vector,
-    itemCount: number
-  ): DuckDBVarCharVector {
+  static fromRawVector(vector: duckdb.Vector, itemCount: number): DuckDBVarCharVector {
     const data = vectorData(vector, itemCount * 16);
-    const dataView = new DataView(
-      data.buffer,
-      data.byteOffset,
-      data.byteLength
-    );
+    const dataView = new DataView(data.buffer, data.byteOffset, data.byteLength);
     const validity = DuckDBValidity.fromVector(vector, itemCount);
     return new DuckDBVarCharVector(dataView, validity, vector, 0, itemCount);
   }
@@ -57,9 +45,7 @@ export class DuckDBVarCharVector extends DuckDBVector<string> {
     if (cachedItem !== undefined) {
       return cachedItem;
     }
-    const item = this.validity.itemValid(itemIndex)
-      ? getString(this.dataView, itemIndex * 16)
-      : null;
+    const item = this.validity.itemValid(itemIndex) ? getString(this.dataView, itemIndex * 16) : null;
     this.itemCache[itemIndex] = item;
     return item;
   }
@@ -73,11 +59,7 @@ export class DuckDBVarCharVector extends DuckDBVector<string> {
       if (this.itemCacheDirty[itemIndex]) {
         const cachedItem = this.itemCache[itemIndex];
         if (cachedItem !== undefined && cachedItem !== null) {
-          duckdb.vector_assign_string_element(
-            this.vector,
-            this.itemOffset + itemIndex,
-            cachedItem
-          );
+          duckdb.vector_assign_string_element(this.vector, this.itemOffset + itemIndex, cachedItem);
         }
         this.itemCacheDirty[itemIndex] = false;
       }
@@ -86,15 +68,11 @@ export class DuckDBVarCharVector extends DuckDBVector<string> {
   }
   public override slice(offset: number, length: number): DuckDBVarCharVector {
     return new DuckDBVarCharVector(
-      new DataView(
-        this.dataView.buffer,
-        this.dataView.byteOffset + offset * 16,
-        length * 16
-      ),
+      new DataView(this.dataView.buffer, this.dataView.byteOffset + offset * 16, length * 16),
       this.validity.slice(offset, length),
       this.vector,
       offset,
-      length
+      length,
     );
   }
 }

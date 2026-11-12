@@ -12,16 +12,13 @@
  * round-trip correctly — JS bitwise operators coerce to signed int32 and
  * would turn 0xffffffff into -1.
  */
-export function varintDecode(
-  view: DataView,
-  offset: number
-): { value: number; nextOffset: number } {
+export function varintDecode(view: DataView, offset: number): { value: number; nextOffset: number } {
   let value = 0;
   let multiplier = 1;
   let cur = offset;
   while (true) {
     if (cur >= view.byteLength) {
-      throw new Error('varint truncated');
+      throw new Error("varint truncated");
     }
     const byte = view.getUint8(cur++);
     value += (byte & 0x7f) * multiplier;
@@ -32,11 +29,11 @@ export function varintDecode(
     if (multiplier > 0x80000000) {
       // multiplier == 128**5 means we're about to process a 6th byte —
       // even a single payload bit beyond would push past 2**32-1.
-      throw new Error('varint overflow');
+      throw new Error("varint overflow");
     }
   }
   if (value > 0xffffffff) {
-    throw new Error('varint overflow');
+    throw new Error("varint overflow");
   }
   return { value, nextOffset: cur };
 }

@@ -1,5 +1,5 @@
-import duckdb from "../../bindings/index.ts";
-import { varintDecode } from '../conversion/varintDecode';
+import type duckdb from "../../bindings/index.ts";
+import { varintDecode } from "../conversion/varintDecode";
 import {
   BIGINT,
   BIGNUM,
@@ -9,7 +9,7 @@ import {
   DATE,
   DECIMAL,
   DOUBLE,
-  DuckDBType,
+  type DuckDBType,
   DuckDBVariantType,
   FLOAT,
   GEOMETRY,
@@ -21,14 +21,14 @@ import {
   SQLNULL,
   STRUCT,
   TIME,
+  TIME_NS,
   TIMESTAMP,
-  TIMESTAMPTZ,
-  TIMESTAMPTZ_NS,
   TIMESTAMP_MS,
   TIMESTAMP_NS,
   TIMESTAMP_S,
+  TIMESTAMPTZ,
+  TIMESTAMPTZ_NS,
   TIMETZ,
-  TIME_NS,
   TINYINT,
   UBIGINT,
   UHUGEINT,
@@ -38,8 +38,8 @@ import {
   UUID,
   VARCHAR,
   VARIANT,
-} from '../DuckDBType';
-import { DuckDBTypeId } from '../DuckDBTypeId';
+} from "../DuckDBType";
+import { DuckDBTypeId } from "../DuckDBTypeId";
 import {
   DuckDBBitValue,
   DuckDBBlobValue,
@@ -50,39 +50,39 @@ import {
   DuckDBListValue,
   DuckDBStructValue,
   DuckDBTimeNSValue,
-  DuckDBTimeTZValue,
-  DuckDBTimeValue,
   DuckDBTimestampMillisecondsValue,
   DuckDBTimestampNanosecondsValue,
   DuckDBTimestampSecondsValue,
-  DuckDBTimestampTZValue,
   DuckDBTimestampTZNanosecondsValue,
+  DuckDBTimestampTZValue,
   DuckDBTimestampValue,
+  DuckDBTimeTZValue,
+  DuckDBTimeValue,
   DuckDBUUIDValue,
-  DuckDBValue,
+  type DuckDBValue,
   DuckDBVariantValue,
-} from '../values';
-import { DuckDBVector } from './DuckDBVector';
+} from "../values";
+import type { DuckDBBlobVector } from "./DuckDBBlobVector";
+import type { DuckDBListVector } from "./DuckDBListVector";
+import { DuckDBStructVector } from "./DuckDBStructVector";
+import type { DuckDBUIntegerVector } from "./DuckDBUIntegerVector";
+import type { DuckDBUTinyIntVector } from "./DuckDBUTinyIntVector";
+import type { DuckDBVarCharVector } from "./DuckDBVarCharVector";
+import { DuckDBVector } from "./DuckDBVector";
 import {
   getBigNumFromBytes,
-  getInt128,
   getInt16,
   getInt32,
   getInt64,
-  getUInt128,
+  getInt128,
+  getUInt8,
   getUInt16,
   getUInt32,
   getUInt64,
-  getUInt8,
+  getUInt128,
   littleEndian,
   textDecoder,
-} from './dataAccessors';
-import { DuckDBBlobVector } from './DuckDBBlobVector';
-import { DuckDBListVector } from './DuckDBListVector';
-import { DuckDBStructVector } from './DuckDBStructVector';
-import { DuckDBUIntegerVector } from './DuckDBUIntegerVector';
-import { DuckDBUTinyIntVector } from './DuckDBUTinyIntVector';
-import { DuckDBVarCharVector } from './DuckDBVarCharVector';
+} from "./dataAccessors";
 
 // ---------------------------------------------------------------------------
 // VARIANT
@@ -178,15 +178,8 @@ export class DuckDBVariantVector extends DuckDBVector<DuckDBVariantValue> {
     this.byteOffsetVec = valuesInner.entryVectorAt(1) as DuckDBUIntegerVector;
   }
 
-  static fromRawVector(
-    vector: duckdb.Vector,
-    itemCount: number
-  ): DuckDBVariantVector {
-    const structVec = DuckDBStructVector.fromRawVector(
-      VARIANT_PHYSICAL_TYPE,
-      vector,
-      itemCount
-    );
+  static fromRawVector(vector: duckdb.Vector, itemCount: number): DuckDBVariantVector {
+    const structVec = DuckDBStructVector.fromRawVector(VARIANT_PHYSICAL_TYPE, vector, itemCount);
     return new DuckDBVariantVector(structVec);
   }
 
@@ -225,16 +218,13 @@ export class DuckDBVariantVector extends DuckDBVector<DuckDBVariantValue> {
     return new DuckDBVariantValue(root.value, root.type);
   }
 
-  public override setItem(
-    _itemIndex: number,
-    value: DuckDBVariantValue | null
-  ): void {
+  public override setItem(_itemIndex: number, value: DuckDBVariantValue | null): void {
     // Writing a VARIANT value isn't supported yet. setItem(null) is
     // tolerated as a no-op so a parent struct/list/array can iterate
     // every child and call setItem(null) on this column without failing
     // — the read path remains usable inside arbitrary container types.
     if (value !== null) {
-      throw new Error('Setting VARIANT values is not yet supported.');
+      throw new Error("Setting VARIANT values is not yet supported.");
     }
   }
 
@@ -261,13 +251,10 @@ export class DuckDBVariantVector extends DuckDBVector<DuckDBVariantValue> {
    * Throws if any index decoded from the blob falls outside its row-local
    * list slice — guards against malformed or hostile VARIANT payloads.
    */
-  private decodeNode(
-    valueIndex: number,
-    row: VariantRow
-  ): { value: DuckDBValue; type: DuckDBType } {
+  private decodeNode(valueIndex: number, row: VariantRow): { value: DuckDBValue; type: DuckDBType } {
     if (valueIndex >= row.valuesLength) {
       throw new Error(
-        `Malformed VARIANT: value_index ${valueIndex} out of bounds (row values length ${row.valuesLength})`
+        `Malformed VARIANT: value_index ${valueIndex} out of bounds (row values length ${row.valuesLength})`,
       );
     }
     const nodeAbs = row.valuesOffset + valueIndex;
@@ -343,9 +330,7 @@ export class DuckDBVariantVector extends DuckDBVector<DuckDBVariantValue> {
         };
       case VariantLogicalType.TIMESTAMP_MILIS:
         return {
-          value: new DuckDBTimestampMillisecondsValue(
-            getInt64(view, byteOffset)
-          ),
+          value: new DuckDBTimestampMillisecondsValue(getInt64(view, byteOffset)),
           type: TIMESTAMP_MS,
         };
       case VariantLogicalType.TIMESTAMP_MICROS:
@@ -355,9 +340,7 @@ export class DuckDBVariantVector extends DuckDBVector<DuckDBVariantValue> {
         };
       case VariantLogicalType.TIMESTAMP_NANOS:
         return {
-          value: new DuckDBTimestampNanosecondsValue(
-            getInt64(view, byteOffset)
-          ),
+          value: new DuckDBTimestampNanosecondsValue(getInt64(view, byteOffset)),
           type: TIMESTAMP_NS,
         };
       case VariantLogicalType.TIMESTAMP_MICROS_TZ:
@@ -367,9 +350,7 @@ export class DuckDBVariantVector extends DuckDBVector<DuckDBVariantValue> {
         };
       case VariantLogicalType.TIMESTAMP_NANOS_TZ:
         return {
-          value: new DuckDBTimestampTZNanosecondsValue(
-            getInt64(view, byteOffset)
-          ),
+          value: new DuckDBTimestampTZNanosecondsValue(getInt64(view, byteOffset)),
           type: TIMESTAMPTZ_NS,
         };
       case VariantLogicalType.INTERVAL:
@@ -377,7 +358,7 @@ export class DuckDBVariantVector extends DuckDBVector<DuckDBVariantValue> {
           value: new DuckDBIntervalValue(
             getInt32(view, byteOffset),
             getInt32(view, byteOffset + 4),
-            getInt64(view, byteOffset + 8)
+            getInt64(view, byteOffset + 8),
           ),
           type: INTERVAL,
         };
@@ -445,12 +426,10 @@ export class DuckDBVariantVector extends DuckDBVector<DuckDBVariantValue> {
           const keyIdx = this.keysIdxVec.getItem(entryAbs) as number;
           if (keyIdx >= row.keysLength) {
             throw new Error(
-              `Malformed VARIANT: keys_index ${keyIdx} out of bounds (row keys length ${row.keysLength})`
+              `Malformed VARIANT: keys_index ${keyIdx} out of bounds (row keys length ${row.keysLength})`,
             );
           }
-          const keyStr = this.keysEntry.getItem(
-            row.keysOffset + keyIdx
-          ) as string;
+          const keyStr = this.keysEntry.getItem(row.keysOffset + keyIdx) as string;
           const valIdx = this.valuesIdxVec.getItem(entryAbs) as number;
           const child = this.decodeNode(valIdx, row);
           entries[keyStr] = child.value;
@@ -488,11 +467,7 @@ export class DuckDBVariantVector extends DuckDBVector<DuckDBVariantValue> {
         }
         return {
           value: new DuckDBListValue(
-            children.map((c) =>
-              c.value === null
-                ? null
-                : new DuckDBVariantValue(c.value, c.type),
-            ),
+            children.map((c) => (c.value === null ? null : new DuckDBVariantValue(c.value, c.type))),
           ),
           type: LIST(VARIANT),
         };
@@ -503,14 +478,10 @@ export class DuckDBVariantVector extends DuckDBVector<DuckDBVariantValue> {
   }
 
   /** Bounds-check an OBJECT / ARRAY's `[childrenIdx, childrenIdx+childCount)` range. */
-  private checkChildrenSlice(
-    childrenIdx: number,
-    childCount: number,
-    row: VariantRow
-  ): void {
+  private checkChildrenSlice(childrenIdx: number, childCount: number, row: VariantRow): void {
     if (childrenIdx + childCount > row.childrenLength) {
       throw new Error(
-        `Malformed VARIANT: children slice [${childrenIdx}, ${childrenIdx + childCount}) out of bounds (row children length ${row.childrenLength})`
+        `Malformed VARIANT: children slice [${childrenIdx}, ${childrenIdx + childCount}) out of bounds (row children length ${row.childrenLength})`,
       );
     }
   }
@@ -529,9 +500,7 @@ export class DuckDBVariantVector extends DuckDBVector<DuckDBVariantValue> {
  * but a `LIST(VARIANT)` of nulls or an empty `LIST(VARIANT)` doesn't
  * survive `create_list_value`.
  */
-function uniformVariantChildType(
-  children: { value: DuckDBValue; type: DuckDBType }[]
-): DuckDBType | null {
+function uniformVariantChildType(children: { value: DuckDBValue; type: DuckDBType }[]): DuckDBType | null {
   let common: DuckDBType | null = null;
   let commonKey: string | null = null;
   for (const child of children) {
@@ -578,15 +547,11 @@ interface VariantRow {
  * payload bytes — callers that need to retain the data should copy.
  * Throws if the prefix length would read past the row's blob.
  */
-function readVarintBytes(
-  view: DataView,
-  offset: number,
-  blob: Uint8Array
-): Uint8Array {
+function readVarintBytes(view: DataView, offset: number, blob: Uint8Array): Uint8Array {
   const { value: length, nextOffset } = varintDecode(view, offset);
   if (nextOffset + length > blob.byteLength) {
     throw new Error(
-      `Malformed VARIANT payload: length-prefixed read of ${length} bytes at offset ${nextOffset} exceeds row blob size ${blob.byteLength}`
+      `Malformed VARIANT payload: length-prefixed read of ${length} bytes at offset ${nextOffset} exceeds row blob size ${blob.byteLength}`,
     );
   }
   return new Uint8Array(blob.buffer, blob.byteOffset + nextOffset, length);
@@ -596,10 +561,7 @@ function readVarintBytes(
  * Reads an OBJECT / ARRAY header: `<varint child_count>` followed by
  * `<varint children_idx>` iff `child_count > 0`.
  */
-function readNestedHeader(
-  view: DataView,
-  offset: number
-): { childCount: number; childrenIdx: number } {
+function readNestedHeader(view: DataView, offset: number): { childCount: number; childrenIdx: number } {
   const cParse = varintDecode(view, offset);
   if (cParse.value === 0) {
     return { childCount: 0, childrenIdx: 0 };

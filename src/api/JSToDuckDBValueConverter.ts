@@ -1,14 +1,8 @@
-import { DuckDBType } from './DuckDBType';
-import { DuckDBTypeId } from './DuckDBTypeId';
-import { JS } from './JS';
-import {
-  JSInputTypeFor,
-  JSInputTypeForTypeId,
-} from './JSInputTypeForTypeId';
-import {
-  ToDuckDBValueConverterFor,
-  createToDuckDBValueConverter,
-} from './ToDuckDBValueConverter';
+import type { DuckDBType } from "./DuckDBType";
+import { DuckDBTypeId } from "./DuckDBTypeId";
+import type { JS } from "./JS";
+import type { JSInputTypeFor, JSInputTypeForTypeId } from "./JSInputTypeForTypeId";
+import { createToDuckDBValueConverter, type ToDuckDBValueConverterFor } from "./ToDuckDBValueConverter";
 import {
   arrayValueFromArray,
   bigintFromNumeric,
@@ -23,14 +17,14 @@ import {
   nullFromNull,
   structValueFromObject,
   timeNSValueFromNanos,
-  timeTZValueFromObject,
-  timeValueFromMicros,
   timestampMillisValueFromDate,
   timestampNanosValueFromDate,
   timestampSecondsValueFromDate,
-  timestampTZValueFromDate,
   timestampTZNanosValueFromDate,
+  timestampTZValueFromDate,
   timestampValueFromDate,
+  timeTZValueFromObject,
+  timeValueFromMicros,
   unionValueFromObject,
   unwritableConverter,
   uuidValueFromString,
@@ -38,14 +32,11 @@ import {
   valueFromNumber,
   valueFromString,
   variantValueFromJS,
-} from './ToDuckDBValueConverters';
-import { DuckDBValue } from './values';
+} from "./ToDuckDBValueConverters";
+import type { DuckDBValue } from "./values";
 
 const JSInputConvertersByTypeId: {
-  [Id in DuckDBTypeId]: ToDuckDBValueConverterFor<
-    JSInputTypeForTypeId[Id],
-    JS
-  >;
+  [Id in DuckDBTypeId]: ToDuckDBValueConverterFor<JSInputTypeForTypeId[Id], JS>;
 } = {
   [DuckDBTypeId.INVALID]: unwritableConverter,
   [DuckDBTypeId.BOOLEAN]: valueFromBoolean,
@@ -100,10 +91,9 @@ const JSInputConvertersByTypeId: {
  * from JS values. `jsToDuckDBValue` below is the single-value form, and checks
  * its input against a statically known type.
  */
-export const JSToDuckDBValueConverter = createToDuckDBValueConverter<
-  JS,
-  JSInputTypeForTypeId
->(JSInputConvertersByTypeId);
+export const JSToDuckDBValueConverter = createToDuckDBValueConverter<JS, JSInputTypeForTypeId>(
+  JSInputConvertersByTypeId,
+);
 
 /**
  * Converts a JS value into the `DuckDBValue` representation for `type`.
@@ -121,16 +111,9 @@ export const JSToDuckDBValueConverter = createToDuckDBValueConverter<
  * `DuckDBPreparedStatement.bindValue`, and `DuckDBDataChunk.setRows` all take
  * a `DuckDBValue`.
  */
-export function jsToDuckDBValue<T extends DuckDBType>(
-  value: JSInputTypeFor<T> | null,
-  type: T
-): DuckDBValue {
+export function jsToDuckDBValue<T extends DuckDBType>(value: JSInputTypeFor<T> | null, type: T): DuckDBValue {
   // The converter chain is typed against JS, which the input table exceeds for
   // VARIANT alone (a DuckDBVariantValue is not a JS value). Narrowed back at
   // the same boundary the factory documents.
-  return JSToDuckDBValueConverter(
-    value as JS,
-    type,
-    JSToDuckDBValueConverter
-  );
+  return JSToDuckDBValueConverter(value as JS, type, JSToDuckDBValueConverter);
 }

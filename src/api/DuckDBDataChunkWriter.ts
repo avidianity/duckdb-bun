@@ -1,9 +1,9 @@
 import duckdb from "../bindings/index.ts";
-import type { DuckDBAppender } from './DuckDBAppender';
-import { DuckDBDataChunk } from './DuckDBDataChunk';
-import { DuckDBType } from './DuckDBType';
-import { ToDuckDBValueConverter } from './ToDuckDBValueConverter';
-import { DuckDBValue } from './values';
+import type { DuckDBAppender } from "./DuckDBAppender";
+import { DuckDBDataChunk } from "./DuckDBDataChunk";
+import type { DuckDBType } from "./DuckDBType";
+import type { ToDuckDBValueConverter } from "./ToDuckDBValueConverter";
+import type { DuckDBValue } from "./values";
 
 /** Receives each data chunk a `DuckDBDataChunkWriter` fills. */
 export type DuckDBDataChunkSink = (chunk: DuckDBDataChunk) => void;
@@ -52,7 +52,7 @@ export class DuckDBDataChunkWriter<T = DuckDBValue> {
   public constructor(
     types: readonly DuckDBType[],
     sink: DuckDBDataChunkSink,
-    options: DuckDBDataChunkWriterOptions<T> = {} as DuckDBDataChunkWriterOptions<T>
+    options: DuckDBDataChunkWriterOptions<T> = {} as DuckDBDataChunkWriterOptions<T>,
   ) {
     this.types = types;
     this.sink = sink;
@@ -61,9 +61,7 @@ export class DuckDBDataChunkWriter<T = DuckDBValue> {
     // Checked here rather than left to the first flush, which is where the
     // chunk itself would refuse it — a whole buffer's worth of rows later.
     if (this.rowsPerDataChunk < 1 || this.rowsPerDataChunk > maxRowCount) {
-      throw new Error(
-        `rowsPerDataChunk must be between 1 and ${maxRowCount}, got ${this.rowsPerDataChunk}`
-      );
+      throw new Error(`rowsPerDataChunk must be between 1 and ${maxRowCount}, got ${this.rowsPerDataChunk}`);
     }
     this.converter = options.converter;
   }
@@ -77,18 +75,14 @@ export class DuckDBDataChunkWriter<T = DuckDBValue> {
    */
   public static forAppender<T = DuckDBValue>(
     appender: DuckDBAppender,
-    options: DuckDBDataChunkWriterOptions<T> = {} as DuckDBDataChunkWriterOptions<T>
+    options: DuckDBDataChunkWriterOptions<T> = {} as DuckDBDataChunkWriterOptions<T>,
   ): DuckDBDataChunkWriter<T> {
     const types: DuckDBType[] = [];
     const columnCount = appender.columnCount;
     for (let columnIndex = 0; columnIndex < columnCount; columnIndex++) {
       types.push(appender.columnType(columnIndex));
     }
-    return new DuckDBDataChunkWriter<T>(
-      types,
-      (chunk) => appender.appendDataChunk(chunk),
-      options
-    );
+    return new DuckDBDataChunkWriter<T>(types, (chunk) => appender.appendDataChunk(chunk), options);
   }
 
   public get bufferedRowCount(): number {
@@ -103,7 +97,7 @@ export class DuckDBDataChunkWriter<T = DuckDBValue> {
   public appendRow(values: readonly (T | null)[]): void {
     if (values.length !== this.types.length) {
       throw new Error(
-        `Provided number of values (${values.length}) does not match number of types (${this.types.length})`
+        `Provided number of values (${values.length}) does not match number of types (${this.types.length})`,
       );
     }
     this.rows.push(values.slice());

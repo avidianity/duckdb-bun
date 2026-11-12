@@ -1,5 +1,5 @@
-import { bytesFromString } from '../conversion/bytesFromString';
-import { stringFromBlob } from '../conversion/stringFromBlob';
+import { bytesFromString } from "../conversion/bytesFromString";
+import { stringFromBlob } from "../conversion/stringFromBlob";
 
 export class DuckDBBlobValue {
   public readonly bytes: Uint8Array;
@@ -19,7 +19,7 @@ export class DuckDBBlobValue {
 }
 
 export function blobValue(input: Uint8Array | string): DuckDBBlobValue {
-  if (typeof input === 'string') {
+  if (typeof input === "string") {
     return DuckDBBlobValue.fromString(input);
   }
   return new DuckDBBlobValue(input);

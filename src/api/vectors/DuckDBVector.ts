@@ -1,19 +1,15 @@
 import duckdb from "../../bindings/index.ts";
-import { DuckDBType } from '../DuckDBType';
-import { DuckDBValue } from '../values';
-import { vectorRegistry } from './vectorRegistry';
+import type { DuckDBType } from "../DuckDBType";
+import type { DuckDBValue } from "../values";
+import { vectorRegistry } from "./vectorRegistry";
 
 export abstract class DuckDBVector<TValue extends DuckDBValue = DuckDBValue> {
   public static standardSize(): number {
     return duckdb.vector_size();
   }
-  public static create(
-    vector: duckdb.Vector,
-    itemCount: number,
-    knownType?: DuckDBType
-  ): DuckDBVector {
+  public static create(vector: duckdb.Vector, itemCount: number, knownType?: DuckDBType): DuckDBVector {
     if (!vectorRegistry.create) {
-      throw new Error('DuckDBVector factory has not been registered');
+      throw new Error("DuckDBVector factory has not been registered");
     }
     return vectorRegistry.create(vector, itemCount, knownType);
   }

@@ -1,10 +1,10 @@
-import duckdb from '../../src/bindings/index.ts';
-import { expect, suite, test } from '../vitest-shim.ts';
-import { expectLogicalType } from './utils/expectLogicalType';
-import { INTEGER, VARCHAR } from './utils/expectedLogicalTypes';
+import duckdb from "../../src/bindings/index.ts";
+import { expect, suite, test } from "../vitest-shim.ts";
+import { INTEGER, VARCHAR } from "./utils/expectedLogicalTypes";
+import { expectLogicalType } from "./utils/expectLogicalType";
 
-suite('data chunk', () => {
-  test('create', () => {
+suite("data chunk", () => {
+  test("create", () => {
     const int_type = duckdb.create_logical_type(duckdb.Type.INTEGER);
     const varchar_type = duckdb.create_logical_type(duckdb.Type.VARCHAR);
     const chunk = duckdb.create_data_chunk([int_type, varchar_type]);
@@ -14,25 +14,23 @@ suite('data chunk', () => {
     const vec1 = duckdb.data_chunk_get_vector(chunk, 1);
     expectLogicalType(duckdb.vector_get_column_type(vec1), VARCHAR);
   });
-  test('create with an unsupported column type', () => {
+  test("create with an unsupported column type", () => {
     // duckdb_create_data_chunk returns null for a type it will not accept,
     // rather than reporting the refusal. Wrapping that null would hand JS a
     // handle that reads as zero columns and crashes on first real use.
     const int_type = duckdb.create_logical_type(duckdb.Type.INTEGER);
     const any_type = duckdb.create_logical_type(duckdb.Type.ANY);
     expect(() => duckdb.create_data_chunk([any_type])).toThrowError(
-      'Failed to create data chunk. One or more column types are not supported.'
+      "Failed to create data chunk. One or more column types are not supported.",
     );
-    expect(() =>
-      duckdb.create_data_chunk([int_type, any_type])
-    ).toThrowError('Failed to create data chunk');
+    expect(() => duckdb.create_data_chunk([int_type, any_type])).toThrowError("Failed to create data chunk");
   });
-  test('create with no column types', () => {
+  test("create with no column types", () => {
     // Zero columns is a legitimate chunk, not a refusal.
     const chunk = duckdb.create_data_chunk([]);
     expect(duckdb.data_chunk_get_column_count(chunk)).toBe(0);
   });
-  test('change size', () => {
+  test("change size", () => {
     const int_type = duckdb.create_logical_type(duckdb.Type.INTEGER);
     const chunk = duckdb.create_data_chunk([int_type]);
     expect(duckdb.data_chunk_get_size(chunk)).toBe(0);
@@ -41,7 +39,7 @@ suite('data chunk', () => {
     duckdb.data_chunk_reset(chunk);
     expect(duckdb.data_chunk_get_size(chunk)).toBe(0);
   });
-  test('write vector validity bit-by-bit', () => {
+  test("write vector validity bit-by-bit", () => {
     const int_type = duckdb.create_logical_type(duckdb.Type.INTEGER);
     const chunk = duckdb.create_data_chunk([int_type]);
     duckdb.data_chunk_set_size(chunk, 3);
@@ -56,7 +54,7 @@ suite('data chunk', () => {
     duckdb.validity_set_row_invalid(validity, 2);
     expect(validity[0]).toBe(0b11111011);
   });
-  test('write vector validity bulk', () => {
+  test("write vector validity bulk", () => {
     const source_buffer = new ArrayBuffer(8);
     const source_array = new BigUint64Array(source_buffer);
     source_array[0] = 0xfedcba9876543210n;
@@ -72,7 +70,7 @@ suite('data chunk', () => {
     const validity_array = new BigUint64Array(validity_bytes.buffer, validity_bytes.byteOffset, 1);
     expect(validity_array[0]).toBe(0xfedcba9876543210n);
   });
-  test('write integer vector', () => {
+  test("write integer vector", () => {
     const source_buffer = new ArrayBuffer(3 * 4);
     const source_dv = new DataView(source_buffer);
     source_dv.setInt32(0, 42, true);
@@ -91,44 +89,50 @@ suite('data chunk', () => {
     expect(vector_dv.getInt32(4, true)).toBe(12345);
     expect(vector_dv.getInt32(8, true)).toBe(67890);
   });
-  test('write string vector', () => {
+  test("write string vector", () => {
     const varchar_type = duckdb.create_logical_type(duckdb.Type.VARCHAR);
     const chunk = duckdb.create_data_chunk([varchar_type]);
     duckdb.data_chunk_set_size(chunk, 3);
     const vector = duckdb.data_chunk_get_vector(chunk, 0);
-    duckdb.vector_assign_string_element(vector, 0, 'ABC');
-    duckdb.vector_assign_string_element(vector, 1, 'abcdefghijkl');
-    duckdb.vector_assign_string_element(vector, 2, 'longer than twelve characters');
+    duckdb.vector_assign_string_element(vector, 0, "ABC");
+    duckdb.vector_assign_string_element(vector, 1, "abcdefghijkl");
+    duckdb.vector_assign_string_element(vector, 2, "longer than twelve characters");
     const data = duckdb.vector_get_data(vector, 3 * 16);
     const dv = new DataView(data.buffer);
     expect(dv.getUint32(0, true)).toBe(3);
     expect([data[4], data[5], data[6]]).toStrictEqual([0x41, 0x42, 0x43]); // A, B, C
     expect(dv.getUint32(16, true)).toBe(12);
     expect([data[20], data[31]]).toStrictEqual([0x61, 0x6c]); // a, l
-    expect(dv.getUint32(32, true)).toBe('longer than twelve characters'.length);
+    expect(dv.getUint32(32, true)).toBe("longer than twelve characters".length);
     expect([data[36], data[37], data[38], data[39]]).toStrictEqual([0x6c, 0x6f, 0x6e, 0x67]); // l, o, n, g
   });
-  test('write blob vector', () => {
+  test("write blob vector", () => {
     const blob_type = duckdb.create_logical_type(duckdb.Type.BLOB);
     const chunk = duckdb.create_data_chunk([blob_type]);
     duckdb.data_chunk_set_size(chunk, 3);
     const vector = duckdb.data_chunk_get_vector(chunk, 0);
-    duckdb.vector_assign_string_element_len(vector, 0, new Uint8Array([0xAB, 0xCD, 0xEF]));
-    duckdb.vector_assign_string_element_len(vector, 1,
-      new Uint8Array([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C]));
-    duckdb.vector_assign_string_element_len(vector, 2,
-      new Uint8Array([0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D])
+    duckdb.vector_assign_string_element_len(vector, 0, new Uint8Array([0xab, 0xcd, 0xef]));
+    duckdb.vector_assign_string_element_len(
+      vector,
+      1,
+      new Uint8Array([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c]),
+    );
+    duckdb.vector_assign_string_element_len(
+      vector,
+      2,
+      new Uint8Array([0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d]),
     );
     const data = duckdb.vector_get_data(vector, 3 * 16);
     const dv = new DataView(data.buffer);
     expect(dv.getUint32(0, true)).toBe(3);
-    expect([data[4], data[5], data[6]]).toStrictEqual([0xAB, 0xCD, 0xEF]);
+    expect([data[4], data[5], data[6]]).toStrictEqual([0xab, 0xcd, 0xef]);
     expect(dv.getUint32(16, true)).toBe(12);
-    expect([data[20], data[31]]).toStrictEqual([0x01, 0x0C]);
+    expect([data[20], data[31]]).toStrictEqual([0x01, 0x0c]);
     expect(dv.getUint32(32, true)).toBe(13);
     expect([data[36], data[37], data[38], data[39]]).toStrictEqual([0x11, 0x12, 0x13, 0x14]);
   });
-  test.skip('write bignum vector', () => { // See https://github.com/duckdb/duckdb/pull/15670
+  test.skip("write bignum vector", () => {
+    // See https://github.com/duckdb/duckdb/pull/15670
     const bignum_type = duckdb.create_logical_type(duckdb.Type.BIGNUM);
     const chunk = duckdb.create_data_chunk([bignum_type]);
     duckdb.data_chunk_set_size(chunk, 1);
@@ -141,7 +145,7 @@ suite('data chunk', () => {
     expect(dv.getUint32(0, true)).toBe(4);
     expect([data[4], data[5], data[6], data[7]]).toStrictEqual([0x80, 0x00, 0x01, 0x2a]); // BIGNUM 42
   });
-  test('set list vector size', () => {
+  test("set list vector size", () => {
     const int_type = duckdb.create_logical_type(duckdb.Type.INTEGER);
     const list_type = duckdb.create_list_type(int_type);
     const chunk = duckdb.create_data_chunk([list_type]);
@@ -151,7 +155,7 @@ suite('data chunk', () => {
     duckdb.list_vector_set_size(vector, 5);
     expect(duckdb.list_vector_get_size(vector)).toBe(5);
   });
-  test('create no types', () => {
+  test("create no types", () => {
     const chunk = duckdb.create_data_chunk([]);
     expect(duckdb.data_chunk_get_column_count(chunk)).toBe(0);
   });

@@ -1,9 +1,9 @@
-import duckdb from '../../../src/bindings/index.ts';
-import v8 from 'node:v8';
-import vm from 'node:vm';
-import { expect, suite, test } from '../../vitest-shim.ts';
-import { withConnection } from '../utils/withConnection';
-import { withDatabase } from '../utils/withDatabase';
+import v8 from "node:v8";
+import vm from "node:vm";
+import duckdb from "../../../src/bindings/index.ts";
+import { expect, suite, test } from "../../vitest-shim.ts";
+import { withConnection } from "../utils/withConnection";
+import { withDatabase } from "../utils/withDatabase";
 
 // These tests exercise the lifetime of the Napi::ObjectReferences held for
 // user-supplied extra info, bind data, and scalar function init state (see
@@ -27,9 +27,9 @@ import { withDatabase } from '../utils/withDatabase';
 // Note that gc() cannot collect the objects under test, because the bindings
 // hold them strongly. That is the point: these tests verify the reference is
 // strong rather than weak, and that reaping survives collection activity.
-v8.setFlagsFromString('--expose-gc');
-const forceGC = vm.runInNewContext('gc') as () => void;
-v8.setFlagsFromString('--no-expose-gc');
+v8.setFlagsFromString("--expose-gc");
+const forceGC = vm.runInNewContext("gc") as () => void;
+v8.setFlagsFromString("--no-expose-gc");
 
 // Registers a scalar function that checks, on every invocation, that the objects
 // it was given at registration and bind time are still intact. A mismatch throws,
@@ -49,7 +49,7 @@ function registerCheckedFunction(
   duckdb.scalar_function_set_return_type(scalar_function, varchar_type);
   duckdb.scalar_function_set_volatile(scalar_function);
   duckdb.scalar_function_set_extra_info(scalar_function, {
-    'extra_info_token': `extra_info_${name}`,
+    extra_info_token: `extra_info_${name}`,
   });
   duckdb.scalar_function_set_bind(scalar_function, (info) => {
     const extra_info = duckdb.scalar_function_bind_get_extra_info(info) as {
@@ -59,7 +59,7 @@ function registerCheckedFunction(
       throw new Error(`extra info corrupted during bind of ${name}`);
     }
     duckdb.scalar_function_set_bind_data(info, {
-      'bind_data_token': `bind_data_${name}`,
+      bind_data_token: `bind_data_${name}`,
     });
   });
   duckdb.scalar_function_set_init(scalar_function, (info) => {
@@ -76,54 +76,51 @@ function registerCheckedFunction(
       throw new Error(`extra info corrupted during init of ${name}`);
     }
     duckdb.scalar_function_init_set_state(info, {
-      'state_token': `state_${name}`,
+      state_token: `state_${name}`,
     });
   });
-  duckdb.scalar_function_set_function(
-    scalar_function,
-    (info, input, output) => {
-      if (gcInMainFunction) {
-        forceGC();
-      }
-      calls++;
-      const bind_data = duckdb.scalar_function_get_bind_data(info) as {
-        bind_data_token: string;
-      };
-      const extra_info = duckdb.scalar_function_get_extra_info(info) as {
-        extra_info_token: string;
-      };
-      const state = duckdb.scalar_function_get_state(info) as {
-        state_token: string;
-      };
-      if (bind_data?.bind_data_token !== `bind_data_${name}`) {
-        throw new Error(`bind data corrupted in ${name}`);
-      }
-      if (extra_info?.extra_info_token !== `extra_info_${name}`) {
-        throw new Error(`extra info corrupted in ${name}`);
-      }
-      if (state?.state_token !== `state_${name}`) {
-        throw new Error(`state corrupted in ${name}`);
-      }
-      const rowCount = duckdb.data_chunk_get_size(input);
-      for (let i = 0; i < rowCount; i++) {
-        duckdb.vector_assign_string_element(output, i, 'ok');
-      }
-    },
-  );
+  duckdb.scalar_function_set_function(scalar_function, (info, input, output) => {
+    if (gcInMainFunction) {
+      forceGC();
+    }
+    calls++;
+    const bind_data = duckdb.scalar_function_get_bind_data(info) as {
+      bind_data_token: string;
+    };
+    const extra_info = duckdb.scalar_function_get_extra_info(info) as {
+      extra_info_token: string;
+    };
+    const state = duckdb.scalar_function_get_state(info) as {
+      state_token: string;
+    };
+    if (bind_data?.bind_data_token !== `bind_data_${name}`) {
+      throw new Error(`bind data corrupted in ${name}`);
+    }
+    if (extra_info?.extra_info_token !== `extra_info_${name}`) {
+      throw new Error(`extra info corrupted in ${name}`);
+    }
+    if (state?.state_token !== `state_${name}`) {
+      throw new Error(`state corrupted in ${name}`);
+    }
+    const rowCount = duckdb.data_chunk_get_size(input);
+    for (let i = 0; i < rowCount; i++) {
+      duckdb.vector_assign_string_element(output, i, "ok");
+    }
+  });
   duckdb.register_scalar_function(connection, scalar_function);
   duckdb.destroy_scalar_function_sync(scalar_function);
   return { callCount: () => calls };
 }
 
-suite('scalar function reference lifetime', () => {
-  test('bind data, extra info, and init state survive garbage collection', async () => {
+suite("scalar function reference lifetime", () => {
+  test("bind data, extra info, and init state survive garbage collection", async () => {
     await withConnection(async (connection) => {
-      const fn = registerCheckedFunction(connection, 'my_func', {
+      const fn = registerCheckedFunction(connection, "my_func", {
         gcInMainFunction: true,
       });
       for (let i = 0; i < 20; i++) {
         // One chunk per query, so one call per query.
-        await duckdb.query(connection, 'select my_func() from range(100)');
+        await duckdb.query(connection, "select my_func() from range(100)");
       }
       expect(fn.callCount()).toBe(20);
     });
@@ -133,7 +130,7 @@ suite('scalar function reference lifetime', () => {
   // Extra info is owned by the catalog entry and released at disconnect/close,
   // both of which run on the JS thread, so it always takes the reaper's inline
   // path.
-  test('many registered functions under GC pressure', async () => {
+  test("many registered functions under GC pressure", async () => {
     await withConnection(async (connection) => {
       for (let i = 0; i < 100; i++) {
         const name = `my_func_${i}`;
@@ -148,13 +145,13 @@ suite('scalar function reference lifetime', () => {
     });
   });
 
-  test('concurrent queries while the JS thread is busy', async () => {
+  test("concurrent queries while the JS thread is busy", async () => {
     const rounds = 25;
     await withDatabase({}, async (db) => {
       const registrar = await duckdb.connect(db);
       const connections: duckdb.Connection[] = [];
       try {
-        const fn = registerCheckedFunction(registrar, 'my_func');
+        const fn = registerCheckedFunction(registrar, "my_func");
         for (let i = 0; i < 8; i++) {
           connections.push(await duckdb.connect(db));
         }
@@ -182,11 +179,9 @@ suite('scalar function reference lifetime', () => {
           // point of this test is to fail loudly, not to wedge the run.
           for (let round = 0; round < rounds; round++) {
             const results = await Promise.allSettled(
-              connections.map((connection) =>
-                duckdb.query(connection, 'select my_func() from range(5000)'),
-              ),
+              connections.map((connection) => duckdb.query(connection, "select my_func() from range(5000)")),
             );
-            const rejected = results.filter((r) => r.status === 'rejected');
+            const rejected = results.filter((r) => r.status === "rejected");
             if (rejected.length > 0) {
               throw new Error(
                 `${rejected.length} of ${results.length} queries failed in round ${round}: ${rejected[0].reason}`,
