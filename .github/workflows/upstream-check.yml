@@ -1,8 +1,16 @@
 name: Upstream check
 
-# Weekly: compares the pins with the latest DuckDB release and the latest @duckdb/node-api on npm,
-# and opens one issue per newer version. An issue with the same title, open or closed, is never opened again.
-# Issue bodies keep package names in backticks, so `@duckdb/...` never mentions a GitHub team.
+# Weekly: compares the pins with the latest DuckDB release and the latest @duckdb/node-api on npm.
+#
+# When the latest @duckdb/node-api is newer than the pin and built on the latest DuckDB, the upgrade job runs
+# scripts/upgrade-duckdb.ts with a read-only token, and the publish job pushes the result to the branch
+# upgrade/duckdb-<node-api version>, dispatches ci.yml on it, and opens a pull request. It opens one pull request
+# per version: an existing branch or pull request, open or closed, is never opened again.
+# When either of them fails, the `failed` job opens one issue for that version.
+#
+# Otherwise the issues job opens one issue per newer version, so a human knows that DuckDB is waiting for its
+# @duckdb/node-api. An issue with the same title, open or closed, is never opened again.
+# Issue and pull request bodies keep package names in backticks, so `@duckdb/...` never mentions a GitHub team.
 on:
   schedule:
     - cron: "0 9 * * 1" # Mondays 09:00 UTC
@@ -10,13 +18,19 @@ on:
 
 permissions: {}
 
+# Two runs at once could both open the same pull request.
+concurrency:
+  group: upstream-check
+  cancel-in-progress: false
+
 jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
-      issues: write
+    outputs:
+      report: ${{ steps.report.outputs.report }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -27,19 +41,30 @@ jobs:
           bun-version-file: package.json
 
       - name: Compare the pins with upstream
+        id: report
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           bun run --silent check-version --upstream-json > "$RUNNER_TEMP/upstream.json"
           cat "$RUNNER_TEMP/upstream.json"
+          echo "report=$(jq -c . "$RUNNER_TEMP/upstream.json")" >> "$GITHUB_OUTPUT"
 
+  issues:
+    needs: check
+    if: fromJSON(needs.check.outputs.report).upgrade == null
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      issues: write
+    steps:
       - name: Open an issue per newer version
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          REPORT: ${{ needs.check.outputs.report }}
         run: |
           set -euo pipefail
-          report="$RUNNER_TEMP/upstream.json"
 
           open_once() {
             local title="$1" body="$2" count
@@ -52,18 +77,241 @@ jobs:
             gh issue create --title "$title" --body "$body"
           }
 
-          if [ "$(jq -r .duckdb.newer "$report")" = "true" ]; then
-            latest="$(jq -r .duckdb.latest "$report")"
+          if [ "$(jq -r .duckdb.newer <<< "$REPORT")" = "true" ]; then
+            latest="$(jq -r .duckdb.latest <<< "$REPORT")"
             open_once "DuckDB v$latest is released" "$(printf '%s\n' \
-              "DuckDB v$latest is released: $(jq -r .duckdb.url "$report")" \
-              "The pin in \`src/version.ts\` is v$(jq -r .duckdb.pinned "$report")." \
-              "Follow MAINTENANCE.md to upgrade.")"
+              "DuckDB v$latest is released: $(jq -r .duckdb.url <<< "$REPORT")" \
+              "The pin in \`src/version.ts\` is v$(jq -r .duckdb.pinned <<< "$REPORT")." \
+              "The latest \`@duckdb/node-api\` is $(jq -r .nodeApi.latest <<< "$REPORT"), which is not built on it yet." \
+              "The upstream check opens the upgrade pull request once a \`@duckdb/node-api\` built on v$latest is on npm.")"
           fi
 
-          if [ "$(jq -r .nodeApi.newer "$report")" = "true" ]; then
-            latest="$(jq -r .nodeApi.latest "$report")"
+          if [ "$(jq -r .nodeApi.newer <<< "$REPORT")" = "true" ]; then
+            latest="$(jq -r .nodeApi.latest <<< "$REPORT")"
             open_once "@duckdb/node-api $latest is released" "$(printf '%s\n' \
-              "\`@duckdb/node-api\` $latest is on npm: $(jq -r .nodeApi.url "$report")" \
-              "The \`devDependencies\` pin in \`package.json\` is $(jq -r .nodeApi.pinned "$report")." \
-              "Follow MAINTENANCE.md to re-vendor and upgrade.")"
+              "\`@duckdb/node-api\` $latest is on npm: $(jq -r .nodeApi.url <<< "$REPORT")" \
+              "The \`devDependencies\` pin in \`package.json\` is $(jq -r .nodeApi.pinned <<< "$REPORT")." \
+              "It is not built on the latest DuckDB release, v$(jq -r .duckdb.latest <<< "$REPORT"), so no upgrade pull request opens." \
+              "Follow MAINTENANCE.md to upgrade by hand.")"
           fi
+
+  # Runs the upgrade with a read-only token and hands the commit to the publish job as a Git bundle,
+  # so dependency installs, downloads and the upgrade script never see a token that can write.
+  upgrade:
+    needs: check
+    if: fromJSON(needs.check.outputs.report).upgrade != null
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      DUCKDB: ${{ fromJSON(needs.check.outputs.report).upgrade.duckdb }}
+      NODE_API: ${{ fromJSON(needs.check.outputs.report).upgrade.nodeApi }}
+      BASE: main
+    outputs:
+      skip: ${{ steps.target.outputs.skip }}
+      branch: ${{ steps.target.outputs.branch }}
+      base_sha: ${{ steps.commit.outputs.base_sha }}
+    steps:
+      - name: Skip a version that already has a branch or pull request
+        id: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          [[ "$DUCKDB" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Unexpected DuckDB version $DUCKDB"; exit 1; }
+          [[ "$NODE_API" =~ ^[0-9]+\.[0-9]+\.[0-9]+-r\.[0-9]+$ ]] || { echo "Unexpected node-api version $NODE_API"; exit 1; }
+          branch="upgrade/duckdb-$NODE_API"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          branches="$(gh api "repos/$GH_REPO/git/matching-refs/heads/$branch" \
+            --jq "map(select(.ref == \"refs/heads/$branch\")) | length")"
+          pulls="$(gh pr list --head "$branch" --state all --json number --jq length)"
+          if [ "$branches" != "0" ] || [ "$pulls" != "0" ]; then
+            echo "The branch $branch or a pull request from it exists; skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.target.outputs.skip == 'false'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.BASE }}
+          persist-credentials: false
+
+      - if: steps.target.outputs.skip == 'false'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      # rustup installs the toolchain and components that rust-toolchain.toml pins; the upgrade script runs `cargo update`.
+      - name: Install the Rust toolchain
+        if: steps.target.outputs.skip == 'false'
+        run: |
+          rustup toolchain install
+          cargo --version
+
+      # lefthook installs no Git hooks when CI is set. Every check the hooks run also runs in ci.yml on the
+      # pull request, so a change that fails one still reaches review; the Commit step runs commitlint itself.
+      - name: Install dependencies
+        if: steps.target.outputs.skip == 'false'
+        run: bun install --frozen-lockfile
+
+      - name: Upgrade
+        if: steps.target.outputs.skip == 'false'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/upgrade"
+          bun run upgrade-duckdb --duckdb "$DUCKDB" --node-api "$NODE_API" --summary "$RUNNER_TEMP/upgrade/summary.md"
+
+      # Stages only the paths the upgrade writes, and fails on anything else it changed.
+      - name: Commit
+        id: commit
+        if: steps.target.outputs.skip == 'false'
+        env:
+          BRANCH: ${{ steps.target.outputs.branch }}
+          DUCKDB_PINNED: ${{ fromJSON(needs.check.outputs.report).duckdb.pinned }}
+          NODE_API_PINNED: ${{ fromJSON(needs.check.outputs.report).nodeApi.pinned }}
+        run: |
+          set -euo pipefail
+          base_sha="$(git rev-parse HEAD)"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+          git switch --create "$BRANCH"
+          git add -- src tests vendor native/Cargo.toml native/Cargo.lock native/src package.json bun.lock README.md
+          if [ -n "$(git status --porcelain --untracked-files=all | grep -v '^[MADR] ' || true)" ]; then
+            echo "The upgrade changed paths outside the expected set:"
+            git status --short
+            exit 1
+          fi
+          if git diff --cached --quiet; then
+            echo "The upgrade changed nothing, although the report says $NODE_API is newer than $NODE_API_PINNED."
+            exit 1
+          fi
+          if [ "$DUCKDB" = "$DUCKDB_PINNED" ]; then
+            subject="build(deps): upgrade @duckdb/node-api to $NODE_API"
+          else
+            subject="build(deps): upgrade DuckDB to v$DUCKDB"
+          fi
+          git -c user.name="github-actions[bot]" \
+            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit --message "$subject" \
+            --message "Re-vendors duckdb-node-neo v$NODE_API, built on DuckDB v$DUCKDB." \
+            --message "Made by the upstream-check workflow through scripts/upgrade-duckdb.ts."
+          bun --bun commitlint --last
+          git bundle create "$RUNNER_TEMP/upgrade/upgrade.bundle" "$base_sha..$BRANCH"
+          echo "$subject" > "$RUNNER_TEMP/upgrade/subject.txt"
+
+      - if: steps.target.outputs.skip == 'false'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: upgrade
+          path: ${{ runner.temp }}/upgrade/
+          if-no-files-found: error
+          retention-days: 7
+
+  # Pushes the branch, dispatches CI on it, and opens the pull request. It runs no code from the repository.
+  publish:
+    needs: [check, upgrade]
+    if: needs.upgrade.outputs.skip == 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      # Push the upgrade branch.
+      contents: write
+      # Open the pull request.
+      pull-requests: write
+      # Dispatch ci.yml on the branch.
+      actions: write
+      # Find the "DuckDB v<version> is released" issue the pull request closes.
+      issues: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      DUCKDB: ${{ fromJSON(needs.check.outputs.report).upgrade.duckdb }}
+      BRANCH: ${{ needs.upgrade.outputs.branch }}
+      BASE: main
+    steps:
+      # The commit the upgrade started from, which the bundle needs as its base.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.upgrade.outputs.base_sha }}
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: upgrade
+          path: ${{ runner.temp }}/upgrade
+
+      # The credential reaches this one push only; it never lands in .git/config.
+      - name: Push
+        run: |
+          set -euo pipefail
+          git fetch "$RUNNER_TEMP/upgrade/upgrade.bundle" "refs/heads/$BRANCH:refs/heads/$BRANCH"
+          basic="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          echo "::add-mask::$basic"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $basic" \
+            push origin "refs/heads/$BRANCH:refs/heads/$BRANCH"
+
+      # A push or pull request made with GITHUB_TOKEN starts no ci.yml run on its own: the pull_request run
+      # waits for approval. A workflow_dispatch event always creates a run, so CI starts here.
+      - name: Dispatch CI on the branch
+        run: gh workflow run ci.yml --ref "$BRANCH"
+
+      - name: Open the pull request
+        env:
+          SERVER_URL: ${{ github.server_url }}
+        run: |
+          set -euo pipefail
+          runs="$SERVER_URL/$GH_REPO/actions/workflows/ci.yml?query=branch%3A$(jq -rn --arg b "$BRANCH" '$b | @uri')"
+          title="DuckDB v$DUCKDB is released"
+          closes="$(gh issue list --state open --search "in:title \"$title\"" --json number,title --limit 100 \
+            | jq -r --arg title "$title" 'map(select(.title == $title)) | map("Closes #\(.number).") | join("\n")')"
+          {
+            cat "$RUNNER_TEMP/upgrade/summary.md"
+            echo
+            echo "## Checks"
+            echo
+            echo "A pull request that a workflow opens with \`GITHUB_TOKEN\` starts its \`pull_request\` workflows only after approval."
+            echo "So the upstream-check workflow dispatched \`ci.yml\` on \`$BRANCH\`; that run reports the checks on the head commit: $runs"
+            echo "Approving the waiting \`pull_request\` run is optional; it runs the same CI on the merge commit."
+            echo "A push to this branch by a person starts \`ci.yml\` as usual."
+            if [ -n "$closes" ]; then
+              echo
+              echo "$closes"
+            fi
+          } > "$RUNNER_TEMP/body.md"
+          gh pr create --base "$BASE" --head "$BRANCH" --title "$(cat "$RUNNER_TEMP/upgrade/subject.txt")" \
+            --body-file "$RUNNER_TEMP/body.md"
+
+  # Opens one issue when the upgrade or its pull request fails, so the failure does not wait for the next run.
+  failed:
+    needs: [check, upgrade, publish]
+    if: always() && (needs.upgrade.result == 'failure' || needs.publish.result == 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      issues: write
+    steps:
+      - name: Open an issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          DUCKDB: ${{ fromJSON(needs.check.outputs.report).upgrade.duckdb }}
+          NODE_API: ${{ fromJSON(needs.check.outputs.report).upgrade.nodeApi }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title="The automated upgrade to @duckdb/node-api $NODE_API failed"
+          count="$(gh issue list --state all --search "in:title \"$title\"" --json title --limit 100 \
+            | jq --arg title "$title" 'map(select(.title == $title)) | length')"
+          if [ "$count" != "0" ]; then
+            echo "An issue titled \"$title\" exists; skipping."
+            exit 0
+          fi
+          gh issue create --title "$title" --body "$(printf '%s\n' \
+            "The upstream-check workflow could not open the pull request that upgrades to \`@duckdb/node-api\` $NODE_API (DuckDB v$DUCKDB): $RUN_URL" \
+            "Fix the cause, delete the branch \`upgrade/duckdb-$NODE_API\` if the run pushed it, and run the workflow again." \
+            "Or upgrade by hand, as MAINTENANCE.md describes.")"
