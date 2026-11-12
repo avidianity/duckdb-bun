@@ -12,6 +12,7 @@ pub mod callbacks;
 pub mod counters;
 pub mod diag;
 pub mod jobs;
+pub mod pool;
 pub mod runtime;
 
 /// The shim's crate version, NUL-terminated.

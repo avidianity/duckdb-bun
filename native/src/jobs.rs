@@ -1,8 +1,8 @@
 //! Blocking DuckDB calls on native threads.
 //!
-//! Each job export copies its inputs, starts one thread named
-//! `duckdb-bun:<op>` with an 8 MiB stack, runs the C call, stores the outcome
-//! in the job and calls `on_complete(job)`. Error handling mirrors the official
+//! Each job export copies its inputs, runs the C call on a pool thread
+//! (`pool.rs`) named `duckdb-bun:<op>` in crash reports while the call runs,
+//! stores the outcome in the job and calls `on_complete(job)`. Error handling mirrors the official
 //! binding's workers (`bindings/src/promise_workers.h`): DuckDB's error text
 //! when it gives one, the official fallback message otherwise, and any partial
 //! handle destroyed before JavaScript can see it.
@@ -10,19 +10,16 @@
 use std::ffi::{CStr, CString, c_char};
 use std::mem::size_of;
 use std::ptr::{null, null_mut};
-use std::thread;
 
 use libduckdb_sys as ffi;
 
 use crate::counters;
 use crate::diag;
+use crate::pool;
 use crate::runtime;
 
 /// The duckdb_api value set when no config is passed, as the official binding does.
 const DEFAULT_DUCKDB_API: &CStr = c"node-neo-bindings";
-
-/// Native thread stack size.
-const STACK_SIZE: usize = 8 << 20;
 
 /// Ring state: job started.
 pub const STATE_START: u32 = 1;
@@ -31,58 +28,58 @@ pub const STATE_END_OK: u32 = 2;
 /// Ring state: job ended with an error.
 pub const STATE_END_ERROR: u32 = 3;
 
-/// A job op: the ring op code and the thread name suffix.
+/// A job op: the ring op code and the thread name a crash report shows while it runs.
 #[derive(Clone, Copy)]
 pub struct Op {
     /// Ring op code, the job's position in the ABI table starting at 1.
     pub code: u32,
-    /// Thread name suffix.
-    pub name: &'static str,
+    /// `duckdb-bun:<op>`.
+    pub thread_name: &'static str,
 }
 
 pub const OP_OPEN: Op = Op {
     code: 1,
-    name: "open",
+    thread_name: "duckdb-bun:open",
 };
 pub const OP_GET_OR_CREATE_FROM_CACHE: Op = Op {
     code: 2,
-    name: "get_or_create_from_cache",
+    thread_name: "duckdb-bun:get_or_create_from_cache",
 };
 pub const OP_CONNECT: Op = Op {
     code: 3,
-    name: "connect",
+    thread_name: "duckdb-bun:connect",
 };
 pub const OP_QUERY: Op = Op {
     code: 4,
-    name: "query",
+    thread_name: "duckdb-bun:query",
 };
 pub const OP_PREPARE: Op = Op {
     code: 5,
-    name: "prepare",
+    thread_name: "duckdb-bun:prepare",
 };
 pub const OP_EXECUTE_PREPARED: Op = Op {
     code: 6,
-    name: "execute_prepared",
+    thread_name: "duckdb-bun:execute_prepared",
 };
 pub const OP_EXECUTE_PREPARED_STREAMING: Op = Op {
     code: 7,
-    name: "execute_prepared_streaming",
+    thread_name: "duckdb-bun:execute_prepared_streaming",
 };
 pub const OP_EXTRACT_STATEMENTS: Op = Op {
     code: 8,
-    name: "extract_statements",
+    thread_name: "duckdb-bun:extract_statements",
 };
 pub const OP_PREPARE_EXTRACTED_STATEMENT: Op = Op {
     code: 9,
-    name: "prepare_extracted_statement",
+    thread_name: "duckdb-bun:prepare_extracted_statement",
 };
 pub const OP_EXECUTE_PENDING: Op = Op {
     code: 10,
-    name: "execute_pending",
+    thread_name: "duckdb-bun:execute_pending",
 };
 pub const OP_FETCH_CHUNK: Op = Op {
     code: 11,
-    name: "fetch_chunk",
+    thread_name: "duckdb-bun:fetch_chunk",
 };
 
 /// The outcome of one job, read by JavaScript through the accessors.
@@ -95,8 +92,8 @@ pub struct Job {
 
 type Outcome = Result<(u64, u64), CString>;
 
-/// Starts `work` on a new native thread and returns the job, or null when the
-/// shim is not initialized or the thread could not start.
+/// Runs `work` on a pool thread and returns the job, or null when the calling
+/// thread has no context or no thread could run it.
 fn spawn(op: Op, handle: u64, work: impl FnOnce() -> Outcome + Send + 'static) -> *mut Job {
     let Some((context, _)) = runtime::current() else {
         return null_mut();
@@ -106,49 +103,45 @@ fn spawn(op: Op, handle: u64, work: impl FnOnce() -> Outcome + Send + 'static) -
     let job_addr = job as usize;
 
     counters::add(counters::JOBS_STARTED, 1);
-    let spawned = thread::Builder::new()
-        .name(format!("duckdb-bun:{}", op.name))
-        .stack_size(STACK_SIZE)
-        .spawn(move || {
-            diag::on_native_thread_start();
-            counters::thread_started();
-            diag::record(op.code, STATE_START, handle, 0, &[]);
-            let outcome = work();
-            let job = job_addr as *mut Job;
-            let state = match outcome {
-                Ok((out0, out1)) => {
-                    // SAFETY: JavaScript does not touch the job before
-                    // `on_complete`, so this thread has exclusive access.
-                    unsafe {
-                        (*job).out0 = out0;
-                        (*job).out1 = out1;
-                    }
-                    STATE_END_OK
+    let submitted = pool::submit(Box::new(move || {
+        diag::set_thread_name(op.thread_name.as_bytes());
+        counters::thread_started();
+        diag::record(op.code, STATE_START, handle, 0, &[]);
+        let outcome = work();
+        let job = job_addr as *mut Job;
+        let state = match outcome {
+            Ok((out0, out1)) => {
+                // SAFETY: JavaScript does not touch the job before
+                // `on_complete`, so this thread has exclusive access.
+                unsafe {
+                    (*job).out0 = out0;
+                    (*job).out1 = out1;
                 }
-                Err(message) => {
-                    // SAFETY: as above.
-                    unsafe { (*job).error = Some(message) };
-                    STATE_END_ERROR
-                }
-            };
-            diag::record(op.code, state, handle, 0, &[]);
-            counters::add(counters::JOBS_COMPLETED, 1);
-            counters::thread_finished();
-            let posted = runtime::post_to(context, |context| (context.on_complete)(job));
-            if !posted {
-                // The JS thread that started the job is gone; nothing will read or free it.
-                // SAFETY: no JavaScript holds the job, so this thread owns it.
-                drop(unsafe { Box::from_raw(job) });
+                STATE_END_OK
             }
-        });
-    match spawned {
-        Ok(_) => job,
-        Err(_) => {
-            counters::sub(counters::JOBS_STARTED, 1);
-            // SAFETY: the thread never started, so nothing else holds the job.
+            Err(message) => {
+                // SAFETY: as above.
+                unsafe { (*job).error = Some(message) };
+                STATE_END_ERROR
+            }
+        };
+        diag::record(op.code, state, handle, 0, &[]);
+        counters::add(counters::JOBS_COMPLETED, 1);
+        counters::thread_finished();
+        let posted = runtime::post_to(context, |context| (context.on_complete)(job));
+        if !posted {
+            // The JS thread that started the job is gone; nothing will read or free it.
+            // SAFETY: no JavaScript holds the job, so this thread owns it.
             drop(unsafe { Box::from_raw(job) });
-            null_mut()
         }
+    }));
+    if submitted {
+        job
+    } else {
+        counters::sub(counters::JOBS_STARTED, 1);
+        // SAFETY: the task was dropped unrun, so nothing else holds the job.
+        drop(unsafe { Box::from_raw(job) });
+        null_mut()
     }
 }
 

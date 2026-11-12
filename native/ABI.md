@@ -37,7 +37,7 @@ A job thread counts its job as completed and itself as no longer running before 
 
 | Index | Counter |
 | --- | --- |
-| 0 | native threads running |
+| 0 | native threads running a job |
 | 1 | native threads peak |
 | 2 | jobs started |
 | 3 | jobs completed (callback posted) |
@@ -48,8 +48,10 @@ A job thread counts its job as completed and itself as no longer running before 
 
 ## Jobs: blocking calls on native threads
 
-Each job export copies its inputs, starts one `std::thread` named `duckdb-bun:<op>` with an 8 MiB stack and an alternate signal stack, runs the C call, stores the outcome in the job, and calls `on_complete(job)`.
-It returns the job pointer, or null when the thread could not start or the calling thread has no context (JavaScript then rejects with "Failed to start a native thread").
+Each job export copies its inputs and runs the C call on a thread of the shim's cached pool (ADR 0006): an idle pool thread when one waits, otherwise a new one with an 8 MiB stack and an alternate signal stack.
+While the call runs, crash reports name the thread `duckdb-bun:<op>`; an idle pool thread is `duckdb-bun:pool`.
+The thread stores the outcome in the job and calls `on_complete(job)`.
+The export returns the job pointer, or null when no thread could run it or the calling thread has no context (JavaScript then rejects with "Failed to start a native thread").
 JavaScript reads the outcome with the accessors and then frees the job.
 
 | Export | Inputs | Outputs |

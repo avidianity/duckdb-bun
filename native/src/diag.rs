@@ -473,6 +473,31 @@ pub fn on_native_thread_start() {
     });
 }
 
+/// Replaces the calling thread's name in the crash report, as a pool thread does for each job.
+/// Does not allocate. A thread without a slot (not started through `on_native_thread_start`, or
+/// the table was full) takes one now when a slot is free.
+pub fn set_thread_name(name: &[u8]) {
+    let name = &name[..name.len().min(NAME_MAX)];
+    THREAD_DIAG.with(|state| {
+        let mut state = state.borrow_mut();
+        let Some(diag) = state.as_mut() else {
+            return;
+        };
+        match diag.name_slot.and_then(|index| NAMES.get(index)) {
+            Some(slot) => {
+                // A crash report reads only the crashing thread's own slot. Zeroing the length
+                // first means a signal during the copy reports no name rather than a mixed one.
+                slot.len.store(0, Ordering::Relaxed);
+                for (cell, byte) in slot.name.iter().zip(name) {
+                    cell.store(*byte, Ordering::Relaxed);
+                }
+                slot.len.store(name.len(), Ordering::Release);
+            }
+            None => diag.name_slot = register_thread_name(name),
+        }
+    });
+}
+
 // ---------------------------------------------------------------------------------------------
 // Crash handler installation
 // ---------------------------------------------------------------------------------------------
@@ -1051,6 +1076,37 @@ mod tests {
         let size = alt_stack_size(page_size());
         assert!(size >= libc::SIGSTKSZ.max(64 * 1024));
         assert_eq!(installed, (0, size, b"duckdb-bun:unit".to_vec()));
+    }
+
+    #[test]
+    fn set_thread_name_renames_the_calling_thread_only() {
+        let names = std::thread::Builder::new()
+            .name("duckdb-bun:pool".to_owned())
+            .spawn(|| {
+                on_native_thread_start();
+                let read = || {
+                    let mut name = [0u8; NAME_MAX];
+                    let len = lookup_thread_name(os_thread_id(), &mut name);
+                    name[..len].to_vec()
+                };
+                set_thread_name(b"duckdb-bun:execute_prepared");
+                let long = read();
+                set_thread_name(b"duckdb-bun:query");
+                let short = read();
+                set_thread_name(&[b'x'; NAME_MAX + 10]);
+                (long, short, read())
+            })
+            .expect("spawn")
+            .join()
+            .expect("join");
+        assert_eq!(
+            names,
+            (
+                b"duckdb-bun:execute_prepared".to_vec(),
+                b"duckdb-bun:query".to_vec(),
+                vec![b'x'; NAME_MAX],
+            )
+        );
     }
 
     fn entry_text(entry: &Snapshot) -> &[u8] {

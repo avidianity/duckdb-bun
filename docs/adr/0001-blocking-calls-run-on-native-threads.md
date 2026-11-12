@@ -1,6 +1,7 @@
 # 0001 Blocking calls run on native threads
 
 Status: accepted, 2026-11-12.
+The "one thread per call" part is superseded by [0006](0006-jobs-run-on-a-cached-thread-pool.md).
 
 ## Context
 
