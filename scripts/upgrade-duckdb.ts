@@ -335,10 +335,10 @@ async function apply({ upstream, sha, bindingsVersion, crate, copies }: Plan): P
     source = source.replace(header, `$1${tag}`);
     await Bun.write(path, source);
     if (added.length > 0) {
-      changes.push(`${entry} now imports the new upstream test files ${added.map((n) => `\`${n}\``).join(", ")}.`);
+      changes.push(`\`${entry}\` now imports the new upstream test files ${added.map((n) => `\`${n}\``).join(", ")}.`);
     }
     if (removed.length > 0) {
-      changes.push(`${entry} no longer imports ${removed.map((n) => `\`${n}\``).join(", ")}, removed upstream.`);
+      changes.push(`\`${entry}\` no longer imports ${removed.map((n) => `\`${n}\``).join(", ")}, removed upstream.`);
     }
   }
 
