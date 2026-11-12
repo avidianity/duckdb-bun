@@ -1,0 +1,14 @@
+{
+  // Writes the published type declarations (dist/) from src/, so a consumer's type checker reads .d.ts files,
+  // never this package's source under the consumer's own compiler options. `bun run build:types` runs it.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "rewriteRelativeImportExtensions": true,
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src"]
+}

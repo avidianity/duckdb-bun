@@ -1,0 +1,19 @@
+{
+  // The compiler options of the downstream project that reported 431 errors in the 1.0.1 source, with
+  // skipLibCheck off, so an error in the published declarations fails too.
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "noImplicitOverride": true,
+    "moduleResolution": "bundler",
+    "module": "ESNext",
+    "target": "ESNext",
+    "types": ["bun-types"],
+    "skipLibCheck": false,
+    "noEmit": true
+  },
+  "include": ["consumer-types.ts"]
+}

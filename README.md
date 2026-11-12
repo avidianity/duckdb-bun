@@ -34,6 +34,8 @@ Bun installs only the one that matches the host.
 Do not install with `--no-optional`.
 Other platforms are not supported yet, because the native shim is built per platform.
 
+The package ships type declarations in `dist/` for type checkers, and its TypeScript source for Bun to run, so a strict `tsconfig.json` checks only your code ([ADR 0010](docs/adr/0010-the-package-publishes-type-declarations.md)).
+
 ## Versions
 
 The package has its own semantic version, independent of DuckDB's:

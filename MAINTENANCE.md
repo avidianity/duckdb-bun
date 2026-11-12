@@ -110,6 +110,7 @@ The `Release` workflow (`.github/workflows/release.yml`) then:
 
 1. Builds the linux-x64 shim on `ubuntu-latest` and the linux-arm64 shim on `ubuntu-24.04-arm`, both in the `rust:1.99.1-bookworm` image, and the darwin-arm64 shim on `macos-latest`, runs every test suite on each, and uploads each platform package directory.
 2. Checks that every version equals the tag and that each platform package holds and lists its native files.
+   It first builds the type declarations in `dist/` (`bun run build:types`, [ADR 0010](docs/adr/0010-the-package-publishes-type-declarations.md)), and fails when one is missing.
 3. Publishes the three platform packages, then the main package, with the `latest` dist-tag and a provenance statement.
    After each publish it waits up to 20 minutes for npm to serve the version, because npm accepts a publish before it serves it.
 
@@ -139,7 +140,7 @@ To publish the first version of a new package:
 1. Push the tag `v<version>`, and run the release workflow without its publish job: `gh workflow run release.yml -f tag=v<version> -f publish=false`.
 2. Log in to npm so that `bun pm whoami` prints your account, through `~/.npmrc` or a short-lived granular access token in `NPM_CONFIG_TOKEN`.
 3. Run `bun run first-publish` (`--dry-run` first, to see the checks without publishing).
-   It downloads every platform package from the green run into a worktree at the tag, packs the four tarballs, and checks their files, versions, `repository.url`, library architectures and the glibc floor of every Linux library.
+   It downloads every platform package from the green run into a worktree at the tag, builds the type declarations there, packs the four tarballs, and checks their files, versions, `repository.url`, library architectures and the glibc floor of every Linux library.
    After you type `publish`, it runs `bun publish --access public --tag latest` for each package not yet on npm, platform packages first.
    npm asks for two-factor authentication in the terminal or the browser.
    It then waits up to 20 minutes for npm to serve each version (`scripts/npm-registry.ts`).
@@ -167,9 +168,9 @@ The `latest` dist-tag points at 1.0.0, so installs do not resolve to it.
 ## Dependency updates
 
 Dependabot proposes weekly updates for GitHub Actions, the Bun dependencies, and the Rust crate in `native/`.
-It ignores `@duckdb/node-api` and `libduckdb-sys`, which move with a DuckDB upgrade, and `@types/bun`, which moves with the Bun pin.
+It ignores `@duckdb/node-api` and `libduckdb-sys`, which move with a DuckDB upgrade, and `@types/bun` and `typescript`, which move with the Bun pin.
 Bun is pinned in `package.json` (`engines`, `packageManager`, and `@types/bun`); every workflow reads it from `packageManager` through `setup-bun`'s `bun-version-file`.
-Change the Bun pin, the `oven/bun` image digest in `.github/workflows/ci.yml`, and `@types/bun` together.
+Change the Bun pin, the `oven/bun` image digest in `.github/workflows/ci.yml`, and `@types/bun` together, and set `typescript` to the version `bun -p process.versions.typescript` prints, which writes the published declarations (ADR 0010).
 A Worker frees its native work in a Node-API cleanup hook that Bun runs before it destroys the Worker's VM (ADR 0008).
 That order is Bun's behavior, not a documented contract: on a Bun upgrade, re-read `VirtualMachine::on_exit` and `teardown` in Bun's source at the new tag, and run `bun run test:worker-terminate`.
 Rust is pinned in `rust-toolchain.toml`, and the `rust` image tag and digest in the workflows must match it.

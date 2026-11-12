@@ -14,6 +14,7 @@ import { existsSync } from "node:fs";
 import { extname, join } from "node:path";
 import { parseArgs } from "node:util";
 import { DUCKDB_VERSION, DUCKDB_VERSION_TAG } from "../src/version.ts";
+import { typesEntries } from "./build-types.ts";
 import { TARGETS } from "./fetch-lib.ts";
 import { NO_REFERENCE, referenceFor, upgradeTarget, versionRows } from "./upgrade-plan.ts";
 
@@ -27,6 +28,8 @@ type PackageJson = {
   files?: string[];
   optionalDependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
+  types?: string;
+  exports?: Record<string, string | Record<string, string>>;
 };
 
 /**
@@ -187,6 +190,13 @@ for (const platform of platforms) {
   }
 }
 if (!platforms.includes(host)) console.log(`No platform package for this host (${host}).`);
+
+// The published declarations (ADR 0010): npm would otherwise publish a package whose "types" files are missing.
+if (values.publish) {
+  for (const entry of typesEntries(root).filter((entry) => !existsSync(join(ROOT, entry)))) {
+    problems.push(`${entry} is missing; run \`bun run build:types\`.`);
+  }
+}
 
 if (values.tag !== undefined) {
   const version = values.tag.replace(/^v/, "");

@@ -34,3 +34,6 @@ dd-neo
 
 # Fuzz trace files, written by `bun run fuzz:nightly`
 /fuzz-trace/
+
+# Type declarations, written by `bun run build:types` for the published package
+/dist/

@@ -361,6 +361,10 @@ jobs:
             "$RUST_IMAGE" \
             bash -euo pipefail -c 'rustup toolchain install && bun run build:native'
 
+      # The declarations in dist/ that each export's "types" condition names, packed as the release packs them (ADR 0010).
+      - name: Build the type declarations
+        run: bun run build:types
+
       - name: Pack the main and platform packages
         run: |
           mkdir -p "$RUNNER_TEMP/packages"
@@ -371,18 +375,24 @@ jobs:
 
       # A fresh project that installs the two tarballs, as a user installs the published packages.
       # The override points the main package's optional dependency at the local platform tarball.
+      # It also type-checks tests/smoke/consumer-types.ts with a strict consumer's compiler options, against the
+      # declarations the tarball ships.
       - name: Create the consumer project
         run: |
           version="$(bun -p 'require("./package.json").version')"
           mkdir -p "$RUNNER_TEMP/smoke"
           cp tests/smoke/smoke.ts "$RUNNER_TEMP/smoke/smoke.ts"
+          cp tests/smoke/consumer-types.ts "$RUNNER_TEMP/smoke/consumer-types.ts"
+          cp tests/smoke/tsconfig.consumer.json "$RUNNER_TEMP/smoke/tsconfig.json"
+          bun_version="$(bun --version)"
           cat > "$RUNNER_TEMP/smoke/package.json" <<EOF
           {
             "name": "duckdb-bun-smoke",
             "private": true,
             "type": "module",
             "dependencies": {
-              "@avidian/duckdb-bun": "file:/packages/avidian-duckdb-bun-${version}.tgz"
+              "@avidian/duckdb-bun": "file:/packages/avidian-duckdb-bun-${version}.tgz",
+              "bun-types": "${bun_version}"
             },
             "overrides": {
               "@avidian/duckdb-bun-${PLATFORM}": "file:/packages/avidian-duckdb-bun-${PLATFORM}-${version}.tgz"
@@ -391,14 +401,14 @@ jobs:
           EOF
           cat "$RUNNER_TEMP/smoke/package.json"
 
-      - name: Run the smoke test in the production image
+      - name: Type-check and run the smoke test in the production image
         run: |
           docker run --rm \
             --volume "$RUNNER_TEMP/packages:/packages:ro" \
             --volume "$RUNNER_TEMP/smoke:/app" \
             --workdir /app \
             "$BUN_IMAGE" \
-            sh -euc 'bun install && bun smoke.ts'
+            sh -euc 'bun install && bun check --no-pretty && bun smoke.ts'
 
       # The same reproduction as the test job, in the production image, where a downstream crash was reported.
       # It prints each package's exit code and its error or signal.
