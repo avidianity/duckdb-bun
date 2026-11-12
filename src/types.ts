@@ -1,4 +1,4 @@
-// Mirror of the `DUCKDB_TYPE` enum from vendor/duckdb.h (v1.5.2).
+// Mirror of the `DUCKDB_TYPE` enum from vendor/duckdb.h.
 export const DuckDBType = {
   INVALID: 0,
   BOOLEAN: 1,

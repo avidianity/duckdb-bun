@@ -1,44 +1,39 @@
-import { ptr } from "bun:ffi";
-import { cstr, lib } from "./ffi.ts";
-import { type Reader, readAllFromResult, throwResultError } from "./reader.ts";
+import type { DuckDBPreparedStatement } from "../vendor/node-api/src/index.ts";
+import { asDuckDBError, asDuckDBErrorSync } from "./errors.ts";
+import { type Reader, readerFrom } from "./reader.ts";
 
 const INT64_MIN = -9_223_372_036_854_775_808n;
 const INT64_MAX = 9_223_372_036_854_775_807n;
 
 /** A prepared statement with 1-based parameter binding. */
 export class PreparedStatement {
-  #stmtBuf: BigUint64Array;
-  #stmt: number;
+  #statement: DuckDBPreparedStatement;
   #closed = false;
 
-  constructor(stmtBuf: BigUint64Array) {
-    this.#stmtBuf = stmtBuf;
-    this.#stmt = Number(stmtBuf[0]);
+  constructor(statement: DuckDBPreparedStatement) {
+    this.#statement = statement;
   }
 
   /** Number of `?` parameters in the statement. */
   get paramCount(): number {
-    return Number(lib.duckdb_nparams(this.#stmt));
+    return this.#statement.parameterCount;
   }
 
   /** Bind a single 1-based parameter, dispatching by JS type. */
   bind(index: number, value: unknown): this {
-    const idx = BigInt(index);
-    if (value === null || value === undefined) {
-      lib.duckdb_bind_null(this.#stmt, idx);
-    } else if (typeof value === "boolean") {
-      lib.duckdb_bind_boolean(this.#stmt, idx, value);
-    } else if (typeof value === "bigint") {
-      if (value >= INT64_MIN && value <= INT64_MAX) lib.duckdb_bind_int64(this.#stmt, idx, value);
-      else lib.duckdb_bind_varchar(this.#stmt, idx, cstr(value.toString()));
-    } else if (typeof value === "number") {
-      if (Number.isInteger(value)) lib.duckdb_bind_int64(this.#stmt, idx, BigInt(value));
-      else lib.duckdb_bind_double(this.#stmt, idx, value);
-    } else if (value instanceof Date) {
-      lib.duckdb_bind_varchar(this.#stmt, idx, cstr(value.toISOString()));
-    } else {
-      lib.duckdb_bind_varchar(this.#stmt, idx, cstr(String(value)));
-    }
+    const statement = this.#statement;
+    asDuckDBErrorSync(() => {
+      if (value === null || value === undefined) statement.bindNull(index);
+      else if (typeof value === "boolean") statement.bindBoolean(index, value);
+      else if (typeof value === "bigint") {
+        if (value >= INT64_MIN && value <= INT64_MAX) statement.bindBigInt(index, value);
+        else statement.bindVarchar(index, value.toString());
+      } else if (typeof value === "number") {
+        if (Number.isSafeInteger(value)) statement.bindBigInt(index, BigInt(value));
+        else statement.bindDouble(index, value);
+      } else if (value instanceof Date) statement.bindVarchar(index, value.toISOString());
+      else statement.bindVarchar(index, String(value));
+    });
     return this;
   }
 
@@ -48,27 +43,19 @@ export class PreparedStatement {
     return this;
   }
 
-  #execute(): number {
-    const result = new Uint8Array(48);
-    const rp = ptr(result);
-    if (lib.duckdb_execute_prepared(this.#stmt, rp) !== 0) throwResultError(rp);
-    return rp;
-  }
-
   /** Execute and discard the result. */
   async run(): Promise<void> {
-    const rp = this.#execute();
-    lib.duckdb_destroy_result(rp);
+    await asDuckDBError(() => this.#statement.run());
   }
 
   /** Execute and read every row. */
   async readAll(): Promise<Reader> {
-    return readAllFromResult(this.#execute());
+    return readerFrom(await asDuckDBError(() => this.#statement.runAndReadAll()));
   }
 
   close(): void {
     if (this.#closed) return;
-    lib.duckdb_destroy_prepare(ptr(this.#stmtBuf));
+    this.#statement.destroySync();
     this.#closed = true;
   }
 }

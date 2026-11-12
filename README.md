@@ -183,7 +183,7 @@ bun run check           # Biome and the type check
 ## Native-JS binding
 
 An older, narrower binding is available at the `/native-js` subpath.
-It returns plain JavaScript values: dates as `YYYY-MM-DD` strings, decimals as numbers, and no wrapper objects.
+It wraps the main API and returns plain JavaScript values: dates as `YYYY-MM-DD` strings, decimals as numbers, and no wrapper objects.
 
 ```ts
 import { DuckDBInstance } from "@avidian/duckdb-bun/native-js";
@@ -195,11 +195,17 @@ import { DuckDBInstance } from "@avidian/duckdb-bun/native-js";
 | TINYINT to INTEGER, unsigned up to 32 bits | `number` |
 | BIGINT, UBIGINT, HUGEINT, UHUGEINT | `bigint` |
 | FLOAT, DOUBLE, DECIMAL | `number` |
-| VARCHAR, UUID, TIME, TIME_TZ | `string` |
+| VARCHAR, UUID, ENUM, TIME, TIME_TZ, TIME_NS, BIT | `string` |
 | DATE | `string` (`YYYY-MM-DD`) |
 | TIMESTAMP, TIMESTAMP_S, _MS, _NS, _TZ | `Date` |
 | BLOB | `Uint8Array` |
+| INTERVAL | `{ months, days, micros }` |
+| LIST, ARRAY | array |
+| STRUCT | object |
+| MAP | array of `{ key, value }` |
 | NULL | `null` |
+
+Values inside LIST, ARRAY, STRUCT and MAP follow the same mapping.
 
 ## Alternatives
 

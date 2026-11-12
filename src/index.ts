@@ -1,4 +1,5 @@
-// duckdb-bun — Bun-native DuckDB binding over the libduckdb C API via bun:ffi.
+// The native-JS binding: a narrow API over the same bindings as the main entry,
+// returning plain JavaScript values (README.md, "Native-JS binding").
 
 export { DuckDBConnection } from "./connection.ts";
 export { DuckDBInstance } from "./database.ts";
@@ -8,9 +9,9 @@ export { PreparedStatement } from "./statement.ts";
 export type { ColumnType, QueryResultShape } from "./types.ts";
 export { DuckDBType } from "./types.ts";
 
-import { lib } from "./ffi.ts";
+import { version } from "../vendor/node-api/src/index.ts";
 
-/** The linked libduckdb version, e.g. "v1.5.2". */
+/** The linked libduckdb version, e.g. "v2.0.0". */
 export function libraryVersion(): string {
-  return lib.duckdb_library_version().toString();
+  return version();
 }

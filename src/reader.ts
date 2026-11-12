@@ -1,10 +1,26 @@
-// Consumes a populated `duckdb_result` (48-byte buffer) by streaming its data
-// chunks and decoding every column, then frees the result.
-import { ptr } from "bun:ffi";
-import { decodeColumn } from "./decode.ts";
-import { DuckDBError } from "./errors.ts";
-import { lib } from "./ffi.ts";
-import { type ColumnType, DuckDBType } from "./types.ts";
+// The native-JS value mapping over the vendored @duckdb/node-api reader: the
+// official JS converter, except that DATE, TIME, TIME_TZ, TIME_NS and BIT come
+// back as their SQL text (DATE as YYYY-MM-DD). Nested values use the same mapping.
+import {
+  type DuckDBResultReader,
+  DuckDBTypeId,
+  type DuckDBValueConverter,
+  JSDuckDBValueConverter,
+} from "../vendor/node-api/src/index.ts";
+
+const AS_TEXT = new Set<DuckDBTypeId>([
+  DuckDBTypeId.DATE,
+  DuckDBTypeId.TIME,
+  DuckDBTypeId.TIME_TZ,
+  DuckDBTypeId.TIME_NS,
+  DuckDBTypeId.BIT,
+]);
+
+const nativeJsConverter: DuckDBValueConverter<unknown> = (value, type, converter) => {
+  if (value === null) return null;
+  if (AS_TEXT.has(type.typeId)) return String(value);
+  return JSDuckDBValueConverter(value, type, converter as never);
+};
 
 /** A materialized query result. Mirrors the slice of @duckdb/node-api's reader used downstream. */
 export class Reader {
@@ -25,55 +41,7 @@ export class Reader {
   }
 }
 
-function columnType(resultPtr: number, col: number): ColumnType {
-  const id = lib.duckdb_column_type(resultPtr, BigInt(col));
-  if (id !== DuckDBType.DECIMAL) return { id };
-  const logical = lib.duckdb_column_logical_type(resultPtr, BigInt(col));
-  const scale = lib.duckdb_decimal_scale(logical);
-  const internal = lib.duckdb_decimal_internal_type(logical);
-  const handle = new BigUint64Array([BigInt(logical)]);
-  lib.duckdb_destroy_logical_type(ptr(handle));
-  return { id, scale, internal };
-}
-
-/** Read the error string out of a result and throw it. Frees the result first. */
-export function throwResultError(resultPtr: number): never {
-  const message = lib.duckdb_result_error(resultPtr)?.toString() || "unknown duckdb error";
-  lib.duckdb_destroy_result(resultPtr);
-  throw new DuckDBError(message);
-}
-
-/** Drain all chunks from a populated result and free it. */
-export function readAllFromResult(resultPtr: number): Reader {
-  const colCount = Number(lib.duckdb_column_count(resultPtr));
-  const columns: string[] = [];
-  const types: ColumnType[] = [];
-  for (let c = 0; c < colCount; c++) {
-    columns.push(lib.duckdb_column_name(resultPtr, BigInt(c)).toString());
-    types.push(columnType(resultPtr, c));
-  }
-
-  const rows: Record<string, unknown>[] = [];
-  while (true) {
-    const chunk = lib.shim_fetch_chunk(resultPtr);
-    if (!chunk) break;
-    const size = Number(lib.duckdb_data_chunk_get_size(chunk));
-    const decoded: unknown[][] = [];
-    for (let c = 0; c < colCount; c++) {
-      const vec = lib.duckdb_data_chunk_get_vector(chunk, BigInt(c));
-      const dataPtr = lib.duckdb_vector_get_data(vec);
-      const validityPtr = lib.duckdb_vector_get_validity(vec);
-      decoded.push(decodeColumn(dataPtr, validityPtr, size, types[c]));
-    }
-    for (let i = 0; i < size; i++) {
-      const row: Record<string, unknown> = {};
-      for (let c = 0; c < colCount; c++) row[columns[c]] = decoded[c][i];
-      rows.push(row);
-    }
-    const handle = new BigUint64Array([BigInt(chunk)]);
-    lib.duckdb_destroy_data_chunk(ptr(handle));
-  }
-
-  lib.duckdb_destroy_result(resultPtr);
-  return new Reader(columns, rows);
+/** Converts a fully read official reader into a native-JS Reader. */
+export function readerFrom(reader: DuckDBResultReader): Reader {
+  return new Reader(reader.columnNames(), reader.convertRowObjects(nativeJsConverter) as Record<string, unknown>[]);
 }
