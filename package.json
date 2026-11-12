@@ -36,6 +36,7 @@
     "fetch-lib": "bun run scripts/fetch-lib.ts",
     "build:native": "bun run scripts/build-native.ts",
     "spike": "bun run scripts/spike.ts",
+    "bench": "bun run bench/main.ts",
     "test": "bun test",
     "test:official": "bun test tests/official/api.test.ts",
     "test:bindings": "bun test tests/official/bindings.test.ts",
