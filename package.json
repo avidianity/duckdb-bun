@@ -47,6 +47,7 @@
     "test:issue-3060": "bun test tests/heavy/issue-3060.test.ts",
     "test:unit": "bun test --path-ignore-patterns 'tests/official/**' --path-ignore-patterns 'tests/heavy/**' --path-ignore-patterns 'tests/compile/**' --path-ignore-patterns tests/parity.test.ts --path-ignore-patterns 'tests/parity/**'",
     "check-version": "bun run scripts/check-version.ts",
+    "first-publish": "bun run scripts/first-publish.ts",
     "lint": "bun --bun biome check src tests scripts examples bench commitlint.config.ts",
     "lint:ci": "bun --bun biome ci src tests scripts examples bench commitlint.config.ts",
     "format": "bun --bun biome format --write src tests scripts examples bench commitlint.config.ts",

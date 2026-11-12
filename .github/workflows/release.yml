@@ -11,6 +11,11 @@ on:
         description: The release tag to build and publish, such as v2.0.0-r.0
         required: true
         type: string
+      publish:
+        description: Publish to npm. Off builds and tests the platform packages only, for scripts/first-publish.ts.
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -187,6 +192,7 @@ jobs:
 
   publish:
     needs: [build-linux-x64, build-darwin-arm64]
+    if: github.event_name == 'release' || inputs.publish
     # npm trusted publishing does not support self-hosted runners.
     runs-on: ubuntu-latest
     timeout-minutes: 15
