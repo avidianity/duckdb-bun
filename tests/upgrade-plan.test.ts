@@ -4,7 +4,9 @@ import { describe, expect, test } from "bun:test";
 import {
   crateMinor,
   matchingCrate,
+  NO_REFERENCE,
   nodeApiBase,
+  referenceFor,
   setReadmeRelease,
   upgradeTarget,
   upgradeVersion,
@@ -12,22 +14,30 @@ import {
 } from "../scripts/upgrade-plan.ts";
 
 describe("upgradeTarget", () => {
-  test("upgrades once a @duckdb/node-api built on the latest DuckDB is out", () => {
-    expect(upgradeTarget("2.0.1", "2.0.1-r.1", "2.0.0-r.1")).toEqual({ duckdb: "2.0.1", nodeApi: "2.0.1-r.1" });
+  const npm = ["2.0.0-r.1", "2.0.0-r.2", "2.0.1-r.1", "2.0.1-r.2", "1.5.0-r.1"];
+
+  test("upgrades to a newer DuckDB release with the newest @duckdb/node-api built on it", () => {
+    expect(upgradeTarget("2.0.1", "2.0.0", npm, "2.0.0-r.1")).toEqual({ duckdb: "2.0.1", nodeApi: "2.0.1-r.2" });
   });
 
-  test("waits while the latest @duckdb/node-api is built on an older DuckDB", () => {
-    expect(upgradeTarget("2.0.1", "2.0.0-r.1", "2.0.0-r.1")).toBeNull();
-    expect(upgradeTarget("2.0.1", "2.0.0-r.2", "2.0.0-r.1")).toBeNull();
+  test("never waits for a @duckdb/node-api built on the new DuckDB", () => {
+    expect(upgradeTarget("2.0.2", "2.0.0", npm, "2.0.0-r.1")).toEqual({ duckdb: "2.0.2", nodeApi: null });
   });
 
-  test("re-vendors a new @duckdb/node-api release on the pinned DuckDB", () => {
-    expect(upgradeTarget("2.0.0", "2.0.0-r.2", "2.0.0-r.1")).toEqual({ duckdb: "2.0.0", nodeApi: "2.0.0-r.2" });
+  test("refreshes the reference when npm has a newer one for the pinned DuckDB", () => {
+    expect(upgradeTarget("2.0.0", "2.0.0", npm, "2.0.0-r.1")).toEqual({ duckdb: "2.0.0", nodeApi: "2.0.0-r.2" });
+    expect(upgradeTarget("2.0.1", "2.0.1", npm, "2.0.0-r.2")).toEqual({ duckdb: "2.0.1", nodeApi: "2.0.1-r.2" });
   });
 
-  test("does nothing when the pin is current", () => {
-    expect(upgradeTarget("2.0.0", "2.0.0-r.1", "2.0.0-r.1")).toBeNull();
+  test("does nothing when the pins are current", () => {
+    expect(upgradeTarget("2.0.0", "2.0.0", npm, "2.0.0-r.2")).toBeNull();
+    expect(upgradeTarget("2.0.2", "2.0.2", npm, "2.0.1-r.2")).toBeNull();
   });
+});
+
+test("referenceFor picks the newest @duckdb/node-api built on a DuckDB", () => {
+  expect(referenceFor(["2.0.1-r.2", "2.0.1-r.10", "2.0.10-r.1", "2.0.1"], "2.0.1")).toBe("2.0.1-r.10");
+  expect(referenceFor(["2.0.0-r.1"], "2.0.1")).toBeUndefined();
 });
 
 test("nodeApiBase reads the DuckDB version of a <duckdb>-r.<n> version", () => {
@@ -69,11 +79,11 @@ describe("the release version of an upgrade", () => {
   const readme = [
     "# duckdb-bun",
     "",
-    "Version 1.0.2 bundles DuckDB v2.0.0 and matches `@duckdb/node-api` 2.0.0-r.1; [Versions](#versions) maps every release.",
+    "Version 1.0.2 bundles DuckDB v2.0.0; [Versions](#versions) maps every release.",
     "",
     "## Versions",
     "",
-    "| `@avidian/duckdb-bun` | DuckDB | `@duckdb/node-api` it matches |",
+    "| `@avidian/duckdb-bun` | DuckDB | `@duckdb/node-api` reference |",
     "| --- | --- | --- |",
     "| 1.0.0 | 2.0.0 | 2.0.0-r.1 |",
     "| 1.0.2 | 2.0.0 | 2.0.0-r.1 |",
@@ -98,13 +108,23 @@ describe("the release version of an upgrade", () => {
 
   test("names the release in the opening sentence and a new last row", () => {
     const upgraded = setReadmeRelease(readme, "1.1.0", "2.0.1", "2.0.1-r.1");
-    expect(upgraded).toContain(
-      "Version 1.1.0 bundles DuckDB v2.0.1 and matches `@duckdb/node-api` 2.0.1-r.1; [Versions]",
-    );
+    expect(upgraded).toContain("Version 1.1.0 bundles DuckDB v2.0.1; [Versions]");
     expect(versionRows(upgraded).at(-1)).toEqual(["1.1.0", "2.0.1", "2.0.1-r.1"]);
     expect(upgraded).toContain("| 1.1.0 | 2.0.1 | 2.0.1-r.1 |\n\n## Install");
     expect(setReadmeRelease(upgraded, "1.1.0", "2.0.1", "2.0.1-r.2")).toBe(
-      upgraded.replace("2.0.1-r.1;", "2.0.1-r.2;").replace("| 2.0.1-r.1 |", "| 2.0.1-r.2 |"),
+      upgraded.replace("| 2.0.1-r.1 |", "| 2.0.1-r.2 |"),
+    );
+  });
+
+  test("writes none when npm has no @duckdb/node-api built on the DuckDB", () => {
+    const upgraded = setReadmeRelease(readme, "1.1.0", "2.0.1", undefined);
+    expect(versionRows(upgraded).at(-1)).toEqual(["1.1.0", "2.0.1", NO_REFERENCE]);
+  });
+
+  test("reads the older sentence that also named a @duckdb/node-api", () => {
+    const older = readme.replace("DuckDB v2.0.0;", "DuckDB v2.0.0 and matches `@duckdb/node-api` 2.0.0-r.1;");
+    expect(setReadmeRelease(older, "1.1.0", "2.0.1", undefined)).toContain(
+      "Version 1.1.0 bundles DuckDB v2.0.1; [Versions]",
     );
   });
 
