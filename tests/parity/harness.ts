@@ -98,11 +98,15 @@ export async function withConnection<T>(
 
 type Replace = (text: string) => string;
 
+const HANDLE_CLASS =
+  /^DuckDB(Instance|InstanceCache|Connection|ClientContext|PreparedStatement|PendingResult|(Materialized)?Result|ResultReader|Appender|ExtractedStatements|DataChunk|LogicalType)$/;
+
 /**
  * Converts any value to plain, JSON-safe comparable data: bigint to `"<digits>n"`,
- * non-finite numbers and -0 to tagged text, byte arrays
- * to hex, dates to ISO text, and class instances (DuckDB value and type objects) to
- * `{ class, string, fields }`, where `string` is the instance's `toString()`.
+ * non-finite numbers and -0 to tagged text, byte arrays to hex, dates to ISO text,
+ * handle-owning objects (connections, results) to `{ class }`, and other class
+ * instances (DuckDB value and type objects) to `{ class, string, fields }`, where
+ * `string` is the instance's `toString()`.
  */
 export function normalize(value: unknown, replace: Replace = (s) => s, depth = 0): unknown {
   if (depth > 32) return "<too deep>";
@@ -135,6 +139,10 @@ export function normalize(value: unknown, replace: Replace = (s) => s, depth = 0
   if (value instanceof Error) return { error: describeError(value) };
   if (Array.isArray(value)) return value.map((item) => normalize(item, replace, depth + 1));
   const object = value as Record<string, unknown>;
+  const className = object.constructor?.name ?? "<anonymous>";
+  // Handle-owning objects hold native handles whose representation is private to each
+  // binding; only their class is part of the contract.
+  if (HANDLE_CLASS.test(className)) return { class: className };
   const fields: Record<string, unknown> = {};
   for (const [key, field] of Object.entries(object)) fields[key] = normalize(field, replace, depth + 1);
   const proto = Object.getPrototypeOf(object);
@@ -145,7 +153,7 @@ export function normalize(value: unknown, replace: Replace = (s) => s, depth = 0
   } catch (err) {
     text = `<toString threw ${describeError(err).message}>`;
   }
-  return { class: object.constructor?.name ?? "<anonymous>", string: text, fields };
+  return { class: className, string: text, fields };
 }
 
 const sharedDirs = new Map<Impl, string>();
