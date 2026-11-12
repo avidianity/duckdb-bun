@@ -1,6 +1,6 @@
 name: Upstream check
 
-# Weekly: compares the DuckDB pin with the latest DuckDB release, and the @duckdb/node-api reference with npm.
+# Every six hours: compares the DuckDB pin with the latest DuckDB release, and the @duckdb/node-api reference with npm.
 #
 # Upgrades follow DuckDB core alone (ADR 0009). When the latest DuckDB release is newer than the pin, the upgrade job
 # runs scripts/upgrade-duckdb.ts with a read-only token, and pins the @duckdb/node-api built on it as the reference
@@ -10,10 +10,19 @@ name: Upstream check
 # ci.yml on it, and opens a pull request. It opens one pull request per target: an existing branch or pull request,
 # open or closed, is never opened again. When either job fails, the `failed` job opens one issue for that target.
 # Issue and pull request bodies keep package names in backticks, so `@duckdb/...` never mentions a GitHub team.
+#
+# A dispatch with `rehearse` runs the upgrade job against the pinned DuckDB and pushes nothing: it proves that the
+# upgrade path still runs end to end, and that regenerating from DuckDB's own release reproduces the tree.
 on:
   schedule:
-    - cron: "0 9 * * 1" # Mondays 09:00 UTC
+    # Every six hours, so the upgrade pull request opens the day DuckDB tags a release.
+    - cron: "23 */6 * * *"
   workflow_dispatch:
+    inputs:
+      rehearse:
+        description: Run the upgrade against the pinned DuckDB, check that it changes nothing, and push nothing
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -43,9 +52,14 @@ jobs:
         id: report
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          REHEARSE: ${{ inputs.rehearse == true }}
         run: |
           set -euo pipefail
           bun run --silent check-version --upstream-json > "$RUNNER_TEMP/upstream.json"
+          if [ "$REHEARSE" = "true" ]; then
+            jq '.upgrade = { duckdb: .duckdb.pinned, nodeApi: null }' "$RUNNER_TEMP/upstream.json" > "$RUNNER_TEMP/rehearsal.json"
+            mv "$RUNNER_TEMP/rehearsal.json" "$RUNNER_TEMP/upstream.json"
+          fi
           cat "$RUNNER_TEMP/upstream.json"
           echo "report=$(jq -c . "$RUNNER_TEMP/upstream.json")" >> "$GITHUB_OUTPUT"
 
@@ -63,6 +77,7 @@ jobs:
       DUCKDB: ${{ fromJSON(needs.check.outputs.report).upgrade.duckdb }}
       NODE_API: ${{ fromJSON(needs.check.outputs.report).upgrade.nodeApi }}
       DUCKDB_PINNED: ${{ fromJSON(needs.check.outputs.report).duckdb.pinned }}
+      REHEARSE: ${{ inputs.rehearse == true }}
       BASE: main
     outputs:
       skip: ${{ steps.target.outputs.skip }}
@@ -78,6 +93,11 @@ jobs:
           set -euo pipefail
           [[ "$DUCKDB" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Unexpected DuckDB version $DUCKDB"; exit 1; }
           [[ -z "$NODE_API" || "$NODE_API" =~ ^[0-9]+\.[0-9]+\.[0-9]+-r\.[0-9]+$ ]] || { echo "Unexpected node-api version $NODE_API"; exit 1; }
+          if [ "$REHEARSE" = "true" ]; then
+            echo "branch=rehearsal/duckdb-$DUCKDB" >> "$GITHUB_OUTPUT"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ "$DUCKDB" != "$DUCKDB_PINNED" ]; then
             branch="upgrade/duckdb-$DUCKDB"
           else
@@ -136,6 +156,16 @@ jobs:
           set -euo pipefail
           base_sha="$(git rev-parse HEAD)"
           echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+          if [ "$REHEARSE" = "true" ]; then
+            if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
+              echo "Rehearsal: the upgrade to the pinned DuckDB v$DUCKDB changed the tree:"
+              git status --short
+              git diff --stat
+              exit 1
+            fi
+            echo "Rehearsal: the upgrade path ran end to end and reproduced the tree for DuckDB v$DUCKDB."
+            exit 0
+          fi
           git switch --create "$BRANCH"
           git add -- src tests vendor native/Cargo.toml native/Cargo.lock native/src package.json packages/*/package.json bun.lock README.md
           if [ -n "$(git status --porcelain --untracked-files=all | grep -v '^[MADR] ' || true)" ]; then
@@ -166,7 +196,7 @@ jobs:
           git bundle create "$RUNNER_TEMP/upgrade/upgrade.bundle" "$base_sha..$BRANCH"
           echo "$subject" > "$RUNNER_TEMP/upgrade/subject.txt"
 
-      - if: steps.target.outputs.skip == 'false'
+      - if: steps.target.outputs.skip == 'false' && env.REHEARSE != 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: upgrade
@@ -177,7 +207,7 @@ jobs:
   # Pushes the branch, dispatches CI on it, and opens the pull request. It runs no code from the repository.
   publish:
     needs: [check, upgrade]
-    if: needs.upgrade.outputs.skip == 'false'
+    if: needs.upgrade.outputs.skip == 'false' && inputs.rehearse != true
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -241,7 +271,7 @@ jobs:
   # Opens one issue when the upgrade or its pull request fails, so the failure does not wait for the next run.
   failed:
     needs: [check, upgrade, publish]
-    if: always() && (needs.upgrade.result == 'failure' || needs.publish.result == 'failure')
+    if: always() && inputs.rehearse != true && (needs.upgrade.result == 'failure' || needs.publish.result == 'failure')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
