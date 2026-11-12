@@ -62,9 +62,12 @@ test("diagnostics() counts native calls and the handles not yet freed", async ()
   const connection = await db.connect(database);
   const result = await q.query(connection, "SELECT 1");
   const during = diagnostics();
-  expect(during.liveHandles.result).toBe((before.liveHandles.result ?? 0) + 1);
   expect(during.jobs.started - before.jobs.started).toBe(3);
   q.destroy_result_sync(result);
+  // A collection during the awaits above may free results earlier tests left, so count only across the destroy:
+  // finalizers run as jobs, never between two synchronous reads.
+  const destroyed = diagnostics();
+  expect((during.liveHandles.result ?? 0) - (destroyed.liveHandles.result ?? 0)).toBe(1);
   db.disconnect_sync(connection);
   db.close_sync(database);
   const after = diagnostics();
