@@ -20,7 +20,7 @@ We reimplement the bindings over `bun:ffi` and prove parity against the official
   It is the official `@duckdb/node-api` Vitest suite, with `util/` and `bench/`; we do not run `bench/`.
   It is **unmodified on disk**.
 - `node-bindings.d.ts` is copied from `bindings/pkgs/@duckdb/node-bindings/duckdb.d.ts`.
-  It is the exact interface contract that our `src/bindings/` reimplements, and the source of truth for `scripts/gen-bindings-scaffold.ts`.
+  It is the exact interface contract that our `src/bindings/` reimplements, and the source of truth for `scripts/gen-contract.ts`.
 - `../node-bindings/test/` is copied from `bindings/test/`.
   It is the official `@duckdb/node-bindings` Vitest suite, with `utils/`, `fixtures/` and `stress/`.
   It is **unmodified on disk**.
@@ -43,9 +43,12 @@ We reimplement the bindings over `bun:ffi` and prove parity against the official
 
 ## Updating (on a DuckDB version bump)
 
-1. Check out the upstream tag whose `api/pkgs/@duckdb/node-api/package.json` matches the new `DUCKDB_VERSION` pin (`src/version.ts`).
-2. Re-copy `api/src` to `src/`, `api/test` to `test/`, `bindings/test` to `../node-bindings/test/`, `LICENSE`, and the bindings `duckdb.d.ts` to `node-bindings.d.ts`.
+`scripts/upgrade-duckdb.ts` (`bun run upgrade-duckdb`) does steps 1 to 5 and updates the table above; MAINTENANCE.md "Upgrading DuckDB" describes when it runs.
+
+1. Check out the upstream tag `v<version>` whose `api/pkgs/@duckdb/node-api/package.json` carries the new `@duckdb/node-api` version, built on the new `DUCKDB_VERSION` pin (`src/version.ts`).
+2. Re-copy `api/src` to `src/`, `api/test` to `test/`, `bindings/test` to `../node-bindings/test/`, `LICENSE` to both `LICENSE` files, and the bindings `duckdb.d.ts` to `node-bindings.d.ts`.
 3. Run `bun run scripts/vendor-rewrite-bindings.ts` to rewrite the `@duckdb/node-bindings` imports to our bindings; it is idempotent.
 4. Add any new bindings test file to `tests/official/bindings.test.ts`, and any new API test file to `tests/official/api.test.ts`.
-5. Run `bun run gen:bindings` to refresh the contract scaffold, then implement any newly added binding functions.
+5. Run `bun run gen:contract` to regenerate `src/bindings/generated/contract.ts` from `node-bindings.d.ts`.
+6. Implement any newly added binding functions.
    Verify with `bun run test:official` and `bun run test:bindings`.

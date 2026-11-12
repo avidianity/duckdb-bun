@@ -38,18 +38,44 @@ It also prints the latest DuckDB release and the latest `@duckdb/node-api` on np
 CI runs the plain form, and the release workflow runs the other two.
 
 The `upstream-check` workflow runs every Monday.
-It opens one issue for each newer DuckDB release and each newer `@duckdb/node-api`, and never opens a second issue with the same title, even after the first is closed.
-Close the issue in the change that upgrades.
+When the latest `@duckdb/node-api` is newer than the pin and built on the latest DuckDB release, it opens an upgrade pull request, as [Upgrading DuckDB](#upgrading-duckdb) describes.
+Otherwise it opens one issue for each newer DuckDB release and each newer `@duckdb/node-api`, so you know that a DuckDB release waits for its `@duckdb/node-api`.
+When an upgrade run fails, it opens one issue for that version instead of a pull request.
+It never opens a second issue with the same title, or a second pull request for the same version, even after the first is closed.
+The upgrade pull request closes the open issue for its DuckDB release; close any other issue in the change that upgrades.
 
 ## Upgrading DuckDB
 
+### The upgrade pull request
+
+The `upstream-check` workflow upgrades on its own once a `@duckdb/node-api` built on the new DuckDB is on npm.
+It runs `bun run upgrade-duckdb --duckdb <new> --node-api <new>-r.<n>` with a read-only token, which does steps 1 to 5 of the manual procedure below.
+It then pushes the branch `upgrade/duckdb-<new>-r.<n>`, dispatches `ci.yml` on it, and opens a pull request.
+GitHub starts no `pull_request` run without approval for a pull request that `GITHUB_TOKEN` opened, but a `workflow_dispatch` event always creates a run, so the dispatched run is the pull request's CI.
+The pull request links that run.
+The workflow needs the repository setting "Allow GitHub Actions to create and approve pull requests", under Settings, Actions, General, Workflow permissions.
+
+To land the pull request:
+
+1. Wait for the dispatched CI run; it runs the official suites, parity, and every other check.
+2. Do what the pull request lists under "Left for a human", such as steps 5 and 6 below, and push to the branch, which starts CI as usual.
+3. Merge it with CI green.
+
+The script never changes a package version; choose it when you release, as [Releasing](#releasing) describes.
+
+### By hand
+
+Upgrade by hand when the workflow opened an issue instead, or to try a release before the workflow runs.
+`bun run upgrade-duckdb` does steps 1 to 5, and `--dry-run` checks the target and prints its plan without writing anything.
+
 1. Set `DUCKDB_VERSION` in `src/version.ts`.
-2. Set the version to `<new>-r.0` in `package.json`, in each `packages/*/package.json`, and in `optionalDependencies`.
-3. Pin the reference with `bun add --dev --exact @duckdb/node-api@<new>-r.<n>`.
-4. Re-vendor `duckdb-node-neo` at the tag of that release, as `vendor/node-api/PROVENANCE.md` describes, and run `bun run gen:contract` when `node-bindings.d.ts` changed.
-5. Set `libduckdb-sys` in `native/Cargo.toml` to the release built from the new `duckdb.h`.
+2. Pin the reference with `bun add --dev --exact @duckdb/node-api@<new>-r.<n>`.
+3. Re-vendor `duckdb-node-neo` at the tag of that release, as `vendor/node-api/PROVENANCE.md` describes, and run `bun run gen:contract`.
+4. Run `bun run fetch-lib all`, `bun run vendor:api-spec` and `bun run gen:ffi`.
+5. Set `libduckdb-sys` in `native/Cargo.toml` to the newest `1.<MAJOR><MINOR><PATCH>.x` release, the duckdb-rs scheme in which DuckDB 2.0.1 is `1.20001.x`, and run `cargo update --manifest-path native/Cargo.toml --package libduckdb-sys --precise <version>`.
+   When crates.io has no such release yet, keep the old one and repeat this step once duckdb-rs publishes it.
    Dependabot ignores that crate for this reason.
-6. Run `bun run fetch-lib all`, then read `git diff vendor/duckdb.h` for changes to functions that `src/bindings/` or `native/` call.
+6. Read `git diff vendor/duckdb.h` for changes to functions that `src/bindings/` or `native/` call.
    Update both sides and `native/ABI.md` together.
 7. Run `bun run build:native` and every check from the CI workflow, in its order.
 8. Commit with a message such as `build(deps): upgrade DuckDB to v2.1.0`.
