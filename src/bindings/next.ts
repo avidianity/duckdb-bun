@@ -1,6 +1,7 @@
 // The @duckdb/node-bindings contract on the Rust shim runtime, being built
 // family by family. It replaces src/bindings/index.ts at the cutover; until then
 // the vendored suites run against it with DUCKDB_BUN_NEXT=1.
+import * as appender from "./api/appender.ts";
 import * as dataChunk from "./api/data-chunk.ts";
 import * as database from "./api/database.ts";
 import * as datetime from "./api/datetime.ts";
@@ -10,6 +11,7 @@ import * as values from "./api/values.ts";
 import * as vector from "./api/vector.ts";
 import * as contract from "./generated/contract.ts";
 
+export * from "./api/appender.ts";
 export * from "./api/data-chunk.ts";
 export * from "./api/database.ts";
 export * from "./api/datetime.ts";
@@ -26,6 +28,7 @@ const duckdb = {
   ...datetime,
   ...logicalTypes,
   ...values,
+  ...appender,
   ...dataChunk,
   ...vector,
 };
