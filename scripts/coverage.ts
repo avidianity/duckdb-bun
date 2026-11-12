@@ -49,15 +49,16 @@ const SHIM_FILES: Record<string, string> = {
 };
 
 /**
- * The TypeScript suites that count, in one `bun test` process: the unit and runtime tests, the official
- * @duckdb/node-api and @duckdb/node-bindings suites, and parity. One process, because Bun's lcov reports a
+ * The TypeScript suites that count, in one `bun test` process: the unit and runtime tests, the API and
+ * bindings suites (tests/api, tests/bindings), and parity. One process, because Bun's lcov reports a
  * file's function totals (FNF, FNH) without naming the functions, so two runs' function counts cannot be merged.
  * tests/compile and tests/heavy are left out of this process: they run their subjects in child processes or
  * hold timing and memory gates; the heavy suites below still run against the instrumented shim.
+ * tests/bindings/stress holds reference-counting stress tests that no suite runs.
  * tests/fuzz is left out because each run draws a new seed, so the lines it reaches change between runs of one
  * commit.
  */
-const TS_IGNORE = ["tests/heavy/**", "tests/compile/**", "tests/fuzz/**"];
+const TS_IGNORE = ["tests/heavy/**", "tests/compile/**", "tests/fuzz/**", "tests/bindings/stress/**"];
 
 /**
  * Heavy suites that run one at a time against the instrumented shim, for the native paths they reach. The

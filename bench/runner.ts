@@ -37,7 +37,7 @@ async function loadApi(impl: Implementation): Promise<Api> {
     assertRealOfficialBinding();
     return import("@duckdb/node-api");
   }
-  // Ours re-exports the same vendored classes; the cast only bridges the two
+  // Ours exports classes of the same shape from src/api; the cast only bridges the two
   // declaration sites, which TypeScript treats as distinct class types.
   return (await import("../src/neo.ts")) as unknown as Api;
 }

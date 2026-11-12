@@ -1,4 +1,4 @@
-import type { DuckDBConnection as OfficialConnection } from "../vendor/node-api/src/index.ts";
+import type { DuckDBConnection as OfficialConnection } from "./api/index.ts";
 import { asDuckDBError } from "./errors.ts";
 import { type Reader, readerFrom } from "./reader.ts";
 import { PreparedStatement } from "./statement.ts";

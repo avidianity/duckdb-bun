@@ -9,7 +9,7 @@ export { PreparedStatement } from "./statement.ts";
 export type { ColumnType, QueryResultShape } from "./types.ts";
 export { DuckDBType } from "./types.ts";
 
-import { version } from "../vendor/node-api/src/index.ts";
+import { version } from "./api/index.ts";
 
 /** The linked libduckdb version, e.g. "v2.0.0". */
 export function libraryVersion(): string {

@@ -6,7 +6,7 @@
     "moduleResolution": "bundler",
     "moduleDetection": "force",
     "allowImportingTsExtensions": true,
-    // Not verbatimModuleSyntax: the vendored @duckdb/node-api code imports types
+    // Not verbatimModuleSyntax: src/api, derived from @duckdb/node-api, imports types
     // as values, as its own tsconfig allows. Biome's useImportType keeps type-only
     // imports explicit in our code, and isolatedModules keeps every file
     // transpilable on its own, as Bun runs it.
@@ -16,7 +16,5 @@
     "skipLibCheck": true,
     "types": ["bun"]
   },
-  "include": ["src", "tests", "scripts", "examples", "bench", "vendor", "commitlint.config.ts"],
-  // Upstream benchmarks, never run here: they need vitest's bench().
-  "exclude": ["vendor/node-api/test/bench"]
+  "include": ["src", "tests", "scripts", "examples", "bench", "vendor", "commitlint.config.ts"]
 }

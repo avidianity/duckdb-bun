@@ -1,4 +1,4 @@
-// The native-JS value mapping over the vendored @duckdb/node-api reader: the
+// The native-JS value mapping over the src/api reader: the
 // official JS converter, except that DATE, TIME, TIME_TZ, TIME_NS and BIT come
 // back as their SQL text (DATE as YYYY-MM-DD). Nested values use the same mapping.
 import {
@@ -6,7 +6,7 @@ import {
   DuckDBTypeId,
   type DuckDBValueConverter,
   JSDuckDBValueConverter,
-} from "../vendor/node-api/src/index.ts";
+} from "./api/index.ts";
 
 const AS_TEXT = new Set<DuckDBTypeId>([
   DuckDBTypeId.DATE,

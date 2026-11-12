@@ -1,4 +1,4 @@
-import { DuckDBInstance as OfficialInstance } from "../vendor/node-api/src/index.ts";
+import { DuckDBInstance as OfficialInstance } from "./api/index.ts";
 import { DuckDBConnection } from "./connection.ts";
 import { asDuckDBError } from "./errors.ts";
 

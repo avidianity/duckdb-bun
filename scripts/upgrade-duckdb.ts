@@ -6,10 +6,8 @@
 //     tag v<node-api> must exist, its node-api package must carry that version, and its node-bindings must
 //     download libduckdb from DuckDB v<duckdb>. It looks up the libduckdb-sys release for <duckdb> on crates.io.
 //  2. Sets DUCKDB_VERSION in src/version.ts and pins the devDependency with `bun add --dev --exact`.
-//  3. Re-vendors duckdb-node-neo at that tag as vendor/node-api/PROVENANCE.md describes, rewrites the
-//     bindings imports, updates the PROVENANCE table, and syncs the test imports in tests/official/.
-//  4. Runs `fetch-lib all`, `vendor:api-spec`, `gen:ffi` and `gen:contract`.
-//  5. Pins libduckdb-sys in native/Cargo.toml and native/Cargo.lock, when crates.io has a release for <duckdb>.
+//  3. Runs `fetch-lib all`, `vendor:api-spec` and `gen:ffi`.
+//  4. Pins libduckdb-sys in native/Cargo.toml and native/Cargo.lock, when crates.io has a release for <duckdb>.
 //
 // It never touches a package version: the release version is chosen at release time.
 // It is idempotent: run with the current pins, it leaves the tree unchanged.
@@ -18,7 +16,7 @@
 // Network: api.github.com and codeload.github.com, registry.npmjs.org (bun add), and crates.io.
 
 import { createHash } from "node:crypto";
-import { lstat, mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { parseArgs } from "node:util";
@@ -29,10 +27,7 @@ import {
   crateMinor,
   matchingCrate,
   nodeApiBase,
-  setNeoTag,
   setReadmeRelease,
-  setTableRow,
-  syncTestImports,
   upgradeVersion,
   versionRows,
 } from "./upgrade-plan.ts";
@@ -87,18 +82,6 @@ async function get(url: string, accept: string): Promise<Response> {
 
 async function getJson<T>(url: string): Promise<T> {
   return (await (await get(url, "application/json")).json()) as T;
-}
-
-/** Every file under a directory, as paths relative to it; throws on anything but files and directories. */
-async function listFiles(dir: string, base = dir): Promise<string[]> {
-  const files: string[] = [];
-  for (const entry of await readdir(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) files.push(...(await listFiles(path, base)));
-    else if (entry.isFile()) files.push(relative(base, path));
-    else throw new Error(`${path} is neither a file nor a directory; vendoring copies only regular files`);
-  }
-  return files.sort();
 }
 
 async function sha256(path: string): Promise<string | undefined> {
@@ -186,26 +169,6 @@ try {
     throw new Error(`${NEO_REPO} ${tag} builds @duckdb/node-bindings on DuckDB ${libduckdbFrom}, not ${duckdb}`);
   }
 
-  // What PROVENANCE.md "Updating" step 2 copies, as [upstream path, vendored path, directory?].
-  const copies: [string, string, boolean][] = [
-    ["api/src", "vendor/node-api/src", true],
-    ["api/test", "vendor/node-api/test", true],
-    ["bindings/test", "vendor/node-bindings/test", true],
-    ["LICENSE", "vendor/node-api/LICENSE", false],
-    ["LICENSE", "vendor/node-bindings/LICENSE", false],
-    ["bindings/pkgs/@duckdb/node-bindings/duckdb.d.ts", "vendor/node-api/node-bindings.d.ts", false],
-  ];
-  for (const [from, , directory] of copies) {
-    const path = join(upstream, from);
-    const stat = await lstat(path).catch((error: unknown) => {
-      throw new Error(`${NEO_REPO} ${tag} has no ${from}`, { cause: error });
-    });
-    if (directory ? !stat.isDirectory() : !stat.isFile()) {
-      throw new Error(`${NEO_REPO} ${tag}: ${from} is not a ${directory ? "directory" : "file"}`);
-    }
-    if (directory && (await listFiles(path)).length === 0) throw new Error(`${NEO_REPO} ${tag}: ${from} is empty`);
-  }
-
   const minor = crateMinor(duckdb);
   console.log(`Looking up ${CRATE} 1.${minor}.x on crates.io`);
   const crates = await getJson<{ versions: CrateVersion[]; meta: { next_page: string | null } }>(
@@ -226,31 +189,24 @@ Plan${dryRun ? " (dry run: nothing is written)" : ""}:
 Steps:
   1. set DUCKDB_VERSION in src/version.ts
   2. bun add --dev --exact ${NODE_API}@${nodeApi}
-  3. re-vendor ${copies.map(([, to]) => to).join(", ")}
-  4. bun run scripts/vendor-rewrite-bindings.ts, update vendor/node-api/PROVENANCE.md and tests/official/*.test.ts
-  5. bun run fetch-lib all, vendor:api-spec, gen:ffi, gen:contract
-  6. ${crate ? `pin ${CRATE} =${crate} in native/Cargo.toml and cargo update native/Cargo.lock` : `leave ${CRATE}`}
-  7. release as version ${release}: set it in every package.json and add its row to the README.md Versions table`);
-  if (!dryRun) await apply({ upstream, sha, bindingsVersion, crate, copies });
+  3. bun run fetch-lib all, vendor:api-spec, gen:ffi
+  4. ${crate ? `pin ${CRATE} =${crate} in native/Cargo.toml and cargo update native/Cargo.lock` : `leave ${CRATE}`}
+  5. release as version ${release}: set it in every package.json and add its row to the README.md Versions table`);
+  if (!dryRun) await apply({ crate });
 } finally {
   await rm(work, { recursive: true, force: true });
 }
 
 type Plan = {
-  /** The extracted duckdb-node-neo tree at the tag. */
-  upstream: string;
-  sha: string;
-  bindingsVersion: string;
   /** The libduckdb-sys release for the target DuckDB, or undefined when crates.io has none. */
   crate: string | undefined;
-  copies: [string, string, boolean][];
 };
 
-async function apply({ upstream, sha, bindingsVersion, crate, copies }: Plan): Promise<void> {
+async function apply({ crate }: Plan): Promise<void> {
   const minor = crateMinor(duckdb);
   const followUps: string[] = [];
   const changes: string[] = [];
-  const watched = ["vendor/duckdb.h", "vendor/node-api/node-bindings.d.ts"];
+  const watched = ["vendor/duckdb.h"];
   const before = new Map(
     await Promise.all(watched.map(async (path) => [path, await sha256(join(ROOT, path))] as const)),
   );
@@ -267,56 +223,7 @@ async function apply({ upstream, sha, bindingsVersion, crate, copies }: Plan): P
   step(`${NODE_API} devDependency`);
   await $`bun add --dev --exact ${NODE_API}@${nodeApi}`.cwd(ROOT);
 
-  // ---- 3. Re-vendor duckdb-node-neo ----
-
-  step(`Re-vendor ${NEO_REPO} ${tag}`);
-  for (const [from, to, directory] of copies) {
-    const target = join(ROOT, to);
-    if (directory) {
-      await rm(target, { recursive: true, force: true });
-      for (const file of await listFiles(join(upstream, from))) {
-        await Bun.write(join(target, file), Bun.file(join(upstream, from, file)));
-      }
-    } else {
-      await Bun.write(target, Bun.file(join(upstream, from)));
-    }
-    console.log(`${from} -> ${to}`);
-  }
-  await $`bun run scripts/vendor-rewrite-bindings.ts`.cwd(ROOT);
-
-  const provenance = join(ROOT, "vendor", "node-api", "PROVENANCE.md");
-  const rows: [string, string][] = [
-    ["Tag", `\`${tag}\``],
-    ["Commit", `\`${sha}\``],
-    [`\`${NODE_API}\` version`, `\`${nodeApi}\``],
-    ["`@duckdb/node-bindings` version", `\`${bindingsVersion}\` (DuckDB core v${duckdb})`],
-  ];
-  let table = await Bun.file(provenance).text();
-  for (const [label, value] of rows) table = setTableRow(table, label, value);
-  await Bun.write(provenance, table);
-
-  // Each official suite entrypoint imports every top-level test file of its vendored suite.
-  for (const [entry, dir] of [
-    ["tests/official/api.test.ts", "vendor/node-api/test"],
-    ["tests/official/bindings.test.ts", "vendor/node-bindings/test"],
-  ] as const) {
-    const path = join(ROOT, entry);
-    const present = (await readdir(join(ROOT, dir), { withFileTypes: true }))
-      .filter((file) => file.isFile() && file.name.endsWith(".test.ts"))
-      .map((file) => file.name);
-    const synced = syncTestImports(await Bun.file(path).text(), `import "../../${dir}/`, present);
-    const { added, removed } = synced;
-    const source = setNeoTag(synced.source, tag);
-    await Bun.write(path, source);
-    if (added.length > 0) {
-      changes.push(`\`${entry}\` now imports the new upstream test files ${added.map((n) => `\`${n}\``).join(", ")}.`);
-    }
-    if (removed.length > 0) {
-      changes.push(`\`${entry}\` no longer imports ${removed.map((n) => `\`${n}\``).join(", ")}, removed upstream.`);
-    }
-  }
-
-  // ---- 4. libduckdb, duckdb.h, the C API spec, and the generated code ----
+  // ---- 3. libduckdb, duckdb.h, the C API spec, and the generated code ----
 
   step("fetch-lib all");
   await $`bun run fetch-lib all`.cwd(ROOT);
@@ -324,10 +231,8 @@ async function apply({ upstream, sha, bindingsVersion, crate, copies }: Plan): P
   await $`bun run vendor:api-spec`.cwd(ROOT);
   step("gen:ffi");
   await $`bun run gen:ffi`.cwd(ROOT);
-  step("gen:contract");
-  await $`bun run gen:contract`.cwd(ROOT);
 
-  // ---- 5. libduckdb-sys ----
+  // ---- 4. libduckdb-sys ----
 
   step(CRATE);
   if (crate) {
@@ -344,7 +249,7 @@ async function apply({ upstream, sha, bindingsVersion, crate, copies }: Plan): P
     );
   }
 
-  // ---- 6. The package version ----
+  // ---- 5. The package version ----
 
   step(`Package version ${release}`);
   const platforms = (await readdir(join(ROOT, "packages"))).filter((name) => name.startsWith("duckdb-bun-"));
@@ -377,12 +282,6 @@ async function apply({ upstream, sha, bindingsVersion, crate, copies }: Plan): P
         " and update both sides and `native/ABI.md` together.",
     );
   }
-  if (before.get("vendor/node-api/node-bindings.d.ts") !== after.get("vendor/node-api/node-bindings.d.ts")) {
-    followUps.push(
-      "`vendor/node-api/node-bindings.d.ts` changed: implement new or changed binding functions in `src/bindings/`," +
-        " with the official C++ binding at the new tag as the reference.",
-    );
-  }
 
   const summary = [
     `Upgrades DuckDB from v${DUCKDB_VERSION} to v${duckdb} and \`${NODE_API}\` from ${nodeApiPin} to ${nodeApi}.`,
@@ -390,8 +289,7 @@ async function apply({ upstream, sha, bindingsVersion, crate, copies }: Plan): P
     "## What `scripts/upgrade-duckdb.ts` changed",
     "",
     `- \`DUCKDB_VERSION\` in \`src/version.ts\` is ${duckdb}, and the \`${NODE_API}\` devDependency is pinned at ${nodeApi}.`,
-    `- \`vendor/node-api\` and \`vendor/node-bindings\` are re-vendored from ${NEO_REPO} \`${tag}\` (\`${sha}\`), and the bindings imports rewritten.`,
-    "- `vendor/duckdb.h`, `vendor/duckdb-api-spec/` and the generated FFI and contract code are refreshed for the new DuckDB.",
+    "- `vendor/duckdb.h`, `vendor/duckdb-api-spec/` and the generated FFI code are refreshed for the new DuckDB.",
     ...changes.map((change) => `- ${change}`),
     "",
     "## Left for a human",

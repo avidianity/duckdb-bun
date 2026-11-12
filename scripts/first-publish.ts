@@ -189,14 +189,12 @@ async function checkTarball(pkg: Pkg, version: string, scratch: string): Promise
     "src/neo.ts",
     "src/index.ts",
     "src/bindings/index.ts",
-    "vendor/node-api/LICENSE",
-    "vendor/node-api/node-bindings.d.ts",
-    "vendor/node-api/src/index.ts",
+    "src/api/index.ts",
+    "src/bindings/node-bindings.d.ts",
   ];
   const missing = required.filter((entry) => !entries.includes(entry));
   if (missing.length > 0) fail(`${pkg.name} is missing ${missing.join(", ")}`);
-  const allowed =
-    /^(LICENSE|README\.md|package\.json|src\/.+\.ts|vendor\/node-api\/(LICENSE|PROVENANCE\.md|node-bindings\.d\.ts|src\/.+))$/;
+  const allowed = /^(LICENSE|README\.md|package\.json|src\/.+\.ts|src\/api\/PROVENANCE\.md)$/;
   const unexpected = entries.filter((entry) => !allowed.test(entry));
   if (unexpected.length > 0) fail(`${pkg.name} holds unexpected files: ${unexpected.join(", ")}`);
   console.log(`  ${pkg.name}: ${entries.length} files`);

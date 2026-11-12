@@ -23,11 +23,7 @@
     "access": "public"
   },
   "files": [
-    "src",
-    "vendor/node-api/src",
-    "vendor/node-api/node-bindings.d.ts",
-    "vendor/node-api/LICENSE",
-    "vendor/node-api/PROVENANCE.md"
+    "src"
   ],
   "workspaces": [
     "packages/*"
@@ -37,8 +33,8 @@
     "build:native": "bun run scripts/build-native.ts",
     "bench": "bun run bench/main.ts",
     "test": "bun test",
-    "test:official": "bun test tests/official/api.test.ts",
-    "test:bindings": "bun test tests/official/bindings.test.ts",
+    "test:api": "bun test tests/api/",
+    "test:bindings": "bun test tests/bindings/ --path-ignore-patterns 'tests/bindings/stress/**'",
     "parity": "bun test tests/parity.test.ts tests/parity/",
     "fuzz": "bun test tests/fuzz/",
     "fuzz:nightly": "bun run scripts/fuzz-nightly.ts",
@@ -50,14 +46,14 @@
     "test:crash": "bun test tests/heavy/crash-report.test.ts",
     "test:issue-3060": "bun test tests/heavy/issue-3060.test.ts",
     "test:worker-terminate": "bun test tests/heavy/worker-terminate.test.ts",
-    "test:unit": "bun test --path-ignore-patterns 'tests/official/**' --path-ignore-patterns 'tests/heavy/**' --path-ignore-patterns 'tests/compile/**' --path-ignore-patterns tests/parity.test.ts --path-ignore-patterns 'tests/parity/**' --path-ignore-patterns 'tests/fuzz/**'",
+    "test:unit": "bun test --path-ignore-patterns 'tests/api/**' --path-ignore-patterns 'tests/bindings/**' --path-ignore-patterns 'tests/heavy/**' --path-ignore-patterns 'tests/compile/**' --path-ignore-patterns tests/parity.test.ts --path-ignore-patterns 'tests/parity/**' --path-ignore-patterns 'tests/fuzz/**'",
     "coverage": "bun run scripts/coverage.ts",
     "check-version": "bun run scripts/check-version.ts",
     "first-publish": "bun run scripts/first-publish.ts",
     "lint": "bun --bun biome check src tests scripts examples bench commitlint.config.ts",
     "lint:ci": "bun --bun biome ci src tests scripts examples bench commitlint.config.ts",
     "format": "bun --bun biome format --write src tests scripts examples bench commitlint.config.ts",
-    "typecheck": "bun check --no-script -p tsconfig.check.json",
+    "typecheck": "bun check --no-script -p tsconfig.json",
     "check": "bun run lint && bun run typecheck",
     "gen:ffi": "bun run scripts/gen-ffi.ts",
     "vendor:api-spec": "bun run scripts/vendor-api-spec.ts",

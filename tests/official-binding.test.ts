@@ -2,7 +2,7 @@
 import { expect, test } from "bun:test";
 import { assertRealOfficialBinding, officialBindingPath } from "./official-binding.ts";
 
-test("the official @duckdb/node-api loads its own @duckdb/node-bindings, also under the test preload", async () => {
+test("the official @duckdb/node-api loads its own @duckdb/node-bindings, also under bun test", async () => {
   expect(officialBindingPath()).toMatch(/node_modules[\\/].*@duckdb[\\/]node-bindings[\\/]duckdb\.js$/);
   assertRealOfficialBinding();
   const official = await import("@duckdb/node-api");

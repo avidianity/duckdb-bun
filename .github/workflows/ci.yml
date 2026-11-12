@@ -114,7 +114,7 @@ jobs:
         run: bun run typecheck
 
       - name: Official @duckdb/node-api suite
-        run: bun run test:official
+        run: bun run test:api
 
       - name: Official @duckdb/node-bindings suite
         run: bun run test:bindings

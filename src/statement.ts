@@ -1,4 +1,4 @@
-import type { DuckDBPreparedStatement } from "../vendor/node-api/src/index.ts";
+import type { DuckDBPreparedStatement } from "./api/index.ts";
 import { asDuckDBError, asDuckDBErrorSync } from "./errors.ts";
 import { type Reader, readerFrom } from "./reader.ts";
 

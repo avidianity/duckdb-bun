@@ -1,0 +1,149 @@
+import duckdb from "../bindings/index.ts";
+import { DuckDBDataChunk } from './DuckDBDataChunk';
+import { DuckDBScalarFunctionBindInfo } from './DuckDBScalarFunctionBindInfo';
+import { DuckDBScalarFunctionInfo } from './DuckDBScalarFunctionInfo';
+import { DuckDBScalarFunctionInitInfo } from './DuckDBScalarFunctionInitInfo';
+import { DuckDBType } from './DuckDBType';
+import { DuckDBVector } from './DuckDBVector';
+
+export type DuckDBScalarBindFunction = (bindInfo: DuckDBScalarFunctionBindInfo) => void;
+
+export type DuckDBScalarInitFunction = (
+  initInfo: DuckDBScalarFunctionInitInfo,
+) => void;
+
+export type DuckDBScalarMainFunction = (
+  functionInfo: DuckDBScalarFunctionInfo,
+  inputDataChunk: DuckDBDataChunk,
+  outputVector: DuckDBVector,
+) => void;
+
+export class DuckDBScalarFunction {
+  readonly scalar_function: duckdb.ScalarFunction;
+
+  public constructor() {
+    this.scalar_function = duckdb.create_scalar_function();
+  }
+
+  public static create({
+    name,
+    bindFunction,
+    initFunction,
+    mainFunction,
+    returnType,
+    parameterTypes,
+    varArgsType,
+    specialHandling,
+    volatile,
+    extraInfo,
+  }: {
+    name: string;
+    bindFunction?: DuckDBScalarBindFunction;
+    initFunction?: DuckDBScalarInitFunction;
+    mainFunction: DuckDBScalarMainFunction;
+    returnType: DuckDBType;
+    parameterTypes?: readonly DuckDBType[];
+    varArgsType?: DuckDBType;
+    specialHandling?: boolean;
+    volatile?: boolean;
+    extraInfo?: object;
+  }): DuckDBScalarFunction {
+    const scalarFunction = new DuckDBScalarFunction();
+    scalarFunction.setName(name);
+    if (bindFunction) {
+      scalarFunction.setBindFunction(bindFunction);
+    }
+    if (initFunction) {
+      scalarFunction.setInitFunction(initFunction);
+    }
+    scalarFunction.setMainFunction(mainFunction);
+    scalarFunction.setReturnType(returnType);
+    if (parameterTypes) {
+      for (const parameterType of parameterTypes) {
+        scalarFunction.addParameter(parameterType);
+      }
+    }
+    if (varArgsType) {
+      scalarFunction.setVarArgs(varArgsType);
+    }
+    if (specialHandling) {
+      scalarFunction.setSpecialHandling();
+    }
+    if (volatile) {
+      scalarFunction.setVolatile();
+    }
+    if (extraInfo) {
+      scalarFunction.setExtraInfo(extraInfo);
+    }
+    return scalarFunction;
+  }
+
+  public destroySync() {
+    duckdb.destroy_scalar_function_sync(this.scalar_function);
+  }
+
+  public setName(name: string) {
+    duckdb.scalar_function_set_name(this.scalar_function, name);
+  }
+
+  public setBindFunction(bindFunction: DuckDBScalarBindFunction) {
+    duckdb.scalar_function_set_bind(this.scalar_function, (info) => {
+      const bindInfo = new DuckDBScalarFunctionBindInfo(info);
+      bindFunction(bindInfo);
+    });
+  }
+
+  public setInitFunction(initFunction: DuckDBScalarInitFunction) {
+    duckdb.scalar_function_set_init(this.scalar_function, (info) => {
+      initFunction(new DuckDBScalarFunctionInitInfo(info));
+    });
+  }
+
+  public setMainFunction(mainFunction: DuckDBScalarMainFunction) {
+    duckdb.scalar_function_set_function(
+      this.scalar_function,
+      (info, input, output) => {
+        const functionInfo = new DuckDBScalarFunctionInfo(info);
+        const inputDataChunk = new DuckDBDataChunk(input);
+        const outputVector = DuckDBVector.create(
+          output,
+          inputDataChunk.rowCount,
+        );
+        mainFunction(functionInfo, inputDataChunk, outputVector);
+      },
+    );
+  }
+
+  public setReturnType(returnType: DuckDBType) {
+    duckdb.scalar_function_set_return_type(
+      this.scalar_function,
+      returnType.toLogicalType().logical_type,
+    );
+  }
+
+  public addParameter(parameterType: DuckDBType) {
+    duckdb.scalar_function_add_parameter(
+      this.scalar_function,
+      parameterType.toLogicalType().logical_type,
+    );
+  }
+
+  public setVarArgs(varArgsType: DuckDBType) {
+    duckdb.scalar_function_set_varargs(
+      this.scalar_function,
+      varArgsType.toLogicalType().logical_type,
+    );
+  }
+
+  public setSpecialHandling() {
+    duckdb.scalar_function_set_special_handling(this.scalar_function);
+  }
+
+  public setVolatile() {
+    duckdb.scalar_function_set_volatile(this.scalar_function);
+  }
+
+  public setExtraInfo(extraInfo: object) {
+    duckdb.scalar_function_set_extra_info(this.scalar_function, extraInfo);
+  }
+}
