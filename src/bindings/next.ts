@@ -8,6 +8,7 @@ import * as datetime from "./api/datetime.ts";
 import * as logicalTypes from "./api/logical-types.ts";
 import * as query from "./api/query.ts";
 import * as scalarFunction from "./api/scalar-function.ts";
+import * as tableFunction from "./api/table-function.ts";
 import * as values from "./api/values.ts";
 import * as vector from "./api/vector.ts";
 import * as contract from "./generated/contract.ts";
@@ -19,6 +20,7 @@ export * from "./api/datetime.ts";
 export * from "./api/logical-types.ts";
 export * from "./api/query.ts";
 export * from "./api/scalar-function.ts";
+export * from "./api/table-function.ts";
 export * from "./api/values.ts";
 export * from "./api/vector.ts";
 export * from "./generated/contract.ts";
@@ -34,5 +36,6 @@ const duckdb = {
   ...dataChunk,
   ...vector,
   ...scalarFunction,
+  ...tableFunction,
 };
 export default duckdb;
