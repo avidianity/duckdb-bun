@@ -2,15 +2,21 @@
 // small ones run, a 10 ms timer keeps firing on time.
 
 import { expect, test } from "bun:test";
+import { availableParallelism } from "node:os";
 import { DuckDBInstance } from "../../src/neo.ts";
 
 const TICK_MS = 10;
 const MAX_GAP_MS = 50;
+// DuckDB gets every core but one, so the JS thread always has a core to run on.
+// With more busy threads than cores, the OS scheduler delays the timer too: a
+// 3-core CI runner with 4 DuckDB threads showed 118 ms gaps, where a 12-core
+// machine showed 12 ms.
+const THREADS = String(Math.max(1, availableParallelism() - 1));
 
 test(
   `a 10 ms timer never waits more than ${MAX_GAP_MS} ms while queries run`,
   async () => {
-    const instance = await DuckDBInstance.create(":memory:", { threads: "4" });
+    const instance = await DuckDBInstance.create(":memory:", { threads: THREADS });
     const long = await instance.connect();
     const short = await instance.connect();
 
