@@ -77,6 +77,40 @@ function destroyCell(cell: Cell): void {
   }
 }
 
+// --- native memory pressure (docs/adr/0007-native-memory-pressure-requests-garbage-collection.md) ---
+//
+// The garbage collector sees only the JS heap, not the native memory a handle
+// owns, so unreachable results and data chunks pile up between collections: a
+// loop of small queries held about 1000 of them, against about 500 for the
+// official binding. Every `pressureLimit` results and data chunks created and not
+// destroyed explicitly, the binding asks for an asynchronous collection, as N-API's
+// napi_adjust_external_memory lets V8 do. The limit grows with the live count, so
+// a program that keeps many results alive is not collected more often.
+
+const PRESSURE_KINDS: ReadonlySet<Kind> = new Set<Kind>(["result", "data chunk"]);
+/** The fewest results and data chunks created between two requested collections. */
+export const MIN_PRESSURE_LIMIT = 256;
+let pressureCount = 0;
+let pressureLimit = MIN_PRESSURE_LIMIT;
+
+function addPressure(kind: Kind): void {
+  if (!PRESSURE_KINDS.has(kind) || ++pressureCount < pressureLimit) return;
+  pressureCount = 0;
+  let liveCount = 0;
+  for (const pressured of PRESSURE_KINDS) liveCount += live.get(pressured) ?? 0;
+  pressureLimit = Math.max(MIN_PRESSURE_LIMIT, liveCount);
+  Bun.gc(false);
+}
+
+function relievePressure(kind: Kind): void {
+  if (PRESSURE_KINDS.has(kind) && pressureCount > 0) pressureCount--;
+}
+
+/** Collections requested so far and the current limit, for tests. */
+export function pressureState(): { count: number; limit: number } {
+  return { count: pressureCount, limit: pressureLimit };
+}
+
 const registry = new FinalizationRegistry<Cell>((cell) => {
   // A native call holds a strong reference to its handles until it completes,
   // so a collected handle has no call in flight; the check is defensive.
@@ -96,6 +130,7 @@ export class Handle<K extends Kind = Kind> {
     if (destroy && ptr !== null) {
       live.set(kind, (live.get(kind) ?? 0) + 1);
       registry.register(this, this.#cell, this.#cell);
+      addPressure(kind);
     }
   }
 
@@ -142,6 +177,7 @@ export class Handle<K extends Kind = Kind> {
   }
 
   #finish(): void {
+    if (this.#cell.ptr !== null && this.#cell.destroy) relievePressure(this.kind);
     registry.unregister(this.#cell);
     destroyCell(this.#cell);
   }
