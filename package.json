@@ -43,6 +43,7 @@
     "test:compile": "bun test tests/compile/compile.test.ts",
     "test:leak": "bun test tests/heavy/leak.test.ts",
     "test:stress": "bun test tests/heavy/event-loop-stress.test.ts",
+    "test:concurrency": "bun test tests/heavy/concurrency-stress.test.ts",
     "test:crash": "bun test tests/heavy/crash-report.test.ts",
     "test:issue-3060": "bun test tests/heavy/issue-3060.test.ts",
     "test:unit": "bun test --path-ignore-patterns 'tests/official/**' --path-ignore-patterns 'tests/heavy/**' --path-ignore-patterns 'tests/compile/**' --path-ignore-patterns tests/parity.test.ts --path-ignore-patterns 'tests/parity/**'",

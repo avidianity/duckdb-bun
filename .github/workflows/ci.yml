@@ -129,6 +129,10 @@ jobs:
       - name: Event loop stress test
         run: bun run test:stress
 
+      # STRESS_SEED from a failed run's log repeats its random choices.
+      - name: Concurrency stress test
+        run: bun run test:concurrency
+
       - name: Crash report test
         run: bun run test:crash
 

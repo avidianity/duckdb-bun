@@ -17,14 +17,21 @@ Bun is pinned in `package.json` (`engines` and `packageManager`); use that versi
 
 ## Checks
 
-| Command                  | What it proves                                                        |
-| ------------------------ | --------------------------------------------------------------------- |
-| `bun run check`          | Biome lint and format, then `bun check` type checking                 |
-| `bun run test:official`  | the vendored `@duckdb/node-api` test suite passes on our bindings     |
-| `bun run test:bindings`  | the vendored `@duckdb/node-bindings` test suite passes on our bindings |
-| `bun run parity`         | results and error text match the real `@duckdb/node-api` side by side |
-| `bun test`               | everything above plus the stress, leak, crash-report and compile tests |
-| `bun run coverage`       | coverage of `src/` and the Rust shim is at or above its floors        |
+| Command                    | What it proves                                                         |
+| -------------------------- | ---------------------------------------------------------------------- |
+| `bun run check`            | Biome lint and format, then `bun check` type checking                  |
+| `bun run test:official`    | the vendored `@duckdb/node-api` test suite passes on our bindings      |
+| `bun run test:bindings`    | the vendored `@duckdb/node-bindings` test suite passes on our bindings |
+| `bun run parity`           | results and error text match the real `@duckdb/node-api` side by side  |
+| `bun run test:concurrency` | concurrent calls of every kind and Workers stay correct and settle     |
+| `bun test`                 | everything above plus the stress, leak, crash-report and compile tests |
+| `bun run coverage`         | coverage of `src/` and the Rust shim is at or above its floors         |
+
+## Concurrency stress
+
+`bun run test:concurrency` (`tests/heavy/concurrency-stress.test.ts`) runs every kind of call on one instance at once for `STRESS_SECONDS` seconds of load, 8 by default, then waits for the job pool's idle timeout and sends calls across it.
+A run takes about 12 seconds plus the load, and up to 15 seconds more on Linux, where it also checks that idle pool threads exit.
+Each run prints its seed; `STRESS_SEED=<seed> bun run test:concurrency` repeats that run's choices of queries, sizes and pauses, though not the interleaving across threads.
 
 ## Coverage
 
