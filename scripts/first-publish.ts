@@ -2,7 +2,7 @@
 // only for a package that already exists (MAINTENANCE.md, "Publishing to npm"). Every later version
 // goes out through the release workflow.
 //
-//   bun run first-publish [--run <release workflow run id>] [--dry-run]
+//   bun run first-publish [--run <release workflow run id>] [--dry-run] [--yes]
 //
 // It publishes what a green release workflow run built and tested, never a local build:
 //
@@ -10,7 +10,7 @@
 //  2. Checks the tag out into a temporary worktree and downloads both platform packages into it.
 //  3. Runs `check-version --tag --publish`, packs the three tarballs, and checks each one: its file list,
 //     its package.json, the CPU architecture of every native library, and the glibc the linux-x64 shim needs.
-//  4. Shows the npm account and what it will publish, and asks for confirmation.
+//  4. Shows the npm account and what it will publish, and asks for confirmation unless --yes.
 //  5. Runs `bun publish <tarball> --access public --tag next`, platform packages first. npm asks for
 //     two-factor authentication in the terminal or the browser; the script never sees it.
 //  6. Waits until npm serves each version, then prints the trusted publisher settings to enter on npmjs.com.
@@ -18,7 +18,7 @@
 // A version already on npm is skipped, so a failed run can be re-run. Auth comes from the npm config Bun
 // reads (~/.npmrc, or NPM_CONFIG_TOKEN with a short-lived granular token); `bun pm whoami` must succeed.
 
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { copyFile, mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
@@ -37,7 +37,11 @@ const MAX_GLIBC_MINOR = 36;
 
 const { values } = parseArgs({
   args: Bun.argv.slice(2),
-  options: { run: { type: "string" }, "dry-run": { type: "boolean", default: false } },
+  options: {
+    run: { type: "string" },
+    "dry-run": { type: "boolean", default: false },
+    yes: { type: "boolean", default: false },
+  },
   strict: true,
 });
 const dryRun = values["dry-run"];
@@ -139,17 +143,26 @@ async function extract(tarball: string, entry: string, into: string): Promise<st
   return join(into, "package", entry);
 }
 
-/** The CPU architecture in a shared library's header: ELF x86-64 or Mach-O arm64. */
-function architecture(bytes: Uint8Array): string {
+const MACHO_CPU: Record<number, string> = { 16777223: "x64", 16777228: "arm64" };
+
+/**
+ * The CPU architectures in a shared library's header: ELF, thin Mach-O, or a universal Mach-O such as
+ * DuckDB's macOS release, which holds both arm64 and x64.
+ */
+function architectures(bytes: Uint8Array): string[] {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   if (view.getUint32(0, false) === 0x7f454c46) {
-    if (bytes[4] !== 2) return "ELF32";
-    return view.getUint16(18, true) === 62 ? "x64" : `ELF machine ${view.getUint16(18, true)}`;
+    if (bytes[4] !== 2) return ["ELF32"];
+    const machine = view.getUint16(18, true);
+    return [machine === 62 ? "x64" : `ELF machine ${machine}`];
   }
-  if (view.getUint32(0, true) === 0xfeedfacf) {
-    return view.getUint32(4, true) === 0x0100000c ? "arm64" : `Mach-O cputype ${view.getUint32(4, true)}`;
+  const cpu = (type: number) => MACHO_CPU[type] ?? `Mach-O cputype ${type}`;
+  if (view.getUint32(0, true) === 0xfeedfacf) return [cpu(view.getUint32(4, true))];
+  if (view.getUint32(0, false) === 0xcafebabe) {
+    const count = view.getUint32(4, false);
+    return Array.from({ length: count }, (_, index) => cpu(view.getUint32(8 + index * 20, false)));
   }
-  return "unknown";
+  return ["unknown"];
 }
 
 /** The newest GLIBC_2.<n> symbol version an ELF file refers to. */
@@ -178,10 +191,12 @@ async function checkTarball(pkg: Pkg, version: string, scratch: string): Promise
     }
     const arch = pkg.platform.split("-")[1];
     for (const lib of [target.lib, shim]) {
-      const bytes = await Bun.file(await extract(pkg.tarball, lib, scratch)).bytes();
-      const found = architecture(bytes);
-      if (found !== arch) fail(`${pkg.name}/${lib} is ${found}, expected ${arch}`);
-      console.log(`  ${pkg.name}/${lib}: ${found}, ${(bytes.byteLength / 1024 / 1024).toFixed(1)} MiB`);
+      const path = await extract(pkg.tarball, lib, scratch);
+      const bytes = await Bun.file(path).bytes();
+      if (bytes.byteLength < 64) fail(`${pkg.name}/${lib} is ${bytes.byteLength} bytes (${path})`);
+      const found = architectures(bytes);
+      if (!found.includes(arch as string)) fail(`${pkg.name}/${lib} is ${found.join(" + ")}, expected ${arch}`);
+      console.log(`  ${pkg.name}/${lib}: ${found.join(" + ")}, ${(bytes.byteLength / 1024 / 1024).toFixed(1)} MiB`);
       if (lib === shim && pkg.platform.startsWith("linux")) {
         const minor = newestGlibcMinor(bytes);
         if (minor > MAX_GLIBC_MINOR) fail(`${pkg.name}/${shim} needs glibc 2.${minor}, above 2.${MAX_GLIBC_MINOR}`);
@@ -252,9 +267,27 @@ try {
   step(`Worktree at ${tag}, with the run's platform packages`);
   await $`git -C ${ROOT} worktree add --detach ${worktree} ${sha}`.quiet();
   for (const platform of Object.keys(TARGETS)) {
+    // gh will not overwrite files, so the artifact lands beside the worktree. Files the tag also holds
+    // (package.json, index.ts, LICENSE) must match it byte for byte; the native libraries are copied in.
+    const artifact = join(scratch, `artifact-${platform}`);
     const dir = join(worktree, "packages", `duckdb-bun-${platform}`);
-    await $`gh run download ${run.databaseId} -R ${REPO} --name duckdb-bun-${platform} --dir ${dir}`.env(ghEnv).quiet();
-    console.log(`  ${platform}: ${(await readdir(dir)).sort().join(", ")}`);
+    await $`gh run download ${run.databaseId} -R ${REPO} --name duckdb-bun-${platform} --dir ${artifact}`
+      .env(ghEnv)
+      .quiet();
+    const files = (await readdir(artifact)).sort();
+    for (const file of files) {
+      const source = join(artifact, file);
+      const target = join(dir, file);
+      if (await Bun.file(target).exists()) {
+        if (!Buffer.from(await Bun.file(source).bytes()).equals(Buffer.from(await Bun.file(target).bytes()))) {
+          fail(`${file} of the ${platform} artifact differs from the tag's`);
+        }
+      } else {
+        // copyFile, not Bun.write: on Bun 1.4.4, Bun.write to a BunFile whose exists() was awaited writes 0 bytes.
+        await copyFile(source, target);
+      }
+    }
+    console.log(`  ${platform}: ${files.join(", ")}`);
   }
 
   step("Versions and native files");
@@ -283,10 +316,10 @@ try {
 
   step("npm account and plan");
   const whoami = await $`bun pm whoami`.quiet().nothrow();
-  if (whoami.exitCode !== 0) {
+  if (whoami.exitCode !== 0 && !dryRun) {
     fail('bun pm whoami failed: log in to npm first (MAINTENANCE.md, "Publishing to npm")');
   }
-  console.log(`  account: ${whoami.text().trim()}`);
+  console.log(`  account: ${whoami.exitCode === 0 ? whoami.text().trim() : "not logged in (dry run continues)"}`);
   const pending: Pkg[] = [];
   for (const pkg of packages) {
     const published = await onRegistry(pkg.name, version);
@@ -295,7 +328,7 @@ try {
     );
     if (!published) pending.push(pkg);
   }
-  if (pending.length > 0 && !dryRun) {
+  if (pending.length > 0 && !dryRun && !values.yes) {
     const answer = prompt(`\nPublish ${pending.length} package(s) to npm? Type "publish" to continue:`);
     if (answer?.trim() !== "publish") fail("stopped; nothing was published");
   }
