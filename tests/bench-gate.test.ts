@@ -67,11 +67,23 @@ test("differences under the floors never fail", () => {
   expect(verdict.failures).toEqual([]);
 });
 
-test("an event loop gap at the limit fails, and a child error fails", () => {
-  expect(judge("s", input(steady), { ...input(steady), metrics: { maxGapMs: 50 } }, DEFAULT_LIMITS).failures).toEqual([
-    "event loop gap 50.0 ms, limit 50 ms",
-  ]);
+test("a p99 gap or a blocked event loop at the limit fails, and a child error fails", () => {
+  const gaps = (metrics: Record<string, number>) =>
+    judge("s", input(steady), { ...input(steady), metrics }, DEFAULT_LIMITS);
+  expect(gaps({ p99GapMs: 50, maxGapMs: 60 }).failures).toEqual(["event loop p99 gap 50.0 ms, limit 50 ms"]);
+  expect(gaps({ p99GapMs: 12, maxGapMs: 1000 }).failures).toEqual(["event loop blocked for 1000.0 ms, limit 1000 ms"]);
   expect(judge("s", input(steady), { ...input([]), error: "boom" }, DEFAULT_LIMITS).failures).toEqual([
     "ours failed: boom",
   ]);
+});
+
+test("CI macOS event-loop-lag: a single 85 ms gap with an 18.6 ms median p99 passes", () => {
+  expect(
+    judge(
+      "event-loop-lag",
+      input(steady),
+      { ...input(steady), metrics: { p99GapMs: 18.6, maxGapMs: 85.2 } },
+      DEFAULT_LIMITS,
+    ).failures,
+  ).toEqual([]);
 });

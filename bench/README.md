@@ -79,7 +79,8 @@ Pick `--lag-rows` so the lag query takes about 5 seconds on the machine; the def
 
 - The runs show ours more than 10% slower (`--max-slower`) at 99% confidence, and the medians differ by more than 5 ms.
 - The run peaks show ours using more than 10% more RSS (`--max-memory`) at 99% confidence, and the medians differ by more than 16 MiB, which covers the baseline difference between the two packages at start-up.
-- In `event-loop-lag`, ours lets the event loop stall for 50 ms or more.
+- In `event-loop-lag`, the median over runs of ours' 99th percentile gap reaches 50 ms, or any single gap reaches 1000 ms, which only a blocked event loop shows.
+  A single gap is not held to 50 ms: the macOS runner preempts the JS thread now and then, and showed single gaps of 85 and 95 ms for ours and official in one run.
 - Either implementation fails or returns a wrong result.
 
 The confidence comes from a one-sided Mann-Whitney U test, a rank test that assumes no particular distribution, of ours against official scaled up by the limit.

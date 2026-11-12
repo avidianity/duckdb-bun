@@ -16,8 +16,10 @@ export interface GateLimits {
   timeFloorMs: number;
   /** Growth smaller than this many MiB never fails: Bun's baseline differs between the packages. */
   memoryFloorMiB: number;
-  /** The event loop's largest gap allowed while ours runs a long query, in milliseconds. */
-  maxGapMs: number;
+  /** The largest median, over runs, of the 99th percentile event loop gap while ours runs a long query, in milliseconds. */
+  p99GapMs: number;
+  /** The largest single event loop gap allowed, in milliseconds: a blocked event loop shows one gap as long as the query. */
+  blockedGapMs: number;
   /** One-sided significance level of the test. */
   alpha: number;
 }
@@ -27,7 +29,8 @@ export const DEFAULT_LIMITS: GateLimits = {
   maxMemoryPct: 10,
   timeFloorMs: 5,
   memoryFloorMiB: 16,
-  maxGapMs: 50,
+  p99GapMs: 50,
+  blockedGapMs: 1000,
   alpha: 0.01,
 };
 
@@ -132,9 +135,16 @@ export function judge(scenario: string, official: GateInput, ours: GateInput, li
     }
   }
 
+  // A busy runner preempts the JS thread now and then: the macOS runner showed single gaps of 85 to
+  // 95 ms for both packages. So the 99th percentile carries the timing claim, and the largest gap
+  // only has to stay far below the query's length.
+  const p99 = ours.metrics.p99GapMs;
+  if (p99 !== undefined && p99 >= limits.p99GapMs) {
+    verdict.failures.push(`event loop p99 gap ${p99.toFixed(1)} ms, limit ${limits.p99GapMs} ms`);
+  }
   const gap = ours.metrics.maxGapMs;
-  if (gap !== undefined && gap >= limits.maxGapMs) {
-    verdict.failures.push(`event loop gap ${gap.toFixed(1)} ms, limit ${limits.maxGapMs} ms`);
+  if (gap !== undefined && gap >= limits.blockedGapMs) {
+    verdict.failures.push(`event loop blocked for ${gap.toFixed(1)} ms, limit ${limits.blockedGapMs} ms`);
   }
   return verdict;
 }
