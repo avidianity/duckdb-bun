@@ -47,7 +47,7 @@ It also prints the latest DuckDB release and the latest `@duckdb/node-api` on np
 `bun run check-version --publish` also requires every platform package to hold its native files and to list them in `files`.
 CI runs the plain form, and the release workflow runs the other two.
 
-The `upstream-check` workflow runs every Monday.
+The `upstream-check` workflow runs every six hours, so the upgrade pull request opens the day DuckDB tags a release.
 When the latest DuckDB release is newer than the pin, it opens an upgrade pull request, as [Upgrading DuckDB](#upgrading-duckdb) describes; a DuckDB release never waits for a `@duckdb/node-api` (ADR 0009).
 When DuckDB is current but npm has a `@duckdb/node-api` built on the pinned DuckDB that is newer than the reference pin, it opens a pull request that moves the reference.
 When either run fails, it opens one issue for that target instead of a pull request.
@@ -73,6 +73,12 @@ To land the pull request:
    When npm has no `@duckdb/node-api` built on the new DuckDB, parity and fuzz report that they have nothing to compare against, and the bench gate compares against the previous release of this package; the release goes ahead.
 2. Do what the pull request lists under "Left for a human", such as steps 4 and 6 below, and push to the branch, which starts CI as usual.
 3. Merge it with CI green, and release the version it set, as [Releasing](#releasing) describes from step 3.
+
+### Rehearsing the upgrade
+
+`gh workflow run upstream-check.yml -f rehearse=true` runs the upgrade job against the pinned DuckDB and pushes nothing.
+It fails when the upgrade path no longer runs end to end, or when regenerating from DuckDB's own release changes the tree, such as a generator that drifted from its output.
+Run it after changing `scripts/upgrade-duckdb.ts`, the generators, or the workflow, and before a DuckDB release you expect.
 
 ### By hand
 
