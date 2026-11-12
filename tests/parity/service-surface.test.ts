@@ -561,7 +561,12 @@ parity(
         const state = pending.runTask();
         connection.interrupt();
         return {
-          notReady: state === api.DuckDBPendingResultState.RESULT_NOT_READY,
+          // Not finished. Which of the two not-finished states the first task returns depends on whether
+          // DuckDB's own threads took the tasks first, so neither binding can promise one of them.
+          unfinished: [
+            api.DuckDBPendingResultState.RESULT_NOT_READY,
+            api.DuckDBPendingResultState.NO_TASKS_AVAILABLE,
+          ].includes(state),
           // Each step is captured: whether a connection with an unread pending result takes a new query is part of the contract.
           seven: await capture(() => rows(connection, "select 7")),
           missing: await capture(() => connection.run("select missing_function()")),

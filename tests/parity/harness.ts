@@ -10,7 +10,7 @@
 // implementation then runs in its own `bun test` child process, filtered to that one
 // test, which writes its outcome to a file. A child that dies or overruns its time
 // budget becomes a `crashed` or `hung` outcome instead of taking the suite down.
-import { expect, test } from "bun:test";
+import { afterAll, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -43,7 +43,7 @@ export interface ScenarioContext {
   impl: Impl;
   /** A fresh directory for this run only, removed afterwards; shows up as `<tmp>` in outcomes. */
   tmp: string;
-  /** A directory kept for the whole process, one per implementation; shows up as `<shared>` in outcomes. */
+  /** A directory kept for the whole test file, one per implementation; shows up as `<shared>` in outcomes. */
   shared: string;
 }
 
@@ -160,10 +160,14 @@ export function normalize(value: unknown, replace: Replace = (s) => s, depth = 0
   return { class: className, string: text, fields };
 }
 
+// Removed after each test file (see parityFor). Not on process "exit": bun test does not emit it
+// (Bun 1.4.4), so those directories were never removed, about 80 MB per extension scenario.
 const sharedDirs = new Map<Impl, string>();
-process.on("exit", () => {
+
+function removeSharedDirs(): void {
   for (const dir of sharedDirs.values()) rmSync(dir, { recursive: true, force: true });
-});
+  sharedDirs.clear();
+}
 
 function makeDir(prefix: string): string {
   return realpathSync(mkdtempSync(join(tmpdir(), prefix)));
@@ -230,6 +234,7 @@ async function runInChild(file: string, name: string, impl: Impl, budgetMs: numb
 
 /** Returns a `parity(name, scenario, options)` test registrar bound to the calling test file. */
 export function parityFor(file: string) {
+  afterAll(removeSharedDirs);
   return function parity(name: string, scenario: Scenario, options: ParityOptions = {}): void {
     const timeout = options.timeout ?? 20_000;
     if (CHILD_IMPL && CHILD_OUT) {
