@@ -23,6 +23,7 @@ import { own } from "../runtime/kinds.ts";
 import { cstr, decode, readCString, slot, slotValue, structBuffer, utf8 } from "../runtime/marshal.ts";
 import { duckdb, shim } from "../runtime/native.ts";
 import { RingOp, record } from "../runtime/ring.ts";
+import { callContext } from "../runtime/trace.ts";
 
 /** The `duckdb_api` value the official binding sets on every config it creates. */
 const DEFAULT_DUCKDB_API = "node-neo-bindings";
@@ -47,6 +48,7 @@ export function get_or_create_from_cache(cache: InstanceCache, path?: string, co
   const { bytes, length } = utf8(path ?? "");
   const handles = configHandle ? [cacheHandle, configHandle] : [cacheHandle];
   return runJob(
+    callContext("get_or_create_from_cache"),
     handles,
     () =>
       shim.dbs_job_get_or_create_from_cache(
@@ -64,6 +66,7 @@ export function open(path?: string, config?: Config): Promise<Database> {
   const configHandle = config === undefined ? undefined : handleOf(config, "config");
   const { bytes, length } = utf8(path ?? "");
   return runJob(
+    callContext("open"),
     configHandle ? [configHandle] : [],
     () => shim.dbs_job_open(bytes, length, path !== undefined, configHandle?.ptr ?? null) as Pointer | null,
     databaseFrom,
@@ -117,6 +120,7 @@ export function set_config(config: Config, name: string, option: string): void {
 export function connect(database: Database): Promise<Connection> {
   const handle = handleOf(database, "database");
   return runJob(
+    callContext("connect"),
     [handle],
     () => shim.dbs_job_connect(handle.destroyRequested ? null : handle.ptr) as Pointer | null,
     (job) => asHandle<Connection>(own("connection", jobOut0(job) as Pointer)),

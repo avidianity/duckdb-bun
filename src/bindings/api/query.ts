@@ -48,6 +48,7 @@ import { own } from "../runtime/kinds.ts";
 import { cstr, encode, type LayoutName, readCString, slot, slotValue, takeCString, utf8 } from "../runtime/marshal.ts";
 import { duckdb, shim } from "../runtime/native.ts";
 import { RingOp, record } from "../runtime/ring.ts";
+import { callContext } from "../runtime/trace.ts";
 
 /** The duckdb_type value DuckDB returns for an out-of-range column. */
 const DUCKDB_TYPE_INVALID = 0;
@@ -86,7 +87,12 @@ function preparedFrom(job: Pointer): PreparedStatement {
 export function query(connection: Connection, sql: string): Promise<Result> {
   const { ptr, handle } = claim(connection, "connection");
   const { bytes, length } = utf8(expectString(sql));
-  return runJob([handle], () => shim.dbs_job_query(ptr, bytes, length) as Pointer | null, resultFrom);
+  return runJob(
+    callContext("query", sql),
+    [handle],
+    () => shim.dbs_job_query(ptr, bytes, length) as Pointer | null,
+    resultFrom,
+  );
 }
 
 // --- prepared statements ----------------------------------------------------------------
@@ -94,7 +100,12 @@ export function query(connection: Connection, sql: string): Promise<Result> {
 export function prepare(connection: Connection, sql: string): Promise<PreparedStatement> {
   const { ptr, handle } = claim(connection, "connection");
   const { bytes, length } = utf8(expectString(sql));
-  return runJob([handle], () => shim.dbs_job_prepare(ptr, bytes, length) as Pointer | null, preparedFrom);
+  return runJob(
+    callContext("prepare", sql),
+    [handle],
+    () => shim.dbs_job_prepare(ptr, bytes, length) as Pointer | null,
+    preparedFrom,
+  );
 }
 
 export function destroy_prepare_sync(prepared_statement: PreparedStatement): void {
@@ -349,12 +360,22 @@ export function bind_null(prepared_statement: PreparedStatement, index: number):
 
 export function execute_prepared(prepared_statement: PreparedStatement): Promise<Result> {
   const { ptr, handle } = claim(prepared_statement, "prepared statement");
-  return runJob([handle], () => shim.dbs_job_execute_prepared(ptr) as Pointer | null, resultFrom);
+  return runJob(
+    callContext("execute_prepared"),
+    [handle],
+    () => shim.dbs_job_execute_prepared(ptr) as Pointer | null,
+    resultFrom,
+  );
 }
 
 export function execute_prepared_streaming(prepared_statement: PreparedStatement): Promise<Result> {
   const { ptr, handle } = claim(prepared_statement, "prepared statement");
-  return runJob([handle], () => shim.dbs_job_execute_prepared_streaming(ptr) as Pointer | null, resultFrom);
+  return runJob(
+    callContext("execute_prepared_streaming"),
+    [handle],
+    () => shim.dbs_job_execute_prepared_streaming(ptr) as Pointer | null,
+    resultFrom,
+  );
 }
 
 // --- pending results ----------------------------------------------------------------------
@@ -403,7 +424,12 @@ export function pending_execute_check_state(pending_result: PendingResult): Pend
 
 export function execute_pending(pending_result: PendingResult): Promise<Result> {
   const { ptr, handle } = claim(pending_result, "pending result");
-  return runJob([handle], () => shim.dbs_job_execute_pending(ptr) as Pointer | null, resultFrom);
+  return runJob(
+    callContext("execute_pending"),
+    [handle],
+    () => shim.dbs_job_execute_pending(ptr) as Pointer | null,
+    resultFrom,
+  );
 }
 
 export function pending_execution_is_finished(pending_state: PendingState): boolean {
@@ -416,6 +442,7 @@ export function extract_statements(connection: Connection, sql: string): Promise
   const { ptr, handle } = claim(connection, "connection");
   const { bytes, length } = utf8(expectString(sql));
   return runJob(
+    callContext("extract_statements", sql),
     [handle],
     () => shim.dbs_job_extract_statements(ptr, bytes, length) as Pointer | null,
     (job) => ({
@@ -434,6 +461,7 @@ export function prepare_extracted_statement(
   const extracted = claim(extracted_statements, "extracted statements");
   const i = u32(index);
   return runJob(
+    callContext("prepare_extracted_statement"),
     [handle, extracted.handle],
     () => shim.dbs_job_prepare_extracted_statement(ptr, extracted.ptr, i) as Pointer | null,
     preparedFrom,
@@ -502,6 +530,7 @@ export function result_return_type(result: Result): ResultType {
 export function fetch_chunk(result: Result): Promise<DataChunk | null> {
   const { ptr, handle } = claim(result, "result");
   return runJob(
+    callContext("fetch_chunk"),
     [handle],
     () => shim.dbs_job_fetch_chunk(ptr) as Pointer | null,
     (job) => {

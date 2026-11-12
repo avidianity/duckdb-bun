@@ -19,6 +19,26 @@ export const RingOp = {
   pendingExecuteTask: 42,
 } as const;
 
+/** The shim's jobs, in native/ABI.md table order; a job's op code is its position plus one. */
+const JOB_OPS = [
+  "open",
+  "get_or_create_from_cache",
+  "connect",
+  "query",
+  "prepare",
+  "execute_prepared",
+  "execute_prepared_streaming",
+  "extract_statements",
+  "prepare_extracted_statement",
+  "execute_pending",
+  "fetch_chunk",
+] as const;
+
+/** The ring op code of a job, by its contract function name; 0 for none. */
+export function jobOp(name: string): number {
+  return JOB_OPS.indexOf(name as (typeof JOB_OPS)[number]) + 1;
+}
+
 const STATE_EVENT = 4;
 const TEXT_MAX = 120;
 const encoder = new TextEncoder();

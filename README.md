@@ -1,170 +1,217 @@
 # duckdb-bun
 
-[![CI](https://github.com/joshcano/duckdb-bun/actions/workflows/ci.yml/badge.svg)](https://github.com/joshcano/duckdb-bun/actions/workflows/ci.yml)
+[![CI](https://github.com/avidianity/duckdb-bun/actions/workflows/ci.yml/badge.svg)](https://github.com/avidianity/duckdb-bun/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
-![DuckDB v1.5.2](https://img.shields.io/badge/DuckDB-v1.5.2-yellow)
-![Bun](https://img.shields.io/badge/Bun-%E2%89%A51.3-black)
+![DuckDB v2.0.0](https://img.shields.io/badge/DuckDB-v2.0.0-yellow)
+![Bun 1.4.4](https://img.shields.io/badge/Bun-1.4.4-black)
 
-A **Bun-native, drop-in reimplementation of [`@duckdb/node-api`](https://www.npmjs.com/package/@duckdb/node-api)**
-built on [`bun:ffi`](https://bun.sh/docs/api/ffi) over the libduckdb **C API** — no N-API `.node`
-addon. It ships the entire official `@duckdb/node-api` TypeScript layer running over our FFI
-bindings, so it's the **same API returning the same value objects**, and it embeds `libduckdb` as a
-Bun asset so that **`bun build --compile` produces a single self-contained executable** (the thing
-the official addon cannot do).
-
-Drop-in: change one import.
+A Bun-native, drop-in reimplementation of [`@duckdb/node-api`](https://www.npmjs.com/package/@duckdb/node-api) over the libduckdb C API through [`bun:ffi`](https://bun.com/docs/runtime/ffi), with no N-API addon.
+It runs the official `@duckdb/node-api` TypeScript layer unmodified over its own bindings, so it has the same API and returns the same value objects.
+It loads libduckdb as a plain shared library, so `bun build --compile` produces one self-contained executable, which the official addon cannot do.
 
 ```ts
-import { DuckDBInstance } from "@joshcano/duckdb-bun"; // was "@duckdb/node-api"
+import { DuckDBInstance } from "@avidian/duckdb-bun"; // was "@duckdb/node-api"
 ```
 
-Verified against the official package's own test suite: **92/92 passing**. Pinned to **DuckDB
-v1.5.2** (matches `@duckdb/node-api@1.5.2-r.1`).
-
-> A narrow, ergonomic native-JS binding (dates as `YYYY-MM-DD` strings, decimals as numbers, etc.)
-> is also available at `@joshcano/duckdb-bun/native-js` — see [Native-JS binding](#native-js-binding).
-
-## Why
-
-`@duckdb/node-api` ships a prebuilt N-API addon (`duckdb.node`) with `libduckdb` linked in.
-`bun build --compile` can't embed a dynamically-loaded `.node` addon, so any Bun service that
-uses it can't be shipped as a standalone binary. `duckdb-bun` `dlopen`s a plain `libduckdb.so`
-that Bun *can* embed via `import p from "./libduckdb.so" with { type: "file" }`.
+It targets DuckDB v2.0.0 and `@duckdb/node-api` 2.0.0-r.1.
+The package version follows the same scheme: `2.0.0-r.<n>`.
 
 ## Install
 
 ```sh
-bun add @joshcano/duckdb-bun
+bun add @avidian/duckdb-bun
 ```
 
-The published package ships the `linux-x64` `libduckdb.so`. On other platforms (or when developing
-from source), fetch the native library first — see Setup.
+The package depends on one optional package per platform, which ships libduckdb and the native shim:
 
-## Setup (development / other platforms)
+| Platform | Package |
+| --- | --- |
+| Linux x64, glibc 2.36 or newer | `@avidian/duckdb-bun-linux-x64` |
+| macOS arm64 | `@avidian/duckdb-bun-darwin-arm64` |
 
-The native library is not committed to git. Fetch it for your platform:
-
-```sh
-bun run fetch-lib          # downloads libduckdb v1.5.2 for the host platform into vendor/
-```
-
-> **glibc vs musl:** prod (oscar-backend) runs a glibc container → the `linux-amd64` asset.
-> On Alpine, fetch the `linux-amd64-musl` variant. The vendored lib must match the libc of
-> whatever `bun build --target` you compile for.
+Bun installs only the one that matches the host.
+Do not install with `--no-optional`.
+On another platform, set `DUCKDB_BUN_LIBRARY_PATH` (see [Environment flags](#environment-flags)).
 
 ## Usage
 
 ```ts
-import { DuckDBInstance } from "@joshcano/duckdb-bun";
+import { DuckDBInstance } from "@avidian/duckdb-bun";
 
-const db = await DuckDBInstance.create(":memory:");
-const conn = await db.connect();
-await conn.run("CREATE TABLE t AS SELECT * FROM range(3) AS r(n)");
-const reader = await conn.runAndReadAll("SELECT n, n * 2 AS double FROM t");
-console.log(reader.columnNames());   // ["n", "double"]
-console.log(reader.getRowObjects()); // [{ n: 0n, double: 0n }, ...]
-conn.closeSync();
-db.closeSync();
+const instance = await DuckDBInstance.create(":memory:");
+const connection = await instance.connect();
+const reader = await connection.runAndReadAll("SELECT 42 AS answer");
+console.log(reader.getRowObjects()); // [{ answer: 42 }]
+connection.closeSync();
+instance.closeSync();
 ```
+
+Everything in the [`@duckdb/node-api` documentation](https://duckdb.org/docs/stable/clients/node_neo/overview) applies.
+The one difference: it runs under Bun, not Node.js.
 
 ## Compile to a standalone binary
 
 ```sh
-bun run build:neo   # compiles the drop-in API entry -> ./dd-neo (self-contained)
-./dd-neo            # runs a real DuckDB query with libduckdb embedded — no bun/node/libduckdb needed
+bun build --compile app.ts --outfile app
+./app
 ```
+
+The executable embeds libduckdb and the shim.
+At start-up it copies both to a temporary directory, because `dlopen` cannot read Bun's embedded file system.
+
+## Diagnostics
+
+`diagnostics()` returns a snapshot of the binding's native state:
+
+```ts
+import { diagnostics } from "@avidian/duckdb-bun";
+
+console.log(diagnostics());
+```
+
+```js
+{
+  versions: { package: "2.0.0-r.0", duckdb: "v2.0.0", bun: "1.4.4", shim: "0.1.0" },
+  paths: { libduckdb: "/…/libduckdb.so", shim: "/…/libduckdb_bun_shim.so" },
+  crashHandler: "installed",
+  flags: { debug: false, traceSql: false, crashHandler: true },
+  tracingChannel: "duckdb-bun:call",
+  nativeThreads: { running: 0, peak: 1 },
+  jobs: { started: 4, completed: 4, inFlight: 0 },
+  callbacks: { posted: 0, completed: 0, inline: 0 },
+  ringEntries: 10,
+  liveHandles: { database: 1, connection: 1, result: 2 },
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `versions` | The package, libduckdb, Bun and native shim versions. |
+| `paths` | The libduckdb and shim files that were loaded. |
+| `crashHandler` | `installed`, `disabled`, or `failed: <reason>`. Queries work without it. |
+| `flags` | The [environment flags](#environment-flags) read at load. |
+| `nativeThreads` | Native threads running blocking calls now, and the most at once. |
+| `jobs` | Blocking calls run on native threads: started, completed, and awaited by JavaScript now. |
+| `callbacks` | Scalar and table function callbacks: posted from DuckDB threads, completed, and run inline on the JS thread. |
+| `ringEntries` | Events written to the crash report's ring buffer. |
+| `liveHandles` | Native handles not yet freed, by kind. A count that only grows points to a leak. |
+
+### Tracing
+
+Every call that runs on a native thread (`open`, `connect`, `query`, `prepare`, `execute_prepared`, `fetch_chunk` and the others) is published on the [`node:diagnostics_channel`](https://nodejs.org/api/diagnostics_channel.html#class-tracingchannel) tracing channel `duckdb-bun:call`.
+The context has `op`, the binding function name, and `sql` when `DUCKDB_BUN_TRACE_SQL=1`.
+
+```ts
+import { tracingChannel } from "node:diagnostics_channel";
+
+tracingChannel("duckdb-bun:call").subscribe({
+  start: (context) => console.time(context.op),
+  asyncEnd: (context) => console.timeEnd(context.op),
+  error: (context) => console.error(context.op, context.error),
+});
+```
+
+A call costs nothing extra while no subscriber is attached.
+
+### SQL redaction
+
+SQL text leaves the binding only when `DUCKDB_BUN_TRACE_SQL=1`, and always redacted.
+In a statement that can carry credentials, every string literal becomes `'<redacted>'`.
+That covers `CREATE SECRET`, `ATTACH`, and any statement that names a secret, password, token, credential, key ID, access key, account key, account name or connection string:
+
+```sql
+CREATE SECRET s (TYPE s3, KEY_ID '<redacted>', SECRET '<redacted>')
+```
+
+### Crash reports
+
+On a fatal signal (SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT) the binding writes a report to stderr before Bun's own crash report:
+
+```
+[duckdb-bun] fatal signal 11 (SIGSEGV) on thread duckdb-bun:query
+[duckdb-bun] package 2.0.0-r.0, duckdb v2.0.0, bun 1.4.4, shim 0.1.0
+[duckdb-bun] in flight: 1 native calls, 1 threads
+[duckdb-bun] last binding events, oldest first:
+[duckdb-bun]   #5 +0.009s query event conn=0 handle=0x0 thread=0x1b8849f text="SELECT 1"
+[duckdb-bun]   #6 +0.009s query start conn=0 handle=0x9bc93a420 thread=0x1b884dc
+[duckdb-bun] native backtrace:
+…
+```
+
+The events come from a ring buffer of the last 256 binding events.
+The process still dies of the original signal, with the same exit status.
+Include the report when you open an issue.
+
+## Environment flags
+
+| Variable | Effect |
+| --- | --- |
+| `DUCKDB_BUN_DEBUG=1` | Writes one stderr line per native call, with its outcome and duration, plus the loaded library paths. |
+| `DUCKDB_BUN_TRACE_SQL=1` | Adds redacted SQL to the tracing channel context, the debug lines and crash reports. |
+| `DUCKDB_BUN_CRASH_HANDLER=0` | Leaves the fatal-signal handler uninstalled. |
+| `DUCKDB_BUN_LIBRARY_PATH=/path/libduckdb.so` | Loads this libduckdb instead of the platform package's. It must be the same DuckDB version. |
+| `DUCKDB_BUN_OFFLINE=1` | Test suite only: skips the tests that install DuckDB extensions from the network. |
+
+## How it works
+
+- The official `@duckdb/node-api` code is vendored in `vendor/node-api/src` and runs unmodified, except that its `@duckdb/node-bindings` import points at `src/bindings/`.
+- `src/bindings/` reimplements the `@duckdb/node-bindings` contract over the libduckdb C API with `bun:ffi`.
+  Its FFI tables are generated from DuckDB's C API specification (`bun run gen:ffi`).
+- `native/` is a small Rust library, the shim.
+  It wraps the C functions that take or return structs by value, which `bun:ffi` cannot call.
+  It runs every blocking call (open, connect, query, prepare, execute, fetch) on a native thread, so the JS thread never waits for a query.
+  It installs the crash handler.
+- Every native pointer is owned by a handle object, freed by a `FinalizationRegistry` or by an explicit close, and never while a native call is using it.
+
+The design decisions are recorded in [`docs/adr/`](docs/adr/).
 
 ## Develop
 
 ```sh
-bun run spike          # FFI smoke test against vendored libduckdb
-bun test               # full suite (unit + parity + official @duckdb/node-api suite)
-bun run test:official  # just the vendored @duckdb/node-api parity suite (92/92)
-bun run gen:bindings   # regenerate the @duckdb/node-bindings contract barrel
-bun run check-version  # is our DuckDB pin behind / consistent?
-bun run check          # biome lint + format
+bun install
+bun run fetch-lib       # libduckdb for the host platform, into packages/duckdb-bun-<platform>/
+bun run build:native    # the Rust shim, next to it
+bun run test:official   # the vendored @duckdb/node-api suite
+bun run test:bindings   # the vendored @duckdb/node-bindings suite
+bun run parity          # side-by-side results against the real @duckdb/node-api
+bun run test:unit       # everything else
+bun run check           # Biome and the type check
 ```
 
-**Maintaining the project** (upgrading DuckDB, comparing against the live binding, platform
-support) is documented in [`MAINTENANCE.md`](MAINTENANCE.md). The short version: `bun run parity`
-proves we still match `@duckdb/node-api`, and `bun run check-version` tells you when to upgrade.
-
-## Migrating from `@duckdb/node-api`
-
-It's a true drop-in — **change the import, nothing else**:
-
-```diff
-- import { DuckDBInstance, DuckDBConnection } from "@duckdb/node-api";
-+ import { DuckDBInstance, DuckDBConnection } from "@joshcano/duckdb-bun";
-```
-
-Same classes, same methods, same wrapper value objects (`DuckDBDateValue`, `DuckDBTimestampValue`,
-`DuckDBDecimalValue`, …), same behavior — verified against `@duckdb/node-api`'s own test suite
-(92/92). Two things to know:
-
-- **Runtime:** uses `bun:ffi`, so it runs under **Bun**, not Node.js. (The payoff: `bun build
-  --compile` works, which the N-API addon blocks.)
-- **Scalar UDFs run single-threaded:** registering a scalar function pins that connection to
-  `threads=1` (our UDF callback is a synchronous FFI callback that must run on the caller's thread).
-  The one intentional behavioral difference; everything else matches.
+[`CONTRIBUTING.md`](CONTRIBUTING.md) has the rules, and [`MAINTENANCE.md`](MAINTENANCE.md) the upgrade and release procedures.
 
 ## Native-JS binding
 
-The original ergonomic binding — dates as `YYYY-MM-DD` strings, decimals/bigints as numbers, no
-wrapper objects — is still available at the `/native-js` subpath:
+An older, narrower binding is available at the `/native-js` subpath.
+It returns plain JavaScript values: dates as `YYYY-MM-DD` strings, decimals as numbers, and no wrapper objects.
 
 ```ts
-import { DuckDBInstance } from "@joshcano/duckdb-bun/native-js";
+import { DuckDBInstance } from "@avidian/duckdb-bun/native-js";
 ```
 
-Its value mapping:
-
 | DuckDB type | JS value |
-|---|---|
+| --- | --- |
 | BOOLEAN | `boolean` |
-| TINYINT…INTEGER, U* (≤32-bit) | `number` |
+| TINYINT to INTEGER, unsigned up to 32 bits | `number` |
 | BIGINT, UBIGINT, HUGEINT, UHUGEINT | `bigint` |
 | FLOAT, DOUBLE, DECIMAL | `number` |
-| VARCHAR | `string` |
+| VARCHAR, UUID, TIME, TIME_TZ | `string` |
 | DATE | `string` (`YYYY-MM-DD`) |
-| TIMESTAMP / _S / _MS / _NS / _TZ | `Date` |
-| TIME / TIME_TZ | `string` |
+| TIMESTAMP, TIMESTAMP_S, _MS, _NS, _TZ | `Date` |
 | BLOB | `Uint8Array` |
-| UUID | `string` |
 | NULL | `null` |
 
-## How it works
+## Alternatives
 
-- `src/library.ts` embeds `libduckdb.so`, `native/shim.c`, and `vendor/duckdb.h` as Bun file
-  assets. Under `bun build --compile` they ride inside the executable; at startup they're
-  materialized to a temp dir (TinyCC and the C-level `dlopen` can't read Bun's `/$bunfs/` VFS).
-- `native/shim.c` is compiled at runtime via `bun:ffi`'s `cc` (bundled TinyCC). It wraps
-  `duckdb_query` / `duckdb_fetch_chunk`, which take `duckdb_result` **by value** — something raw
-  `bun:ffi` dlopen can't pass. The shim `dlsym`s them and calls through function pointers.
-- Everything else is pointer-based and bound directly with `dlopen`.
+If you do not need `bun build --compile`, another driver may fit:
 
-> **Gotcha:** every `FFIType.cstring` argument (for both dlopen and cc symbols) must be a
-> null-terminated `Buffer` — passing a bare JS string throws (dlopen) or segfaults (cc). Use the
-> `cstr()` helper in `src/ffi.ts`.
+| Package | Bun FFI | Embeds libduckdb | Notes |
+| --- | --- | --- | --- |
+| `@avidian/duckdb-bun` (this) | yes | yes | The `@duckdb/node-api` API on Bun, compile-ready. |
+| [`@duckdb/node-api`](https://www.npmjs.com/package/@duckdb/node-api) | no, N-API | no | The official package and the reference this one is tested against. |
+| [`duckdb-bun`](https://github.com/shreeve/duckdb-bun) | yes | no, needs a system libduckdb | Its own driver API. |
 
-## Alternatives / prior art
+## License
 
-Pick the right tool — if you don't need `bun build --compile`, an existing driver may fit better:
-
-| Package | Bun-native FFI | Embeds libduckdb (compile-ready) | Notes |
-|---|---|---|---|
-| **duckdb-bun** (this) | ✅ | ✅ **the point** | Runtime `cc` shim; embeds & materializes the `.so` so a compiled binary is self-contained. |
-| [`shreeve/duckdb-bun`](https://github.com/shreeve/duckdb-bun) (npm `duckdb-bun`) | ✅ | ❌ needs system libduckdb (`brew`/`apt`/`DUCKDB_LIB_PATH`) | Mature, richer driver API (`all`/`get`/`run`/`iterate`/`transaction`). Great if you don't need `--compile`. |
-| [`@duckdb/node-api`](https://www.npmjs.com/package/@duckdb/node-api) (official) | ❌ N-API addon | ❌ can't be `bun build --compile`d | The reference implementation; we test parity against it. |
-| [`@evan/duckdb`](https://github.com/evanwashere/duckdb) | ✅ | ❌ | Unmaintained (2023, DuckDB ~0.7). |
-
-**When to use this package:** you want a single self-contained executable from `bun build --compile`
-with DuckDB inside it. No other binding does that today — it's [an open Bun
-issue](https://github.com/oven-sh/bun/issues/17312). For everything else, `shreeve/duckdb-bun` is a
-fine, more full-featured choice.
-
-## Status
-
-Core binding complete: all scalar types, NULLs, multi-chunk streaming, prepared statements,
-error propagation, a `bun test` suite, a differential parity test vs the official `@duckdb/node-api`,
-Biome lint, and a verified `bun build --compile` proof. See `MAINTENANCE.md`.
+MIT.
+The vendored `@duckdb/node-api` code is MIT, from DuckDB Labs: see [`vendor/node-api/LICENSE`](vendor/node-api/LICENSE).

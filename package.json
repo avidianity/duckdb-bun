@@ -52,7 +52,7 @@
     "lint": "bun --bun biome check src tests scripts examples commitlint.config.ts",
     "lint:ci": "bun --bun biome ci src tests scripts examples commitlint.config.ts",
     "format": "bun --bun biome format --write src tests scripts examples commitlint.config.ts",
-    "typecheck": "bun check --no-script src/bindings/next.ts src/bindings/api src/bindings/runtime src/bindings/generated src/library.ts tests/runtime tests/vitest-shim.ts tests/preload.ts tests/node-bindings-resolve.ts scripts/gen-ffi.ts scripts/gen-contract.ts scripts/vendor-api-spec.ts scripts/check-version.ts scripts/build-native.ts commitlint.config.ts",
+    "typecheck": "bun check --no-script src/bindings/next.ts src/bindings/api src/bindings/runtime src/bindings/generated src/library.ts tests/runtime tests/heavy tests/vitest-shim.ts tests/preload.ts tests/node-bindings-resolve.ts scripts/gen-ffi.ts scripts/gen-contract.ts scripts/vendor-api-spec.ts scripts/check-version.ts scripts/build-native.ts commitlint.config.ts",
     "check": "bun run lint && bun check",
     "gen:ffi": "bun run scripts/gen-ffi.ts",
     "vendor:api-spec": "bun run scripts/vendor-api-spec.ts",

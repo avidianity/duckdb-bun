@@ -53,16 +53,28 @@ type Destroy = (ptr: Pointer) => void;
 /** The native state of one handle, shared with the FinalizationRegistry. It
  * never references the Handle itself, so it does not keep it alive. */
 interface Cell {
+  readonly kind: Kind;
   ptr: Pointer | null;
   readonly destroy: Destroy | null;
   inFlight: number;
   destroyRequested: boolean;
 }
 
+/** Owned handles whose pointer is not yet freed, by kind, for diagnostics(). */
+const live = new Map<Kind, number>();
+
+/** A snapshot of the owned handles not yet freed, by kind. */
+export function liveHandles(): Record<string, number> {
+  return Object.fromEntries([...live].filter(([, count]) => count > 0));
+}
+
 function destroyCell(cell: Cell): void {
   const { ptr, destroy } = cell;
   cell.ptr = null;
-  if (ptr !== null && destroy) destroy(ptr);
+  if (ptr !== null && destroy) {
+    live.set(cell.kind, (live.get(cell.kind) ?? 1) - 1);
+    destroy(ptr);
+  }
 }
 
 const registry = new FinalizationRegistry<Cell>((cell) => {
@@ -79,9 +91,12 @@ export class Handle<K extends Kind = Kind> {
 
   constructor(kind: K, ptr: Pointer | null, destroy: Destroy | null, owner?: object) {
     this.kind = kind;
-    this.#cell = { ptr, destroy, inFlight: 0, destroyRequested: false };
+    this.#cell = { kind, ptr, destroy, inFlight: 0, destroyRequested: false };
     this.#owner = owner;
-    if (destroy && ptr !== null) registry.register(this, this.#cell, this.#cell);
+    if (destroy && ptr !== null) {
+      live.set(kind, (live.get(kind) ?? 0) + 1);
+      registry.register(this, this.#cell, this.#cell);
+    }
   }
 
   /** The native pointer, or null once destroyed. */

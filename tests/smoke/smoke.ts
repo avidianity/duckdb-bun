@@ -6,6 +6,7 @@
 //   bun smoke.ts --crash   the child: crashes on purpose through the package's crash test hook
 //
 // It needs network access for INSTALL; it is not part of `bun test`.
+import { dlopen } from "bun:ffi";
 import { DuckDBInstance, diagnostics } from "@avidian/duckdb-bun";
 
 const CRASH_FLAG = "--crash";
@@ -23,8 +24,10 @@ async function crashChild(): Promise<void> {
   const instance = await DuckDBInstance.create(":memory:");
   const connection = await instance.connect();
   await connection.run("SELECT 1");
-  // TODO(diagnostics): the crash test hook's name is not final; this is the only placeholder in this file.
-  diagnostics().__crashForTest(1);
+  // The crash hook is not public API: open the shim the package already loaded and call it directly.
+  const { shimPath } = await import("@avidian/duckdb-bun-linux-x64");
+  const { symbols } = dlopen(shimPath, { dbs_crash_for_test: { args: ["u32"], returns: "void" } });
+  symbols.dbs_crash_for_test(1);
   fail("the crash test hook returned instead of crashing the process");
 }
 

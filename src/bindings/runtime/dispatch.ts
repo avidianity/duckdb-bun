@@ -9,6 +9,8 @@
 import { CString, JSCallback, type Pointer, read } from "bun:ffi";
 import type { Handle } from "./handle.ts";
 import { shim } from "./native.ts";
+import { jobOp, record } from "./ring.ts";
+import { type CallContext, traced } from "./trace.ts";
 
 // --- keeping the event loop alive -----------------------------------------------
 
@@ -50,14 +52,26 @@ function complete(job: Pointer): void {
 
 /**
  * Runs one blocking C call on a native thread and settles with `read(job)`, or
- * rejects with the job's error text. Each handle in `handles` counts the job as
+ * rejects with the job's error text. `context` names the call for tracing. Each handle in `handles` counts the job as
  * in flight until it completes, so an explicit destroy waits for it.
  */
 export function runJob<T>(
+  context: CallContext,
   handles: readonly Handle[],
   start: () => Pointer | null,
   read: (job: Pointer) => T,
 ): Promise<T> {
+  return traced(context, () => startJob(context, handles, start, read));
+}
+
+function startJob<T>(
+  context: CallContext,
+  handles: readonly Handle[],
+  start: () => Pointer | null,
+  read: (job: Pointer) => T,
+): Promise<T> {
+  // The shim records the job's start and end; the SQL, when kept, goes in just before.
+  if (context.sql !== undefined) record(jobOp(context.op), null, 0, context.sql);
   for (const handle of handles) handle.acquire();
   const job = start();
   if (job === null) {
@@ -82,6 +96,11 @@ export function runJob<T>(
       },
     });
   });
+}
+
+/** Native calls in flight on native threads, for diagnostics(). */
+export function jobsInFlight(): number {
+  return inFlight;
 }
 
 /** The pointer a job produced, or null. */
