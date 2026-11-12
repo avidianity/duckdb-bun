@@ -33,6 +33,37 @@ export function expectObject(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+export function expectArray(value: unknown): readonly unknown[] {
+  if (!Array.isArray(value)) throw new Error("An array was expected");
+  return value;
+}
+
+// --- N-API number coercions ------------------------------------------------------------
+// The official binding reads some numbers with node-addon-api's lossy accessors
+// rather than GetIntegerFromNumber; these reproduce what each accessor returns.
+
+/** Number::Int32Value: ToInt32, so fractions truncate, values wrap modulo 2^32, and NaN and infinities read as 0. */
+export function int32FromNumber(value: unknown): number {
+  return expectNumber(value) | 0;
+}
+
+/** Number::Uint32Value: ToUint32, so a negative index arrives as a large unsigned one. */
+export function uint32FromNumber(value: unknown): number {
+  return expectNumber(value) >>> 0;
+}
+
+const INT64_MAX = 2n ** 63n - 1n;
+const INT64_MIN = -(2n ** 63n);
+
+/** Number::Int64Value: truncates, saturates at the int64 bounds, and reads NaN and infinities as 0. */
+export function int64FromNumber(value: unknown): bigint {
+  const number = expectNumber(value);
+  if (!Number.isFinite(number)) return 0n;
+  if (number >= 2 ** 63) return INT64_MAX;
+  if (number <= -(2 ** 63)) return INT64_MIN;
+  return BigInt(Math.trunc(number));
+}
+
 // --- bounds -------------------------------------------------------------------------------
 
 export function throwIndexOutOfRange(index: number | bigint, count: number | bigint, what: string): never {
