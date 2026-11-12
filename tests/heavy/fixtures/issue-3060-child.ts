@@ -1,7 +1,10 @@
 // Child process for issue-3060.test.ts. Runs the duckdb/duckdb#26441 query through
 // one implementation of the @duckdb/node-api surface and prints the outcome as
 // one JSON line. Usage: bun issue-3060-child.ts <ours|official> <temp dir>
+import { assertRealOfficialBinding } from "../../official-binding.ts";
+
 const [which, tempDirectory] = process.argv.slice(2);
+if (which === "official") assertRealOfficialBinding();
 const api = which === "official" ? await import("@duckdb/node-api") : await import("../../../src/neo.ts");
 
 const SQL = `

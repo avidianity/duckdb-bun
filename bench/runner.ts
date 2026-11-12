@@ -4,6 +4,7 @@
 //
 //   bun bench/runner.ts --impl ours --scenario read-all --data <dir> --work <dir> --out <file>
 import { parseArgs } from "node:util";
+import { assertRealOfficialBinding } from "../tests/official-binding.ts";
 import { SCENARIOS, type ScenarioContext } from "./scenarios.ts";
 
 export const IMPLEMENTATIONS = ["official", "ours"] as const;
@@ -32,7 +33,10 @@ type Api = typeof import("@duckdb/node-api");
 const RSS_SAMPLE_MS = 10;
 
 async function loadApi(impl: Implementation): Promise<Api> {
-  if (impl === "official") return import("@duckdb/node-api");
+  if (impl === "official") {
+    assertRealOfficialBinding();
+    return import("@duckdb/node-api");
+  }
   // Ours re-exports the same vendored classes; the cast only bridges the two
   // declaration sites, which TypeScript treats as distinct class types.
   return (await import("../src/neo.ts")) as unknown as Api;

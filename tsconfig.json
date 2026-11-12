@@ -14,15 +14,7 @@
     "noEmit": true,
     "strict": true,
     "skipLibCheck": true,
-    "types": ["bun"],
-    "paths": {
-      // For type checking only: the vendored suites import `vitest`, which is not
-      // installed. At run time tests/preload.ts rewrites that import to the shim.
-      "vitest": ["./tests/vitest-shim.ts"],
-      // The vendored suites import the bindings by package name; tests/preload.ts
-      // points that import at src/bindings/ at run time.
-      "@duckdb/node-bindings": ["./src/bindings/index.ts"]
-    }
+    "types": ["bun"]
   },
   "include": ["src", "tests", "scripts", "examples", "bench", "vendor", "commitlint.config.ts"],
   // Upstream benchmarks, never run here: they need vitest's bench().

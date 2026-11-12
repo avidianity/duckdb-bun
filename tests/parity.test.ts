@@ -3,9 +3,11 @@
 // common shape, and assert they agree. This is how we verify parity with the live
 // version and catch regressions when bumping DuckDB. Skips if the live napi binary
 // can't load (e.g. an environment without the prebuilt @duckdb/node-bindings).
+
 import { beforeAll, describe, expect, test } from "bun:test";
 import { DuckDBInstance as OursInstance } from "../src/index.ts";
 import { DUCKDB_VERSION_TAG } from "../src/version.ts";
+import { assertRealOfficialBinding } from "./official-binding.ts";
 
 // Canonicalize a decoded value from EITHER binding into a comparable primitive.
 // Ours already returns natives (Date/number/bigint/string); the live binding
@@ -62,11 +64,9 @@ const QUERIES = [
 
 let live: typeof import("@duckdb/node-api") | null = null;
 beforeAll(async () => {
-  try {
-    live = await import("@duckdb/node-api");
-  } catch {
-    live = null;
-  }
+  // A missing or aliased official binding fails the run rather than skipping the comparison.
+  assertRealOfficialBinding();
+  live = await import("@duckdb/node-api");
 });
 
 describe("parity with @duckdb/node-api", () => {

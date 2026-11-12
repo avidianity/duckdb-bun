@@ -15,6 +15,10 @@ import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as officialApi from "@duckdb/node-api";
+import { assertRealOfficialBinding } from "../official-binding.ts";
+
+assertRealOfficialBinding();
+
 import * as oursApi from "../../src/neo.ts";
 
 export type Api = typeof officialApi;

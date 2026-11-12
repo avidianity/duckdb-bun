@@ -51,7 +51,7 @@
     "lint": "bun --bun biome check src tests scripts examples bench commitlint.config.ts",
     "lint:ci": "bun --bun biome ci src tests scripts examples bench commitlint.config.ts",
     "format": "bun --bun biome format --write src tests scripts examples bench commitlint.config.ts",
-    "typecheck": "bun check --no-script",
+    "typecheck": "bun check --no-script -p tsconfig.check.json",
     "check": "bun run lint && bun run typecheck",
     "gen:ffi": "bun run scripts/gen-ffi.ts",
     "vendor:api-spec": "bun run scripts/vendor-api-spec.ts",

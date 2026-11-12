@@ -7,6 +7,7 @@
 import { expect, test } from "bun:test";
 import { availableParallelism } from "node:os";
 import * as ours from "../../src/neo.ts";
+import { assertRealOfficialBinding } from "../official-binding.ts";
 
 const TICK_MS = 10;
 // Most gaps stay near the tick. A busy machine still preempts the JS thread now and then: the 3-vCPU
@@ -72,6 +73,7 @@ function describe(name: string, m: Awaited<ReturnType<typeof measure>>): string 
 test(
   `a 10 ms timer keeps firing while queries run: p99 gap under ${P99_GAP_MS} ms, none near the query`,
   async () => {
+    assertRealOfficialBinding();
     const official = (await import("@duckdb/node-api")) as unknown as Api;
     console.log(describe("official @duckdb/node-api", await measure(official)));
     const result = await measure(ours);

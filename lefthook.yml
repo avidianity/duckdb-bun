@@ -19,6 +19,7 @@ pre-commit:
       glob:
         - "**/*.ts"
         - "tsconfig.json"
+        - "tsconfig.check.json"
         - "package.json"
       run: bun run typecheck
 
