@@ -247,10 +247,13 @@ export function decimalFromObject(value: unknown): { width: number; scale: numbe
 
 /**
  * The big-endian magnitude bytes and sign of a BigInt, padded to whole 64-bit
- * words as GetBigNumFromBigInt does (zero has no words, so no bytes).
+ * words as GetBigNumFromBigInt does. Zero is one zero byte rather than the
+ * official binding's empty array: DuckDB's Bignum::FromByteArray throws a C++
+ * exception for an empty array, which aborts the process.
  */
 export function bignumFromBigInt(value: unknown): { bytes: Uint8Array; isNegative: boolean } {
   const big = expectBigInt(value);
+  if (big === 0n) return { bytes: new Uint8Array(1), isNegative: false };
   const isNegative = big < 0n;
   let magnitude = isNegative ? -big : big;
   let wordCount = 0;
@@ -263,13 +266,14 @@ export function bignumFromBigInt(value: unknown): { bytes: Uint8Array; isNegativ
   return { bytes, isNegative };
 }
 
-/** The BigInt for big-endian magnitude bytes, reading whole 64-bit words as MakeBigIntFromBigNum does. */
+/**
+ * The BigInt for big-endian magnitude bytes of any length. The official
+ * MakeBigIntFromBigNum reads only size / 8 whole words, so it returns a wrong
+ * value for every bignum whose byte count is not a multiple of 8, which is
+ * every bignum DuckDB produces itself (`1::BIGNUM` has one byte).
+ */
 export function bigIntFromBignum(bytes: Uint8Array, isNegative: boolean): bigint {
-  const used = bytes.length - (bytes.length % 8);
   let magnitude = 0n;
-  // MakeBigIntFromBigNum reverses all bytes, then reads size / 8 little-endian
-  // words, so a trailing partial word comes from the leading big-endian bytes.
-  const reversed = bytes.slice().reverse().subarray(0, used);
-  for (let i = reversed.length - 1; i >= 0; i--) magnitude = (magnitude << 8n) | BigInt(reversed[i]);
+  for (const byte of bytes) magnitude = (magnitude << 8n) | BigInt(byte);
   return isNegative ? -magnitude : magnitude;
 }
