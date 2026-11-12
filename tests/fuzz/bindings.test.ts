@@ -17,11 +17,13 @@
 // C++ exceptions: many libduckdb C API functions throw a C++ exception on bad
 // input, such as to_date() with month 0, to_timestamp() past the timestamp range,
 // and get_bignum() or get_blob() on a value that does not cast. Bun's N-API turns
-// the exception into "A native exception was thrown" for the official binding;
-// ours catches it in the shim (native/cpp/boundary.hpp) and throws DuckDB's
-// message, such as "Conversion Error: Date out of range: 2025-0-1". Where the
-// official binding reports a native exception, ours must throw an Error with a
-// DuckDB message, and both count as equal.
+// the exception into "A native exception was thrown" for the official binding on
+// macOS, and into an Error whose message is the exception's raw what(), DuckDB's
+// JSON, on Linux. Ours catches it in the shim (native/cpp/boundary.hpp) and throws
+// the message DuckDB builds from it, such as "Conversion Error: Date out of range:
+// 2025-0-1". Where the official binding reports the raw what(), ours must throw
+// exactly that message; where it reports a native exception, ours must throw an
+// Error with a DuckDB message. Both then count as equal.
 //
 // Allowed differences, from the runtimes rather than the code:
 // - Given null or undefined where it reads an object or a handle, the official
@@ -52,6 +54,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createRequire } from "node:module";
 import fc from "fast-check";
 import ours from "../../src/bindings/index.ts";
+import { exceptionMessage } from "../../src/bindings/runtime/exception.ts";
 import { assertRealOfficialBinding } from "../official-binding.ts";
 import { check, RUNS, trace } from "./config.ts";
 
@@ -592,9 +595,9 @@ function reconcile(sequence: Call[], official: Outcome[], ours: Outcome[]): void
     if (
       "error" in a &&
       "error" in b &&
-      a.error.message === NATIVE_EXCEPTION &&
       b.error.class === "Error" &&
-      DUCKDB_MESSAGE.test(b.error.message)
+      ((a.error.message === NATIVE_EXCEPTION && DUCKDB_MESSAGE.test(b.error.message)) ||
+        (a.error.message.startsWith('{"exception_type":') && b.error.message === exceptionMessage(a.error.message)))
     ) {
       official[i] = ours[i] = { error: { class: "allowed", message: "a C++ exception" } };
       tally.nativeExceptions += 1;
