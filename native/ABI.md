@@ -35,13 +35,16 @@ Through `bun:ffi` such an exception aborts the process, and Rust cannot catch on
 - The shim's Rust code calls libduckdb directly.
   Its jobs call entry points that catch exceptions themselves (`duckdb_query`, `duckdb_prepare`, `duckdb_fetch_chunk` and the others in "Jobs"), and the rest of it calls getters, setters and destroy functions.
 
-## Lifecycle and counters
+## Lifecycle
 
 | Export | Signature | Meaning |
 | --- | --- | --- |
 | `dbs_init` | `(on_complete: extern "C" fn(*mut Job), on_call: extern "C" fn(*mut Call), on_release: extern "C" fn(u64)) -> i32` | Registers the calling thread as a JS thread, a context, with three callbacks: `on_complete` and `on_release` are thread-safe JSCallbacks, `on_call` is the thread-safe dispatcher for function callbacks. Returns the context id, 1 to 4095. Returns -1 when a callback is null, -2 when the calling thread already has an open context, and -3 when 4095 contexts were registered. Each JS thread that loads the bindings, the main thread and every Worker, calls it once. |
 | `dbs_set_sync_call` | `(on_call_sync: extern "C" fn(*mut Call))` | The calling context's non-thread-safe dispatcher, used when DuckDB calls a function callback on that JS thread itself. Null clears it. A thread without a context changes nothing. |
-| `dbs_context_close` | `()` | Closes the calling thread's context before the JS thread goes away, as a Worker does on exit. Later completions, callbacks and releases for it are dropped, never called. A closed context id is never reused. |
+| `dbs_context_close` | `()` | Closes the calling thread's context before the JS thread stops running script, as the main thread does on "exit". Later completions, callbacks and releases for it are dropped, never called, and posted function callbacks still waiting are released (see "Closing a context"). The handles JavaScript owns stay as they are. A closed context id is never reused. |
+| `dbs_context_close_and_free` | `()` | Closes the calling thread's context as `dbs_context_close` does, interrupts its owned connections, and frees what it owns once no job of it runs. The cleanup hook calls it; it is exported for tests. |
+| `napi_register_module_v1` | `(env, exports) -> exports` | The Node-API entry point. A Worker loads the shim with `process.dlopen` after `dbs_init`; the shim adds an environment cleanup hook that runs `dbs_context_close_and_free` on that thread. `napi_add_env_cleanup_hook` is looked up with `dlsym(RTLD_DEFAULT, ...)`. |
+| `dbs_context_hooked` | `() -> bool` | Whether the calling thread's Node-API environment has the cleanup hook. |
 | `dbs_counters` | `() -> *const u64` | Pointer to the static counter block below, read by JavaScript through a view. |
 | `dbs_version` | `() -> *const c_char` | The shim's crate version, static. |
 
@@ -49,7 +52,52 @@ A context keeps each Worker's callbacks apart, as the official binding's per-env
 
 - A job completes to the context of the thread that started it.
 - JavaScript allocates every function, bind data, init data and state id as `context * 2^40 + local`, so ids stay exact as JS numbers. A function callback and an id release go to the context in bits 40 and up.
-- A post to a closed context is dropped. A dropped job is freed by the shim. A dropped function callback reports an error on `info`.
+- A post to a closed context is dropped. A dropped job is freed by the shim with its output. A dropped function callback reports an error on `info`.
+
+### Closing a context
+
+Every call into a JS thread is made with its context's lock held and only while the context is open, so once a close returns, no call into that thread runs or can start.
+A thread-safe `JSCallback` only posts the call and returns, so the lock is never held while JavaScript runs.
+Closing releases each function callback still waiting on that context; its DuckDB thread reports `duckdb-bun: the JS thread of this function exited before the callback ran` on `info`.
+
+A context counts the jobs it started until each completion is posted or dropped, and keeps the jobs posted to JavaScript until `dbs_job_free`.
+After `dbs_context_close_and_free`, once no job of the context runs, the shim frees, on the closing thread or on the thread of the last job:
+
+1. each posted job JavaScript did not free, and its `out0` unless JavaScript read it with `dbs_job_out0` or recorded it with `dbs_own`;
+2. every handle recorded with `dbs_own`, in this order: data chunk, vector, value, logical type, result, pending result, prepared statement, extracted statements, appender, catalog entry, catalog, client context, scalar function, table function, config, connection, database, instance cache.
+
+A job thread that frees a context's handles counts as a running native thread (counter 0) until it is done.
+The reasoning and Bun's order of a Worker's end are in `docs/adr/0008-a-worker-closes-its-context-in-an-n-api-cleanup-hook.md`.
+
+## Handle ownership
+
+| Export | Meaning |
+| --- | --- |
+| `dbs_own(kind: u32, ptr)` | Records that JavaScript owns `ptr`, a handle of `kind`, in the calling thread's context. Null and unknown kinds are ignored. |
+| `dbs_destroy(kind: u32, ptr)` | Frees `ptr` with the destroy function of `kind` and forgets it. In a thread with a context, only a pointer recorded with `dbs_own` and not yet destroyed is freed, so nothing is freed twice; in a thread without one, the pointer is freed directly. |
+
+| Kind | Handle | Destroy |
+| --- | --- | --- |
+| 1 | appender | `duckdb_appender_destroy` |
+| 2 | catalog | `duckdb_destroy_catalog` |
+| 3 | catalog entry | `duckdb_destroy_catalog_entry` |
+| 4 | client context | `duckdb_destroy_client_context` |
+| 5 | config | `duckdb_destroy_config` |
+| 6 | connection | `duckdb_disconnect` |
+| 7 | data chunk | `duckdb_destroy_data_chunk` |
+| 8 | database | `duckdb_close` |
+| 9 | extracted statements | `duckdb_destroy_extracted` |
+| 10 | instance cache | `duckdb_destroy_instance_cache` |
+| 11 | logical type | `duckdb_destroy_logical_type` |
+| 12 | pending result | `duckdb_destroy_pending` |
+| 13 | prepared statement | `duckdb_destroy_prepare` |
+| 14 | result (`duckdb_result *` from `duckdb_malloc`) | `duckdb_destroy_result`, then `duckdb_free` |
+| 15 | scalar function | `duckdb_destroy_scalar_function` |
+| 16 | table function | `duckdb_destroy_table_function` |
+| 17 | value | `duckdb_destroy_value` |
+| 18 | vector | `duckdb_destroy_vector` |
+
+## Counters
 
 Counter block, `u64` each, updated with atomics (relaxed is enough).
 A job thread counts its job as completed and itself as no longer running before it calls `on_complete`, so the counters are settled when JavaScript sees the completion.
@@ -97,8 +145,8 @@ Jobs record their start and end in the ring with the job's first input handle as
 | --- | --- |
 | `dbs_job_failed` | `(job) -> bool` |
 | `dbs_job_error` | `(job) -> *const c_char` (valid until `dbs_job_free`) |
-| `dbs_job_out0`, `dbs_job_out1` | `(job) -> u64` |
-| `dbs_job_free` | `(job)` |
+| `dbs_job_out0`, `dbs_job_out1` | `(job) -> u64`; reading `out0` hands it to JavaScript, so a closing context does not free it with the job |
+| `dbs_job_free` | `(job)`; frees the job, never its outputs |
 
 ## Function callbacks: scalar and table functions
 
@@ -127,7 +175,7 @@ JavaScript reports a thrown error through the C API's set-error functions on `in
 | `dbs_set_bind_data(info, kind: u32, data_id: u64)`, `dbs_get_bind_data(info, kind) -> u64` | Bind data as an id; the destroy callback posts `on_release(data_id)`. `kind` is the `Call` kind of the callback that received `info`, which picks the C API family and info type: set takes 1 (scalar bind) or 4 (table bind); get takes 2 or 3 (scalar init or main) or 5, 6 or 7 (table init, local init or main). Other kinds are ignored and read as 0. |
 | `dbs_set_init_data(info, data_id)`, `dbs_get_init_data(info) -> u64`, `dbs_get_local_init_data(info) -> u64` | Table function init data, the same way. |
 | `dbs_scalar_init_set_state(info, state_id)`, `dbs_scalar_get_state(info) -> u64` | Scalar function state, the same way. |
-| `dbs_call_done(call)` | Releases a blocked DuckDB thread. |
+| `dbs_call_done(call)` | Releases a blocked DuckDB thread. A call its closing context already released is ignored, and `call` is not read. |
 
 Ids are allocated by JavaScript and never 0; 0 means none.
 

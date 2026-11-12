@@ -7,14 +7,17 @@
 //! when it gives one, the official fallback message otherwise, and any partial
 //! handle destroyed before JavaScript can see it.
 
+use std::collections::HashMap;
 use std::ffi::{CStr, CString, c_char};
 use std::mem::size_of;
 use std::ptr::{null, null_mut};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use libduckdb_sys as ffi;
 
 use crate::counters;
 use crate::diag;
+use crate::handles;
 use crate::pool;
 use crate::runtime;
 
@@ -88,6 +91,46 @@ pub struct Job {
     error: Option<CString>,
     out0: u64,
     out1: u64,
+    /// The context the job completes to, set before it is posted.
+    context: u64,
+    /// The job's op code, which names the kind of handle in `out0`.
+    op: u32,
+    /// JavaScript read `out0` and owns it from then on.
+    taken: AtomicBool,
+}
+
+/// Records where a finished job goes and what its output is.
+///
+/// # Safety
+///
+/// `job` is live and the calling thread has exclusive access to it.
+pub(crate) unsafe fn set_origin(job: *mut Job, context: u64, op: u32) {
+    // SAFETY: the caller guarantees exclusive access.
+    unsafe {
+        (*job).context = context;
+        (*job).op = op;
+    }
+}
+
+/// Frees a job JavaScript will never free, and its output unless JavaScript
+/// took it or `owned` (the context's handles, freed by the caller) holds it.
+///
+/// # Safety
+///
+/// `job` is a live job from `spawn` that no other thread uses or frees.
+pub(crate) unsafe fn discard(job: *mut Job, owned: &HashMap<usize, u32>) {
+    // SAFETY: the caller hands over the job.
+    let job = unsafe { Box::from_raw(job) };
+    let out0 = usize::try_from(job.out0).unwrap_or(0);
+    if job.error.is_none()
+        && out0 != 0
+        && !job.taken.load(Ordering::Acquire)
+        && !owned.contains_key(&out0)
+        && let Some(kind) = handles::job_output_kind(job.op)
+    {
+        // SAFETY: a successful job's output that JavaScript never took.
+        unsafe { handles::destroy(kind, out0) };
+    }
 }
 
 type Outcome = Result<(u64, u64), CString>;
@@ -95,7 +138,7 @@ type Outcome = Result<(u64, u64), CString>;
 /// Runs `work` on a pool thread and returns the job, or null when the calling
 /// thread has no context or no thread could run it.
 fn spawn(op: Op, handle: u64, work: impl FnOnce() -> Outcome + Send + 'static) -> *mut Job {
-    let Some((context, _)) = runtime::current() else {
+    let Some(ticket) = runtime::JobTicket::acquire() else {
         return null_mut();
     };
     let job = Box::into_raw(Box::<Job>::default());
@@ -128,18 +171,14 @@ fn spawn(op: Op, handle: u64, work: impl FnOnce() -> Outcome + Send + 'static) -
         diag::record(op.code, state, handle, 0, &[]);
         counters::add(counters::JOBS_COMPLETED, 1);
         counters::thread_finished();
-        let posted = runtime::post_to(context, |context| (context.on_complete)(job));
-        if !posted {
-            // The JS thread that started the job is gone; nothing will read or free it.
-            // SAFETY: no JavaScript holds the job, so this thread owns it.
-            drop(unsafe { Box::from_raw(job) });
-        }
+        // Posts the job, or frees it and its output when the JS thread is gone.
+        ticket.complete(job, op.code);
     }));
     if submitted {
         job
     } else {
         counters::sub(counters::JOBS_STARTED, 1);
-        // SAFETY: the task was dropped unrun, so nothing else holds the job.
+        // SAFETY: the task, and its ticket, were dropped unrun, so nothing else holds the job.
         drop(unsafe { Box::from_raw(job) });
         null_mut()
     }
@@ -664,7 +703,10 @@ pub unsafe extern "C" fn dbs_job_error(job: *const Job) -> *const c_char {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dbs_job_out0(job: *const Job) -> u64 {
     // SAFETY: the caller passes a completed, live job.
-    unsafe { job.as_ref() }.map_or(0, |job| job.out0)
+    unsafe { job.as_ref() }.map_or(0, |job| {
+        job.taken.store(true, Ordering::Release);
+        job.out0
+    })
 }
 
 /// The job's second output.
@@ -678,7 +720,7 @@ pub unsafe extern "C" fn dbs_job_out1(job: *const Job) -> u64 {
     unsafe { job.as_ref() }.map_or(0, |job| job.out1)
 }
 
-/// Frees a completed job. Its outputs are not destroyed.
+/// Frees a completed job. Its outputs are not destroyed: JavaScript owns them.
 ///
 /// # Safety
 ///
@@ -687,6 +729,7 @@ pub unsafe extern "C" fn dbs_job_out1(job: *const Job) -> u64 {
 pub unsafe extern "C" fn dbs_job_free(job: *mut Job) {
     if !job.is_null() {
         // SAFETY: the caller hands over a live job allocated by `spawn`.
-        drop(unsafe { Box::from_raw(job) });
+        let job = unsafe { Box::from_raw(job) };
+        runtime::job_freed(job.context, std::ptr::from_ref(&*job).cast_mut());
     }
 }

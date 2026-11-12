@@ -186,6 +186,7 @@ Include the report when you open an issue.
   It runs every blocking call (open, connect, query, prepare, execute, fetch) on a native thread, so the JS thread never waits for a query.
   It installs the crash handler.
 - Every native pointer is owned by a handle object, freed by a `FinalizationRegistry` or by an explicit close, and never while a native call is using it.
+- A Worker that ends, including through `terminate()` in the middle of a query, interrupts its queries and frees its databases, connections and other handles; the main thread's databases keep working ([ADR 0008](docs/adr/0008-a-worker-closes-its-context-in-an-n-api-cleanup-hook.md)).
 
 The design decisions are recorded in [`docs/adr/`](docs/adr/).
 
@@ -217,10 +218,10 @@ Each CI run uploads its full tables as the `bench-<platform>` artifact.
 
 ## Known issues
 
-- Terminating a Bun `Worker` with `worker.terminate()` while that Worker runs a query crashes the process with SIGSEGV.
-  Bun runs no exit handler in a terminated Worker, so the binding never learns that the Worker's JavaScript is gone, and the finished query calls back into it.
-  The official `@duckdb/node-api` crashes on the same sequence under Bun 1.4.4, on the first termination.
-  Until a fix ships, let a Worker's queries settle, or close its connections, before terminating it.
+- In a `bun build --compile` binary, each Worker that loads the package copies libduckdb and the shim into a new temporary folder and loads its own copy.
+  Starting many Workers leaves those folders behind, and the main thread's `diagnostics()` does not count the Workers' native work.
+- A Worker terminated in the few microseconds between a query's native thread starting and DuckDB beginning that query does not interrupt it.
+  The query runs to its end before the Worker's handles are freed; nothing crashes or leaks.
 - One process can load the package in at most 4094 Workers over its whole life, because each JS thread takes a context id that is never reused (`native/ABI.md`, `dbs_init`).
   A Worker past that limit throws when it loads the package.
 

@@ -40,6 +40,7 @@ const NOT_INITIALIZED: &CStr =
 const NO_SYNC_DISPATCHER: &CStr =
     c"duckdb-bun: a function callback ran on the JS thread before dbs_set_sync_call";
 const NO_FUNCTION_ID: &CStr = c"duckdb-bun: the function has no callback id";
+const CLOSED: &CStr = c"duckdb-bun: the JS thread of this function exited before the callback ran";
 
 /// One function callback in flight, read by JavaScript (layout in `native/ABI.md`).
 #[repr(C)]
@@ -65,10 +66,45 @@ const _: () = {
     assert!(std::mem::offset_of!(Call, output) == 32);
 };
 
+/// Wakes the DuckDB thread blocked on one posted call.
 #[derive(Default)]
-struct Signal {
-    done: Mutex<bool>,
+pub(crate) struct Signal {
+    state: Mutex<u8>,
     cv: Condvar,
+}
+
+/// The call is waiting for JavaScript.
+const WAITING: u8 = 0;
+/// JavaScript ran the call (`dbs_call_done`).
+const DONE: u8 = 1;
+/// The call's context closed before JavaScript ran it.
+const CANCELLED: u8 = 2;
+
+impl Signal {
+    /// Wakes the waiting thread with `to`, unless the call already finished.
+    fn finish(&self, to: u8) {
+        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+        if *state == WAITING {
+            *state = to;
+        }
+        // Notify while holding the lock, as duckdb_thread_callback.h does.
+        self.cv.notify_one();
+        drop(state);
+    }
+
+    /// Releases the waiting thread because the call's JS thread is gone.
+    pub(crate) fn cancel(&self) {
+        self.finish(CANCELLED);
+    }
+
+    /// Blocks until the call is done or cancelled, and returns which.
+    fn wait(&self) -> u8 {
+        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+        while *state == WAITING {
+            state = self.cv.wait(state).unwrap_or_else(PoisonError::into_inner);
+        }
+        *state
+    }
 }
 
 /// A JavaScript object id owned by DuckDB. Dropping it posts `on_release(id)`.
@@ -217,16 +253,16 @@ fn dispatch(
 
     let signal = Arc::clone(&call.signal);
     let context_id = function_id >> runtime::CONTEXT_SHIFT;
-    if !runtime::post_to(context_id, |context| (context.on_call)(call_ptr)) {
+    if !runtime::post_call(context_id, call_ptr, &signal) {
         set_error(kind, info, NOT_INITIALIZED);
         return;
     }
     counters::add(counters::CALLS_POSTED, 1);
-    let mut done = signal.done.lock().unwrap_or_else(PoisonError::into_inner);
-    while !*done {
-        done = signal.cv.wait(done).unwrap_or_else(PoisonError::into_inner);
+    let outcome = signal.wait();
+    runtime::call_finished(context_id, call_ptr);
+    if outcome == CANCELLED {
+        set_error(kind, info, CLOSED);
     }
-    drop(done);
     counters::add(counters::CALLS_COMPLETED, 1);
 }
 
@@ -234,21 +270,20 @@ fn dispatch(
 ///
 /// # Safety
 ///
-/// `call` is a pointer passed to `on_call` whose `dbs_call_done` has not run yet.
+/// `call` is a pointer passed to `on_call`. A call already completed or released
+/// by its closing context is ignored.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dbs_call_done(call: *mut Call) {
     if call.is_null() {
         return;
     }
-    // SAFETY: the waiting thread keeps `call` alive until `done` is set below.
-    // Holding our own Arc keeps the mutex and condvar alive after it wakes and
-    // frees the call.
-    let signal = unsafe { Arc::clone(&(*call).signal) };
-    let mut done = signal.done.lock().unwrap_or_else(PoisonError::into_inner);
-    *done = true;
-    // Notify while holding the lock, as duckdb_thread_callback.h does.
-    signal.cv.notify_one();
-    drop(done);
+    // The context hands back the call's signal only while its DuckDB thread
+    // still waits, so `call` is never read here: once a closing context has
+    // released the thread, the call may be gone. Holding the Arc keeps the
+    // mutex and condvar alive after the thread wakes and frees the call.
+    if let Some(signal) = runtime::take_call(call) {
+        signal.finish(DONE);
+    }
 }
 
 unsafe extern "C" fn scalar_bind(info: ffi::duckdb_bind_info) {

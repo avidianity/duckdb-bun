@@ -7,8 +7,9 @@
 // each call onto the JS thread, so everything here runs on the JS thread, and a
 // job's completion always runs after the code that started the job has returned.
 import { CString, JSCallback, type Pointer, read } from "bun:ffi";
+import { isMainThread } from "node:worker_threads";
 import type { Handle } from "./handle.ts";
-import { shim } from "./native.ts";
+import { shim, shimPath } from "./native.ts";
 import { jobOp, record } from "./ring.ts";
 import { type CallContext, traced } from "./trace.ts";
 
@@ -196,5 +197,17 @@ const context = shim.dbs_init(onComplete.ptr, onCall.ptr, onReleaseCallback.ptr)
 if (context < 1) throw new Error(`duckdb-bun: the native shim refused this thread (dbs_init returned ${context})`);
 contextBase = context * CONTEXT_SCALE;
 shim.dbs_set_sync_call(onCallSync.ptr);
-// A Worker's callbacks die with it, so the shim drops whatever arrives for it afterwards.
-process.on("exit", () => shim.dbs_context_close());
+
+if (isMainThread) {
+  // After "exit" no more script runs, so the shim drops whatever arrives for this thread.
+  process.on("exit", () => shim.dbs_context_close());
+} else {
+  // A Worker stopped by terminate() emits no "exit" and runs no script, but Bun runs
+  // its Node-API cleanup hooks on the Worker's thread before its VM goes away. The
+  // shim, loaded as an addon here, adds one that closes this context and frees the
+  // handles it owns (docs/adr/0008-a-worker-closes-its-context-in-an-n-api-cleanup-hook.md).
+  process.dlopen({ exports: {} }, shimPath);
+  if (!shim.dbs_context_hooked()) {
+    throw new Error("duckdb-bun: the native shim could not add its Node-API cleanup hook in this Worker");
+  }
+}

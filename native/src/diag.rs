@@ -546,7 +546,7 @@ static PREVIOUS: PreviousActions = PreviousActions {
     saved: [const { AtomicBool::new(false) }; FATAL_SIGNALS.len()],
 };
 
-/// Registers the shim's 8-counter block (ABI.md "Lifecycle and counters") so the crash report
+/// Registers the shim's 8-counter block (ABI.md "Counters") so the crash report
 /// can print the native calls and threads in flight.
 pub fn set_counter_block(block: &'static [AtomicU64; 8]) {
     COUNTERS.store(block.as_ptr().cast_mut(), Ordering::Release);

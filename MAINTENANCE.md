@@ -154,6 +154,8 @@ Dependabot proposes weekly updates for GitHub Actions, the Bun dependencies, and
 It ignores `@duckdb/node-api` and `libduckdb-sys`, which move with a DuckDB upgrade, and `@types/bun`, which moves with the Bun pin.
 Bun is pinned in `package.json` (`engines`, `packageManager`, and `@types/bun`); every workflow reads it from `packageManager` through `setup-bun`'s `bun-version-file`.
 Change the Bun pin, the `oven/bun` image digest in `.github/workflows/ci.yml`, and `@types/bun` together.
+A Worker frees its native work in a Node-API cleanup hook that Bun runs before it destroys the Worker's VM (ADR 0008).
+That order is Bun's behavior, not a documented contract: on a Bun upgrade, re-read `VirtualMachine::on_exit` and `teardown` in Bun's source at the new tag, and run `bun run test:worker-terminate`.
 Rust is pinned in `rust-toolchain.toml`, and the `rust` image tag and digest in the workflows must match it.
 The `asan` job in `.github/workflows/ci.yml` alone uses a dated nightly Rust, `NIGHTLY`, for `-Zsanitizer=address`; move it to a newer date when it stops building, independently of the stable pin.
 Pin each image by the digest of its multi-platform index, which `docker buildx imagetools inspect <image>:<tag>` prints first, not by one platform's manifest.

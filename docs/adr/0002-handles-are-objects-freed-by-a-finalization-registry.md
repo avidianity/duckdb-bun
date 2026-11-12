@@ -21,3 +21,4 @@ A native thread never reads memory the JS heap owns: the shim copies strings, an
 
 Handles cost one object and one registry entry each.
 `diagnostics()` can count handles alive per type, which makes a leak visible.
+The shim also records each owned handle for its JS thread, so a Worker that ends without running script still frees them (ADR 0008).

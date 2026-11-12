@@ -18,7 +18,7 @@ Scalar and table function callbacks that DuckDB calls on its own threads are pos
 That removes the `threads=1` pin the imported binding needed for scalar functions.
 Each JS thread that loads the bindings, the main thread and every Worker, registers its own callbacks with the shim as a context.
 A call completes to the context that started it, and a function callback goes to the context encoded in its id, as the official binding's per-environment thread-safe functions do.
-A Worker closes its context when it exits, and the shim drops anything posted to it afterwards.
+A Worker closes its context when it ends, including through `terminate()`, and the shim drops anything posted to it afterwards (ADR 0008).
 
 ## Rejected options
 
