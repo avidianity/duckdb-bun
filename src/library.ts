@@ -31,28 +31,29 @@ interface PlatformPackage {
   shimPath: string;
 }
 
-const PLATFORM_PACKAGES: Record<string, string> = {
-  "linux-x64": "@avidian/duckdb-bun-linux-x64",
-  "darwin-arm64": "@avidian/duckdb-bun-darwin-arm64",
-};
+const SUPPORTED = "the supported platforms are linux-x64 (glibc) and darwin-arm64";
 
-function platformPackage(): PlatformPackage {
-  const key = `${process.platform}-${process.arch}`;
-  const name = PLATFORM_PACKAGES[key];
-  if (!name) {
-    throw new Error(
-      `duckdb-bun: no native package for ${key}; the supported platforms are linux-x64 and darwin-arm64.`,
-    );
-  }
+function load(name: string, require: () => unknown): PlatformPackage {
   try {
-    // One literal require per platform, so `bun build --compile` embeds it.
-    if (key === "linux-x64") return require("@avidian/duckdb-bun-linux-x64") as PlatformPackage;
-    return require("@avidian/duckdb-bun-darwin-arm64") as PlatformPackage;
+    return require() as PlatformPackage;
   } catch (cause) {
     throw new Error(`duckdb-bun: the optional package ${name} is not installed. Reinstall without --no-optional.`, {
       cause,
     });
   }
+}
+
+function platformPackage(): PlatformPackage {
+  // Each test reads process.platform and process.arch directly: `bun build --compile`
+  // folds them to constants, so it embeds the target's package and skips the others,
+  // whose native files are absent on this machine.
+  if (process.platform === "linux" && process.arch === "x64") {
+    return load("@avidian/duckdb-bun-linux-x64", () => require("@avidian/duckdb-bun-linux-x64"));
+  }
+  if (process.platform === "darwin" && process.arch === "arm64") {
+    return load("@avidian/duckdb-bun-darwin-arm64", () => require("@avidian/duckdb-bun-darwin-arm64"));
+  }
+  throw new Error(`duckdb-bun: no native package for ${process.platform}-${process.arch}; ${SUPPORTED}.`);
 }
 
 function copyTo(dir: string, path: string, name = basename(path)): string {
@@ -92,25 +93,7 @@ export interface LegacyNativePaths {
 }
 
 async function legacyPlatformLibrary(): Promise<string> {
-  const override = process.env.DUCKDB_BUN_LIBRARY_PATH;
-  if (override) return override;
-  const key = `${process.platform}-${process.arch}`;
-  const name = PLATFORM_PACKAGES[key];
-  if (!name) {
-    throw new Error(
-      `duckdb-bun: no libduckdb package for ${key}. Set DUCKDB_BUN_LIBRARY_PATH to a libduckdb of the same DuckDB version.`,
-    );
-  }
-  try {
-    // One literal import per platform so the bundler can follow it.
-    if (key === "linux-x64") return (await import("@avidian/duckdb-bun-linux-x64")).default;
-    return (await import("@avidian/duckdb-bun-darwin-arm64")).default;
-  } catch (cause) {
-    throw new Error(
-      `duckdb-bun: the optional package ${name} is not installed. Reinstall without --no-optional, or set DUCKDB_BUN_LIBRARY_PATH.`,
-      { cause },
-    );
-  }
+  return process.env.DUCKDB_BUN_LIBRARY_PATH || platformPackage().default;
 }
 
 let legacyCached: LegacyNativePaths | undefined;

@@ -1,9 +1,10 @@
-// The headline proof: `bun build --compile` embeds libduckdb (+ the cc shim
-// source & header) so the standalone binary queries DuckDB with nothing on disk.
+// The headline proof: `bun build --compile` embeds libduckdb and the native shim,
+// so the standalone binary queries DuckDB with nothing else on disk.
 import { expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DUCKDB_VERSION_TAG } from "../../src/version.ts";
 
 const repoRoot = new URL("../../", import.meta.url).pathname;
 const entry = join(repoRoot, "examples/compile-entry.ts");
@@ -22,7 +23,15 @@ test(
       const run = await Bun.$`${bin}`.cwd(dir).env({ PATH: "/usr/bin:/bin" }).quiet().nothrow();
       expect(run.exitCode).toBe(0);
       const out = JSON.parse(run.stdout.toString().trim());
-      expect(out).toEqual({ version: "v1.5.2", v: "ok", n: 42, count: 3000 });
+      expect(out).toMatchObject({
+        version: DUCKDB_VERSION_TAG,
+        v: "ok",
+        n: "42",
+        count: "3000",
+        crashHandler: "installed",
+      });
+      // Both libraries were copied out of the executable, never loaded from the repository.
+      for (const path of out.paths) expect(path.startsWith(repoRoot)).toBe(false);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

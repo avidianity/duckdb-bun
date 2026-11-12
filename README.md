@@ -31,7 +31,7 @@ The package depends on one optional package per platform, which ships libduckdb 
 
 Bun installs only the one that matches the host.
 Do not install with `--no-optional`.
-On another platform, set `DUCKDB_BUN_LIBRARY_PATH` (see [Environment flags](#environment-flags)).
+Other platforms are not supported yet, because the native shim is built per platform.
 
 ## Usage
 
