@@ -47,6 +47,7 @@ Every release is a stable version, so a range such as `^1.0.0` takes every compa
 | `@avidian/duckdb-bun` | DuckDB | `@duckdb/node-api` it matches |
 | --- | --- | --- |
 | 1.0.0 | 2.0.0 | 2.0.0-r.1 |
+| 1.0.1 | 2.0.0 | 2.0.0-r.1 |
 
 At run time, `DUCKDB_VERSION` holds the bundled DuckDB version, and `diagnostics().versions` holds all of them:
 
