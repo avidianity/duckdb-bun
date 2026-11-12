@@ -219,3 +219,13 @@ jobs:
             --workdir /app \
             "$BUN_IMAGE" \
             sh -euc 'bun install && bun smoke.ts'
+
+      # The same reproduction as the test job, in the production image, where a downstream crash was reported.
+      # It prints each package's exit code and its error or signal.
+      - name: Issue 3060 reproduction in the production image
+        run: |
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/work" \
+            --workdir /work \
+            "$BUN_IMAGE" \
+            bun test tests/heavy/issue-3060.test.ts
