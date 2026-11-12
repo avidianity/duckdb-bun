@@ -160,7 +160,7 @@ jobs:
       - name: Remaining tests
         run: bun run test:unit
 
-      # ABBA against @duckdb/node-api on this runner; fails when ours is slower or heavier than bench/gate.ts allows.
+      # Paired runs against @duckdb/node-api on this runner; fails when ours is slower or heavier than bench/gate.ts allows.
       - name: Bench gate against @duckdb/node-api
         run: bun run bench --gate
 

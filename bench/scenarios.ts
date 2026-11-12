@@ -25,9 +25,12 @@ export interface MetricSpec {
 export interface Scenario {
   name: string;
   title: string;
-  /** Measured runs; the reported wall time is their median. */
-  runs: number;
-  /** Run once unmeasured before the measured runs. */
+  /**
+   * Rounds of official, ours, ours, official, one child with one measured run each, so each
+   * implementation gets twice this many runs and the gate twice this many pairs (bench/gate.ts).
+   */
+  rounds: number;
+  /** Run once unmeasured in each child before its measured run. */
   warmup: boolean;
   metrics: MetricSpec[];
   setup?(ctx: ScenarioContext): Promise<void>;
@@ -79,7 +82,7 @@ function ingest(name: string, title: string, source: (ctx: ScenarioContext) => s
   return {
     name,
     title,
-    runs: 5,
+    rounds: 5,
     warmup: true,
     metrics: [],
     async run(ctx) {
@@ -106,7 +109,7 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "parquet-write",
     title: "Parquet write (COPY TO)",
-    runs: 5,
+    rounds: 5,
     warmup: true,
     metrics: [],
     async setup(ctx) {
@@ -124,7 +127,7 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "read-all",
     title: "Query and read all (runAndReadAll + getRowObjects)",
-    runs: 5,
+    rounds: 5,
     warmup: true,
     metrics: [
       { key: "queryMs", label: "runAndReadAll (ms)", aggregate: "median" },
@@ -146,7 +149,7 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "prepared",
     title: `Prepared statement (prepare once, bind and run ${PREPARED_ITERATIONS} times)`,
-    runs: 5,
+    rounds: 5,
     warmup: true,
     metrics: [{ key: "perCallUs", label: "Per call (us)", aggregate: "median" }],
     async setup(ctx) {
@@ -176,7 +179,8 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "event-loop-lag",
     title: `Event-loop lag during a long query (${LAG_INTERVAL_MS} ms interval)`,
-    runs: 3,
+    // 4 rounds give 8 pairs, the fewest whose signed-rank test can reach p < 0.01 (1/256).
+    rounds: 4,
     warmup: false,
     metrics: [
       { key: "maxGapMs", label: "Max gap (ms)", aggregate: "max" },

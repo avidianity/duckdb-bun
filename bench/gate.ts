@@ -2,10 +2,11 @@
 // `maxMemoryPct` more peak RSS per run than the official package, on every scenario.
 //
 // A CI runner is noisy, and on the macOS runner the runs of one scenario spread by up to 60%, so the
-// gate does not compare two medians against a fixed limit. It fails only when the runs show, at 99%
-// confidence, that ours is beyond the limit: a one-sided Mann-Whitney U test of ours against official
-// scaled up by the limit. With low noise a small excess fails; with high noise only a large one does.
-// bench/README.md explains.
+// gate does not compare two medians against a fixed limit. The bench runs the packages in pairs of
+// children seconds apart (bench/main.ts), and the gate fails only when the pairs show, at 99%
+// confidence, that ours is beyond the limit: a one-sided Wilcoxon signed-rank test of each pair's
+// log ratio against the limit's. A slow spell on the runner slows both halves of a pair, so it moves
+// a pair's ratio far less than it moves either run. bench/README.md explains.
 
 export interface GateLimits {
   /** Largest allowed slowdown, in percent. */
@@ -36,9 +37,9 @@ export const DEFAULT_LIMITS: GateLimits = {
 
 /** What the gate reads from one implementation's runs of one scenario. */
 export interface GateInput {
-  /** Wall time of each measured run, in milliseconds. */
+  /** Wall time of each measured run, in milliseconds; run k of each implementation is pair k. */
   runsMs: number[];
-  /** Peak RSS of each measured run, in MiB. */
+  /** Peak RSS of each measured run, in MiB, in the same order. */
   runPeaksMiB: number[];
   metrics: Record<string, number>;
   error?: string;
@@ -46,11 +47,13 @@ export interface GateInput {
 
 export interface Verdict {
   scenario: string;
-  /** Ours over official median run time, minus 1, in percent; positive is slower. */
+  /** Pairs of runs the test compared. */
+  pairs?: number;
+  /** The median over pairs of ours over official run time, minus 1, in percent; positive is slower. */
   slowerPct?: number;
   /** One-sided p-value that ours is more than the limit slower. */
   slowerP?: number;
-  /** Ours over official median run peak RSS, minus 1, in percent; positive is more memory. */
+  /** The median over pairs of ours over official run peak RSS, minus 1, in percent; positive is more memory. */
   memoryPct?: number;
   /** One-sided p-value that ours uses more than the limit more memory. */
   memoryP?: number;
@@ -63,45 +66,51 @@ export function median(values: number[]): number {
   return sorted.length % 2 === 1 ? (sorted[mid] ?? 0) : ((sorted[mid - 1] ?? 0) + (sorted[mid] ?? 0)) / 2;
 }
 
-function pct(ours: number, official: number): number {
-  return (ours / official - 1) * 100;
-}
-
-/** The standard normal upper tail, 1 - Phi(z), by Abramowitz and Stegun 7.1.26 (error below 1.5e-7). */
-function upperTail(z: number): number {
-  const x = Math.abs(z) / Math.SQRT2;
-  const t = 1 / (1 + 0.3275911 * x);
-  const poly = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
-  const erfc = poly * Math.exp(-x * x);
-  return z >= 0 ? erfc / 2 : 1 - erfc / 2;
-}
-
 /**
- * One-sided Mann-Whitney U test: the p-value for "values in `a` tend to be larger than values in `b`",
- * by the normal approximation with tie and continuity corrections.
+ * One-sided Wilcoxon signed-rank test: the exact p-value for "the differences in `d` tend to be above
+ * zero". Zero differences are dropped and tied magnitudes get their average rank, as usual; the null
+ * distribution is counted over every assignment of signs to those ranks.
  */
-export function mannWhitneyGreater(a: number[], b: number[]): number {
-  const n1 = a.length;
-  const n2 = b.length;
-  if (n1 === 0 || n2 === 0) return 1;
-  let u = 0;
-  for (const x of a) for (const y of b) u += x > y ? 1 : x === y ? 0.5 : 0;
-  const counts = new Map<number, number>();
-  for (const value of [...a, ...b]) counts.set(value, (counts.get(value) ?? 0) + 1);
-  const n = n1 + n2;
-  let ties = 0;
-  for (const t of counts.values()) ties += t ** 3 - t;
-  const variance = ((n1 * n2) / 12) * (n + 1 - ties / (n * (n - 1)));
-  if (variance <= 0) return u > (n1 * n2) / 2 ? 0 : 1;
-  return upperTail((u - (n1 * n2) / 2 - 0.5) / Math.sqrt(variance));
+export function signedRankGreater(d: number[]): number {
+  const nonzero = d.filter((value) => value !== 0);
+  const n = nonzero.length;
+  if (n === 0) return 1;
+  const order = nonzero.map((value, index) => ({ size: Math.abs(value), index })).sort((a, b) => a.size - b.size);
+  // Twice the average rank, so ranks of ties stay integers.
+  const doubled = new Array<number>(n).fill(0);
+  for (let i = 0; i < n; ) {
+    let j = i;
+    while (j + 1 < n && order[j + 1]?.size === order[i]?.size) j++;
+    for (let k = i; k <= j; k++) doubled[order[k]?.index ?? 0] = i + j + 2;
+    i = j + 1;
+  }
+  let observed = 0;
+  nonzero.forEach((value, index) => {
+    if (value > 0) observed += doubled[index] ?? 0;
+  });
+  // ways[s]: sign assignments whose positive ranks sum to s (doubled).
+  const total = doubled.reduce((sum, rank) => sum + rank, 0);
+  let ways = new Array<number>(total + 1).fill(0);
+  ways[0] = 1;
+  for (const rank of doubled) {
+    const next = [...ways];
+    for (let sum = rank; sum <= total; sum++) next[sum] = (next[sum] ?? 0) + (ways[sum - rank] ?? 0);
+    ways = next;
+  }
+  let atLeast = 0;
+  for (let sum = observed; sum <= total; sum++) atLeast += ways[sum] ?? 0;
+  return atLeast / 2 ** n;
 }
 
-/** The p-value that `ours` is more than `limitPct` above `official`. */
+/** The p-value that ours is more than `limitPct` above official, over pairs of runs. */
 function beyondLimit(ours: number[], official: number[], limitPct: number): number {
-  return mannWhitneyGreater(
-    ours,
-    official.map((value) => value * (1 + limitPct / 100)),
-  );
+  const limit = Math.log(1 + limitPct / 100);
+  return signedRankGreater(ours.map((value, k) => Math.log(value / (official[k] ?? Number.NaN)) - limit));
+}
+
+/** The median over pairs of ours over official, minus 1, in percent. */
+function pairedPct(ours: number[], official: number[]): number {
+  return (median(ours.map((value, k) => value / (official[k] ?? Number.NaN))) - 1) * 100;
 }
 
 export function judge(scenario: string, official: GateInput, ours: GateInput, limits: GateLimits): Verdict {
@@ -113,9 +122,17 @@ export function judge(scenario: string, official: GateInput, ours: GateInput, li
     return verdict;
   }
 
+  if (official.runsMs.length !== ours.runsMs.length || official.runPeaksMiB.length !== ours.runPeaksMiB.length) {
+    verdict.failures.push(
+      `unpaired runs: ${ours.runsMs.length} of ours and ${official.runsMs.length} of official; run k of each must be pair k`,
+    );
+    return verdict;
+  }
+
+  verdict.pairs = ours.runsMs.length;
   const oursMs = median(ours.runsMs);
   const officialMs = median(official.runsMs);
-  verdict.slowerPct = pct(oursMs, officialMs);
+  verdict.slowerPct = pairedPct(ours.runsMs, official.runsMs);
   verdict.slowerP = beyondLimit(ours.runsMs, official.runsMs, limits.maxSlowerPct);
   if (verdict.slowerP < limits.alpha && oursMs - officialMs > limits.timeFloorMs) {
     verdict.failures.push(
@@ -126,7 +143,7 @@ export function judge(scenario: string, official: GateInput, ours: GateInput, li
   if (official.runPeaksMiB.length > 0 && ours.runPeaksMiB.length > 0) {
     const oursMiB = median(ours.runPeaksMiB);
     const officialMiB = median(official.runPeaksMiB);
-    verdict.memoryPct = pct(oursMiB, officialMiB);
+    verdict.memoryPct = pairedPct(ours.runPeaksMiB, official.runPeaksMiB);
     verdict.memoryP = beyondLimit(ours.runPeaksMiB, official.runPeaksMiB, limits.maxMemoryPct);
     if (verdict.memoryP < limits.alpha && oursMiB - officialMiB > limits.memoryFloorMiB) {
       verdict.failures.push(
@@ -162,11 +179,11 @@ export function gateTable(verdicts: Verdict[], limits: GateLimits): string {
   const lines = [
     `### Gate: fails when ours is more than ${limits.maxSlowerPct}% slower or ${limits.maxMemoryPct}% heavier than official at p < ${limits.alpha}`,
     "",
-    "| Scenario | Median time vs official | p (slower than limit) | Median run peak RSS vs official | p (heavier than limit) | Result |",
-    "| --- | --- | --- | --- | --- | --- |",
+    "| Scenario | Pairs | Time vs official, median pair | p (slower than limit) | Run peak RSS vs official, median pair | p (heavier than limit) | Result |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
     ...verdicts.map(
       (v) =>
-        `| ${v.scenario} | ${signed(v.slowerPct)} | ${probability(v.slowerP)} | ${signed(v.memoryPct)} | ${probability(v.memoryP)} | ${
+        `| ${v.scenario} | ${v.pairs ?? "-"} | ${signed(v.slowerPct)} | ${probability(v.slowerP)} | ${signed(v.memoryPct)} | ${probability(v.memoryP)} | ${
           v.failures.length === 0 ? "pass" : `FAIL: ${v.failures.join("; ").replaceAll("|", "\\|")}`
         } |`,
     ),

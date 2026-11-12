@@ -1,8 +1,9 @@
-// The bench release gate (bench/gate.ts): the significance test, the floors and the event-loop gap.
-// The run lists marked "CI" are real runs from GitHub-hosted runners on 2026-11-12.
+// The bench release gate (bench/gate.ts): the paired significance test, the floors and the event-loop gap.
 import { expect, test } from "bun:test";
-import { DEFAULT_LIMITS, type GateInput, judge, mannWhitneyGreater } from "../bench/gate.ts";
+import { DEFAULT_LIMITS, type GateInput, judge, signedRankGreater } from "../bench/gate.ts";
+import { SCENARIOS } from "../bench/scenarios.ts";
 
+/** Runs in pair order: run k of official and run k of ours ran seconds apart. */
 function input(runsMs: number[], runPeaksMiB: number[] = runsMs.map(() => 500)): GateInput {
   return { runsMs, runPeaksMiB, metrics: {} };
 }
@@ -10,15 +11,21 @@ function input(runsMs: number[], runPeaksMiB: number[] = runsMs.map(() => 500)):
 const steady = [100, 101, 99, 100, 102, 98, 100, 101, 99, 100];
 const times = (factor: number) => steady.map((value) => value * factor);
 
-test("the Mann-Whitney test separates shifted samples and not equal ones", () => {
-  expect(mannWhitneyGreater(times(1.5), steady)).toBeLessThan(0.001);
-  expect(mannWhitneyGreater(steady, steady)).toBeGreaterThan(0.4);
-  expect(mannWhitneyGreater(steady, times(1.5))).toBeGreaterThan(0.999);
+test("the signed-rank test gives exact p-values, with zeros dropped and tied ranks averaged", () => {
+  expect(signedRankGreater([1, 2, 3])).toBe(1 / 8);
+  // Ranks 1, 2, 3 with positive ranks 1 and 3: 3 of the 8 sign assignments reach a sum of 4.
+  expect(signedRankGreater([1, -2, 3])).toBe(3 / 8);
+  expect(signedRankGreater([-1, -2, -3])).toBe(1);
+  expect(signedRankGreater([1, 1, 1])).toBe(1 / 8);
+  expect(signedRankGreater([0, 1])).toBe(1 / 2);
+  expect(signedRankGreater([0, 0])).toBe(1);
+  expect(signedRankGreater(Array.from({ length: 10 }, (_, i) => i + 1))).toBe(1 / 1024);
 });
 
 test("within the limit passes, and 20% slower with low noise fails", () => {
   expect(judge("s", input(steady), input(times(1.05)), DEFAULT_LIMITS).failures).toEqual([]);
   const verdict = judge("s", input(steady), input(times(1.2)), DEFAULT_LIMITS);
+  expect(verdict.pairs).toBe(10);
   expect(verdict.failures).toHaveLength(1);
   expect(verdict.failures[0]).toStartWith("20.0% slower (120.0 vs 100.0 ms), more than 10% at p = ");
 });
@@ -38,16 +45,36 @@ test("20% more peak RSS per run with low noise fails", () => {
   expect(verdict.failures[0]).toStartWith("20.0% more peak RSS per run (600 vs 500 MiB), more than 10% at p = ");
 });
 
-test("CI Linux parquet-write: runs in two speed modes for both packages pass", () => {
-  const official = [116, 116, 138, 113, 119, 111, 141, 112, 138, 138];
-  const ours = [145, 133, 138, 111, 139, 120, 137, 139, 143, 139];
-  expect(judge("parquet-write", input(official), input(ours), DEFAULT_LIMITS).failures).toEqual([]);
+test("a slow spell that slows both runs of a pair passes", () => {
+  // The macOS runner on 2026-11-12: runs of one package went from about 140 ms to 300 to 520 ms for a few
+  // seconds. Paired children see the spell together.
+  const spell = [1, 1, 1, 2.1, 3.7, 3.4, 2.4, 1, 1, 1];
+  const official = spell.map((factor, k) => (steady[k] ?? 100) * factor);
+  const ours = spell.map((factor, k) => (steady[(k + 3) % 10] ?? 100) * factor * 1.04);
+  expect(judge("s", input(official), input(ours), DEFAULT_LIMITS).failures).toEqual([]);
 });
 
-test("CI macOS ingest-csv: a 17% median gap inside a 144 to 265 ms spread passes", () => {
-  const official = [186, 200, 201, 179, 199, 265, 177, 180, 196, 144];
-  const ours = [248, 222, 238, 226, 265, 220, 239, 169, 183, 202];
-  expect(judge("ingest-csv", input(official), input(ours), DEFAULT_LIMITS).failures).toEqual([]);
+test("a consistent excess fails even inside a slow spell", () => {
+  const spell = [1, 1, 1, 2.1, 3.7, 3.4, 2.4, 1, 1, 1];
+  const official = spell.map((factor, k) => (steady[k] ?? 100) * factor);
+  const ours = official.map((value) => value * 1.3);
+  expect(judge("s", input(official), input(ours), DEFAULT_LIMITS).failures[0]).toStartWith("30.0% slower");
+});
+
+test("runs that do not pair up fail", () => {
+  expect(judge("s", input(steady), input(steady.slice(1)), DEFAULT_LIMITS).failures).toEqual([
+    "unpaired runs: 9 of ours and 10 of official; run k of each must be pair k",
+  ]);
+});
+
+test("every scenario has enough pairs for its signed-rank test to reach the significance level", () => {
+  for (const scenario of SCENARIOS) {
+    const pairs = 2 * scenario.rounds;
+    expect({ scenario: scenario.name, reachable: 0.5 ** pairs < DEFAULT_LIMITS.alpha }).toEqual({
+      scenario: scenario.name,
+      reachable: true,
+    });
+  }
 });
 
 test("differences under the floors never fail", () => {

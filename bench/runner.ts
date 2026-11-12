@@ -2,7 +2,7 @@
 // `ChildResult` as JSON to `--out`. The parent (`bench/main.ts`) starts one child per
 // implementation and scenario, so RSS numbers never mix between them.
 //
-//   bun bench/runner.ts --impl ours --scenario read-all --data <dir> --work <dir> --out <file>
+//   bun bench/runner.ts --impl ours --scenario read-all --data <dir> --work <dir> --out <file> [--runs 1]
 import { parseArgs } from "node:util";
 import { assertRealOfficialBinding } from "../tests/official-binding.ts";
 import { SCENARIOS, type ScenarioContext } from "./scenarios.ts";
@@ -102,7 +102,7 @@ async function main(): Promise<void> {
         rows: Number(values.rows ?? 1_000_000),
         lagRows: Number(values["lag-rows"] ?? 600_000_000),
       };
-      const runs = Number(values.runs ?? scenario.runs);
+      const runs = Number(values.runs ?? 1);
       await scenario.setup?.(ctx);
       if (scenario.warmup) await scenario.run(ctx, -1);
       for (let i = 0; i < runs; i++) {

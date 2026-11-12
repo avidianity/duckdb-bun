@@ -2,7 +2,7 @@
 // `@duckdb/node-api` and against ours, each in its own child process, prints one
 // Markdown table per scenario and writes the results to `bench/results/`, as JSON and Markdown.
 //
-//   bun run bench [--scenario read-all,prepared] [--impl ours] [--runs 3] [--rows 1000000] [--lag-rows 600000000]
+//   bun run bench [--scenario read-all,prepared] [--impl ours] [--rounds 3] [--rows 1000000] [--lag-rows 600000000]
 //                 [--gate] [--max-slower 10] [--max-memory 10]
 //
 // --gate exits 1 when ours is slower or uses more memory than the limits allow on any scenario (bench/gate.ts).
@@ -54,15 +54,15 @@ async function runChild(
   impl: Implementation,
   scenario: Scenario,
   dirs: { data: string; root: string },
-  options: { runs?: string; rows: string; lagRows: string },
+  options: { rows: string; lagRows: string },
+  index: number,
 ): Promise<ChildResult> {
-  const work = join(dirs.root, `work-${impl}-${scenario.name}`);
-  const out = join(dirs.root, `result-${impl}-${scenario.name}.json`);
+  const work = join(dirs.root, `work-${impl}-${scenario.name}-${index}`);
+  const out = join(dirs.root, `result-${impl}-${scenario.name}-${index}.json`);
   await mkdir(work, { recursive: true });
   const args = [
     ...["--impl", impl, "--scenario", scenario.name, "--data", dirs.data, "--work", work, "--out", out],
-    ...["--rows", options.rows, "--lag-rows", options.lagRows],
-    ...(options.runs ? ["--runs", options.runs] : []),
+    ...["--rows", options.rows, "--lag-rows", options.lagRows, "--runs", "1"],
   ];
   const child = Bun.spawn([process.execPath, RUNNER, ...args], {
     stdout: "inherit",
@@ -205,7 +205,7 @@ async function main(): Promise<void> {
     options: {
       scenario: { type: "string" },
       impl: { type: "string" },
-      runs: { type: "string" },
+      rounds: { type: "string" },
       rows: { type: "string", default: "1000000" },
       "lag-rows": { type: "string", default: "600000000" },
       gate: { type: "boolean", default: false },
@@ -240,13 +240,22 @@ async function main(): Promise<void> {
     tables.push(heading);
     console.log(heading);
     for (const scenario of SCENARIOS.filter((s) => scenarioNames.includes(s.name))) {
-      // ABBA order: each implementation runs once early and once late, so a machine that warms up or
-      // throttles during a scenario slows both alike. A fixed order made the second one look slower.
+      // Rounds of official, ours, ours, official, one child with one measured run each. Each adjacent
+      // official and ours child is a pair that ran seconds apart, so a slow spell on the runner slows
+      // both halves of a pair alike, and the k-th run of each implementation belong to pair k
+      // (bench/gate.ts). Two children per implementation in plain ABBA order put both ours runs
+      // back to back, and one slow spell made ours look 28% slower on the macOS runner.
+      const rounds = Number(values.rounds ?? scenario.rounds);
+      if (!Number.isInteger(rounds) || rounds < 1)
+        throw new Error(`--rounds must be a positive integer, got ${values.rounds}`);
       const raws = new Map<Implementation, ChildResult[]>(impls.map((impl) => [impl, []]));
-      for (const impl of [...impls, ...[...impls].reverse()]) {
-        console.error(`Running ${scenario.name} on ${impl} ...`);
-        const raw = await runChild(impl, scenario, { data, root }, { runs: values.runs, rows, lagRows });
-        raws.get(impl)?.push(raw);
+      let child = 0;
+      for (let round = 1; round <= rounds; round++) {
+        for (const impl of [...impls, ...[...impls].reverse()]) {
+          console.error(`Running ${scenario.name} on ${impl}, round ${round} of ${rounds} ...`);
+          const raw = await runChild(impl, scenario, { data, root }, { rows, lagRows }, child++);
+          raws.get(impl)?.push(raw);
+        }
       }
       const summaries = impls.map((impl) => summarize(scenario, merge(raws.get(impl) ?? [])));
       results[scenario.name] = summaries;
@@ -278,7 +287,11 @@ async function main(): Promise<void> {
       ours: await packageVersion(join(import.meta.dir, "..", "package.json")),
       official: await packageVersion(join(import.meta.dir, "..", "node_modules/@duckdb/node-api/package.json")),
     },
-    options: { rows: Number(rows), lagRows: Number(lagRows), runs: values.runs ? Number(values.runs) : "default" },
+    options: {
+      rows: Number(rows),
+      lagRows: Number(lagRows),
+      rounds: values.rounds ? Number(values.rounds) : "default",
+    },
     limits,
     scenarios: results,
     gate: verdicts,

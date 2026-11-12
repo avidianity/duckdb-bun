@@ -19,12 +19,12 @@ Options, all optional:
 ```sh
 bun run bench --scenario read-all,prepared   # only these scenarios
 bun run bench --impl ours                    # only one implementation
-bun run bench --runs 3                       # measured runs per scenario, overriding each scenario's default
+bun run bench --rounds 2                     # rounds per scenario, overriding each scenario's default
 bun run bench --rows 100000                  # rows in the generated files and tables (default 1000000)
 bun run bench --lag-rows 600000000           # rows the event-loop lag query hashes (default 600000000)
 ```
 
-`--rows 10000 --lag-rows 10000000 --runs 3` gives a smoke run that finishes in under a minute.
+`--rows 10000 --lag-rows 10000000 --rounds 2` gives a smoke run that finishes in under a minute.
 
 ## Scenarios
 
@@ -39,14 +39,15 @@ bun run bench --lag-rows 600000000           # rows the event-loop lag query has
 
 The mixed table has 1M rows of INTEGER, VARCHAR, DOUBLE, TIMESTAMP, DECIMAL(18,2) and INTEGER[] columns.
 The bench writes the JSON and CSV inputs with plain JavaScript before any child starts, so neither implementation pays for generating them.
-All scenarios except `event-loop-lag` do one unmeasured warm-up run first.
+All scenarios except `event-loop-lag` do one unmeasured warm-up run in each child first.
 After the measured runs, each scenario checks its result (row counts, the prepared statement's returned id), and a wrong result is reported as an error.
 
 ## How it measures
 
-The parent, `bench/main.ts`, starts one child process (`bench/runner.ts`) per implementation and scenario, one at a time.
+The parent, `bench/main.ts`, starts one child process (`bench/runner.ts`) at a time, and each child does one measured run of one scenario on one implementation.
 So RSS of one implementation or scenario never mixes with another.
-Each scenario runs in ABBA order, official, ours, ours, official, and each row merges the runs of both children.
+Each scenario runs in rounds of official, ours, ours, official: 5 rounds, so 10 runs of each implementation, and 4 rounds for `event-loop-lag`.
+Each official child and the ours child next to it form a pair, which ran seconds apart, and each row merges the runs of all the children.
 A fixed order is biased: with official always first, `getRowObjects` measured 25% slower for ours, and about 10% faster when ours went first.
 The child opens an in-memory database with DuckDB's default thread count, runs the scenario, and writes its raw numbers as JSON for the parent.
 A child that crashes, hangs for more than 15 minutes, or throws is reported with its error text, and the bench moves on.
@@ -83,9 +84,10 @@ Pick `--lag-rows` so the lag query takes about 5 seconds on the machine; the def
   A single gap is not held to 50 ms: the macOS runner preempts the JS thread now and then, and showed single gaps of 85 and 95 ms for ours and official in one run.
 - Either implementation fails or returns a wrong result.
 
-The confidence comes from a one-sided Mann-Whitney U test, a rank test that assumes no particular distribution, of ours against official scaled up by the limit.
-It uses every measured run of both ABBA children, so it reads the runner's noise from the runs themselves.
-The gate table prints each p-value; a scenario fails below 0.01.
+The confidence comes from a one-sided Wilcoxon signed-rank test, a rank test that assumes no particular distribution, over the pairs.
+For each pair it takes the log of ours over official, minus the log of 1.1 for the 10% limit, and asks whether those differences lie above zero.
+The p-value is exact: it counts every way of giving signs to the ranks, so 10 pairs can reach 1/1024 and 8 pairs 1/256.
+The gate table prints the number of pairs, the median pair ratio and each p-value; a scenario fails below 0.01.
 
 A fixed limit on two medians failed at random on CI, because the runners are noisy in different ways:
 
@@ -93,8 +95,14 @@ A fixed limit on two medians failed at random on CI, because the runners are noi
 - On the macOS runner (3 vCPU, virtualized), runs of one scenario spread by up to 60%: `ingest-csv` ran between 144 and 265 ms for the official package alone.
 - RSS does not fall after a garbage collection, so pages kept from one run add to the next run's peak at random.
 
+A test over unpaired runs failed at random too, because the macOS runner's noise comes in spells of a few seconds.
+With two children per implementation in plain ABBA order, both ours children ran back to back.
+On 2026-11-12 one spell made the official `parquet-write` runs of one child take 295 to 524 ms instead of 134 to 150 ms, and another made ours look 28% slower on `ingest-json` at p = 0.0036.
+A Mann-Whitney U test counted the 10 runs of each package as independent, but runs in one spell are not.
+Paired children see the same spell, so it moves a pair's ratio far less than either run.
+
 With low noise, the test fails a real excess of a few percent over the limit; with the macOS runner's noise it fails only a large one, so the Linux job is the sharp gate.
-`tests/bench-gate.test.ts` replays CI runs from 2026-11-12 through it.
+`tests/bench-gate.test.ts` checks the exact p-values and replays the slow spells the macOS runner showed on 2026-11-12.
 CI runs the gate on both platforms on every push, and the release workflow runs it before it publishes.
 Each run uploads `bench/results/` as the `bench-<platform>` artifact.
 
