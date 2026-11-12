@@ -222,6 +222,10 @@ Each CI run uploads its full tables as the `bench-<platform>` artifact.
   Until a fix ships, let a Worker's queries settle, or close its connections, before terminating it.
 - One process can load the package in at most 4094 Workers over its whole life, because each JS thread takes a context id that is never reused (`native/ABI.md`, `dbs_init`).
   A Worker past that limit throws when it loads the package.
+- A libduckdb C API call that throws a C++ exception on bad input aborts the process, because `bun:ffi` has no exception boundary.
+  `DuckDBDateValue.fromParts({ year: 2025, month: 0, day: 1 })` is one: the official `@duckdb/node-api` throws `Error: A native exception was thrown` under Bun, and ours crashes.
+  The other known calls are `DuckDBTimestampValue.fromParts` and `DuckDBTimestampTZValue.fromParts` with an invalid date, and the raw bindings' `get_blob` and `get_bignum` on a value that does not cast.
+  Until a fix ships, pass only valid parts to these constructors.
 
 ## Develop
 
