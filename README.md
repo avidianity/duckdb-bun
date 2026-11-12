@@ -220,6 +220,8 @@ Each CI run uploads its full tables as the `bench-<platform>` artifact.
   Bun runs no exit handler in a terminated Worker, so the binding never learns that the Worker's JavaScript is gone, and the finished query calls back into it.
   The official `@duckdb/node-api` crashes on the same sequence under Bun 1.4.4, on the first termination.
   Until a fix ships, let a Worker's queries settle, or close its connections, before terminating it.
+- One process can load the package in at most 4094 Workers over its whole life, because each JS thread takes a context id that is never reused (`native/ABI.md`, `dbs_init`).
+  A Worker past that limit throws when it loads the package.
 
 ## Develop
 
