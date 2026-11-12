@@ -33,7 +33,7 @@ jobs:
     name: build (linux-x64)
     runs-on: ubuntu-latest
     container: rust:1.99.1-bookworm@sha256:e6f2cff35d0f309acf8433b4f05878ed77092602c5065cc81801177da0bb3a9c
-    timeout-minutes: 60
+    timeout-minutes: 90
     defaults:
       run:
         shell: bash
@@ -105,6 +105,19 @@ jobs:
       - name: Remaining tests
         run: bun run test:unit
 
+      # ABBA against @duckdb/node-api on this runner; fails when ours is slower or heavier than bench/gate.ts allows.
+      - name: Bench gate against @duckdb/node-api
+        run: bun run bench --gate
+
+      - name: Upload the bench results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bench-linux-x64
+          path: bench/results/
+          if-no-files-found: warn
+          retention-days: 90
+
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: duckdb-bun-linux-x64
@@ -115,7 +128,7 @@ jobs:
   build-darwin-arm64:
     name: build (darwin-arm64)
     runs-on: macos-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       PLATFORM: darwin-arm64
     steps:
@@ -182,6 +195,19 @@ jobs:
 
       - name: Remaining tests
         run: bun run test:unit
+
+      # ABBA against @duckdb/node-api on this runner; fails when ours is slower or heavier than bench/gate.ts allows.
+      - name: Bench gate against @duckdb/node-api
+        run: bun run bench --gate
+
+      - name: Upload the bench results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bench-darwin-arm64
+          path: bench/results/
+          if-no-files-found: warn
+          retention-days: 90
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

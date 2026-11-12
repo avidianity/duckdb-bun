@@ -71,9 +71,23 @@ Each scenario prints one Markdown table with one row per implementation.
 
 Pick `--lag-rows` so the lag query takes about 5 seconds on the machine; the default takes 5 to 7 seconds on an Apple M5 with 10 cores.
 
+## Gate
+
+`bun run bench --gate` fails, with exit status 1, when ours does worse than official on any scenario:
+
+- The median run is more than 10% slower (`--max-slower`), and slower by more than 5 ms.
+- Peak RSS is more than 10% higher (`--max-memory`), and higher by more than 16 MiB, which covers the baseline difference between the two packages at start-up.
+- In `event-loop-lag`, ours lets the event loop stall for 50 ms or more.
+- Either implementation fails or returns a wrong result.
+
+The gate table also shows the noise of each scenario: the spread between the medians of one implementation's two ABBA children, the larger of the two implementations'.
+A limit below that noise would fail at random, so the limits must stay above the noise CI measures.
+CI runs the gate on both platforms on every push, and the release workflow runs it before it publishes.
+Each run uploads `bench/results/` as the `bench-<platform>` artifact.
+
 ## Results
 
-Each run also writes `bench/results/<date>-<platform>.json`, for example `bench/results/2026-11-12-darwin-arm64.json`.
+Each run also writes `bench/results/<date>-<platform>.json`, and the same tables, with the gate, as `bench/results/<date>-<platform>.md`; for example `bench/results/2026-11-12-darwin-arm64.json`.
 It holds the machine, the Bun and package versions, the options, and for each scenario and implementation the summary plus the raw per-run numbers.
 A second run on the same day and platform overwrites the file.
 Git ignores `bench/results/`; attach the file to an issue or a pull request to share it.

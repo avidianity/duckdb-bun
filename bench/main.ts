@@ -1,13 +1,17 @@
 // `bun run bench`: generates the input files, runs every scenario against the official
 // `@duckdb/node-api` and against ours, each in its own child process, prints one
-// Markdown table per scenario and writes the results to `bench/results/`.
+// Markdown table per scenario and writes the results to `bench/results/`, as JSON and Markdown.
 //
 //   bun run bench [--scenario read-all,prepared] [--impl ours] [--runs 3] [--rows 1000000] [--lag-rows 600000000]
+//                 [--gate] [--max-slower 10] [--max-memory 10]
+//
+// --gate exits 1 when ours is slower or uses more memory than the limits allow on any scenario (bench/gate.ts).
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { cpus, tmpdir, totalmem } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { writeDataFiles } from "./data.ts";
+import { DEFAULT_LIMITS, type GateLimits, gateTable, judge, noise, type Verdict } from "./gate.ts";
 import { type ChildResult, IMPLEMENTATIONS, type Implementation } from "./runner.ts";
 import { type MetricSpec, SCENARIO_NAMES, SCENARIOS, type Scenario } from "./scenarios.ts";
 
@@ -26,6 +30,8 @@ interface Summary {
   metrics: Record<string, number>;
   peakRssMiB: number;
   maxRssMiB: number;
+  /** Spread between the medians of this implementation's two ABBA children, in percent. */
+  noisePct?: number;
   error?: string;
   raw: ChildResult;
 }
@@ -189,15 +195,26 @@ async function main(): Promise<void> {
       runs: { type: "string" },
       rows: { type: "string", default: "1000000" },
       "lag-rows": { type: "string", default: "600000000" },
+      gate: { type: "boolean", default: false },
+      "max-slower": { type: "string", default: String(DEFAULT_LIMITS.maxSlowerPct) },
+      "max-memory": { type: "string", default: String(DEFAULT_LIMITS.maxMemoryPct) },
     },
     strict: true,
   });
+  const limits: GateLimits = {
+    ...DEFAULT_LIMITS,
+    maxSlowerPct: Number(values["max-slower"]),
+    maxMemoryPct: Number(values["max-memory"]),
+  };
   const scenarioNames = list(values.scenario, SCENARIO_NAMES, "--scenario");
   const impls = list(values.impl, IMPLEMENTATIONS, "--impl") as Implementation[];
   const rows = values.rows;
   const lagRows = values["lag-rows"];
   const root = await mkdtemp(join(tmpdir(), "duckdb-bun-bench-"));
+  if (values.gate && impls.length !== IMPLEMENTATIONS.length) throw new Error("--gate needs both implementations");
   const results: Record<string, Summary[]> = {};
+  const tables: string[] = [];
+  const verdicts: Verdict[] = [];
   try {
     const data = join(root, "data");
     await mkdir(data);
@@ -206,7 +223,9 @@ async function main(): Promise<void> {
       console.error(`Writing ${rows} rows of JSON and CSV to ${data} ...`);
       await writeDataFiles(data, Number(rows));
     }
-    console.log(`## duckdb-bun benchmark (${process.platform}-${process.arch}, Bun ${Bun.version})\n`);
+    const heading = `## duckdb-bun benchmark (${process.platform}-${process.arch}, Bun ${Bun.version})\n`;
+    tables.push(heading);
+    console.log(heading);
     for (const scenario of SCENARIOS.filter((s) => scenarioNames.includes(s.name))) {
       // ABBA order: each implementation runs once early and once late, so a machine that warms up or
       // throttles during a scenario slows both alike. A fixed order made the second one look slower.
@@ -216,9 +235,19 @@ async function main(): Promise<void> {
         const raw = await runChild(impl, scenario, { data, root }, { runs: values.runs, rows, lagRows });
         raws.get(impl)?.push(raw);
       }
-      const summaries = impls.map((impl) => summarize(scenario, merge(raws.get(impl) ?? [])));
+      const summaries = impls.map((impl) => {
+        const children = raws.get(impl) ?? [];
+        const summary = summarize(scenario, merge(children));
+        summary.noisePct = noise(children.filter((c) => c.runsMs.length > 0).map((c) => median(c.runsMs)));
+        return summary;
+      });
       results[scenario.name] = summaries;
-      console.log(table(scenario, summaries));
+      const rendered = table(scenario, summaries);
+      tables.push(rendered);
+      console.log(rendered);
+      const official = summaries.find((s) => s.impl === "official");
+      const ours = summaries.find((s) => s.impl === "ours");
+      if (official && ours) verdicts.push(judge(scenario.name, official, ours, limits));
     }
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -227,6 +256,8 @@ async function main(): Promise<void> {
   const platform = `${process.platform}-${process.arch}`;
   const date = new Date().toISOString().slice(0, 10);
   const file = join(RESULTS_DIR, `${date}-${platform}.json`);
+  const gate = verdicts.length > 0 ? gateTable(verdicts, limits) : "";
+  if (gate) console.log(gate);
   await mkdir(RESULTS_DIR, { recursive: true });
   const report = {
     date: new Date().toISOString(),
@@ -240,10 +271,18 @@ async function main(): Promise<void> {
       official: await packageVersion(join(import.meta.dir, "..", "node_modules/@duckdb/node-api/package.json")),
     },
     options: { rows: Number(rows), lagRows: Number(lagRows), runs: values.runs ? Number(values.runs) : "default" },
+    limits,
     scenarios: results,
+    gate: verdicts,
   };
   await Bun.write(file, `${JSON.stringify(report, null, 2)}\n`);
-  console.error(`Wrote ${file}`);
+  await Bun.write(file.replace(/\.json$/, ".md"), [...tables, gate].join("\n"));
+  console.error(`Wrote ${file} and its .md table`);
+  const failed = verdicts.filter((v) => v.failures.length > 0);
+  if (values.gate && failed.length > 0) {
+    console.error(`Bench gate failed on ${failed.map((v) => v.scenario).join(", ")}.`);
+    process.exit(1);
+  }
 }
 
 await main();
