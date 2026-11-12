@@ -68,7 +68,9 @@ test("diagnostics() counts native calls and the handles not yet freed", async ()
   db.disconnect_sync(connection);
   db.close_sync(database);
   const after = diagnostics();
-  expect(after.liveHandles).toEqual(before.liveHandles);
+  // A collection between the two reads may free handles earlier tests left, so no kind may grow.
+  const grown = Object.entries(after.liveHandles).filter(([kind, n]) => n > (before.liveHandles[kind] ?? 0));
+  expect(grown).toEqual([]);
   expect(after.jobs.inFlight).toBe(0);
   expect(after.nativeThreads.running).toBe(0);
   expect(after.versions.duckdb).toBe(DUCKDB_VERSION_TAG);
