@@ -16,17 +16,17 @@
         "lefthook": "2.2.2",
       },
       "optionalDependencies": {
-        "@avidian/duckdb-bun-darwin-arm64": "2.0.0-r.0",
-        "@avidian/duckdb-bun-linux-x64": "2.0.0-r.0",
+        "@avidian/duckdb-bun-darwin-arm64": "1.0.0",
+        "@avidian/duckdb-bun-linux-x64": "1.0.0",
       },
     },
     "packages/duckdb-bun-darwin-arm64": {
       "name": "@avidian/duckdb-bun-darwin-arm64",
-      "version": "2.0.0-r.0",
+      "version": "1.0.0",
     },
     "packages/duckdb-bun-linux-x64": {
       "name": "@avidian/duckdb-bun-linux-x64",
-      "version": "2.0.0-r.0",
+      "version": "1.0.0",
     },
   },
   "trustedDependencies": [
