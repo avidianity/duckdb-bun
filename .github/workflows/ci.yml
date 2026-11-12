@@ -217,6 +217,76 @@ jobs:
           if-no-files-found: warn
           retention-days: 90
 
+  # The Rust shim under AddressSanitizer: the native cargo tests (native/tests/*.rs) run with an
+  # instrumented shim and standard library, so a heap or stack overflow, a use after free or a double
+  # free in the shim fails the job. ASan needs nightly Rust (`-Zsanitizer=address`); -Zbuild-std
+  # instruments std too, and `--target` keeps the flag off build scripts.
+  #
+  # The Bun suites do not run against an ASan shim here. On Linux, rustc links its ASan runtime
+  # statically into executables only, never into a cdylib, and the Rust toolchain ships no shared
+  # runtime to LD_PRELOAD into Bun. That needs `-Zexternal-clangrt` and a shared ASan runtime from the
+  # same LLVM major version as the nightly rustc, loaded before Bun's allocator and signal handlers,
+  # which no run has shown to work yet. On macOS the runtime must come in through
+  # DYLD_INSERT_LIBRARIES, which the hardened runtime of the released Bun binary ignores.
+  #
+  # LeakSanitizer is off: libduckdb's process-lifetime allocations are not leaks of the shim, and
+  # handle leaks are checked through diagnostics().liveHandles (leak, concurrency stress and soak).
+  # native/diag-tests stays out: its children crash on purpose, and ASan's own SIGSEGV handler would
+  # take the signal from the crash handler under test.
+  asan:
+    name: asan (linux-x64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PLATFORM: linux-x64
+      # A dated nightly, so the sanitizer flags and their results do not change under the job.
+      NIGHTLY: nightly-2026-11-10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      # -Zbuild-std compiles the standard library from the rust-src component.
+      - name: Install the nightly Rust toolchain
+        run: |
+          rustup toolchain install "$NIGHTLY" --profile minimal --component rust-src
+          rustc "+$NIGHTLY" --version
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: native -> target/asan
+          key: asan
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Point the Rust build at this platform's libduckdb
+        run: echo "DUCKDB_LIB_DIR=$GITHUB_WORKSPACE/packages/duckdb-bun-$PLATFORM" >> "$GITHUB_ENV"
+
+      - name: Cache libduckdb
+        id: libduckdb
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: packages/duckdb-bun-linux-x64/libduckdb.*
+          key: libduckdb-linux-x64-${{ hashFiles('src/version.ts', 'scripts/fetch-lib.ts') }}
+
+      - name: Fetch libduckdb
+        if: steps.libduckdb.outputs.cache-hit != 'true'
+        run: bun run fetch-lib "$PLATFORM"
+
+      - name: cargo test under AddressSanitizer
+        working-directory: native
+        env:
+          RUSTFLAGS: -Zsanitizer=address
+          RUSTDOCFLAGS: -Zsanitizer=address
+          CARGO_TARGET_DIR: target/asan
+          ASAN_OPTIONS: detect_leaks=0
+        run: cargo "+$NIGHTLY" test -Zbuild-std --target x86_64-unknown-linux-gnu
+
   docker-smoke:
     name: docker smoke (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}

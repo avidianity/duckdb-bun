@@ -155,6 +155,7 @@ It ignores `@duckdb/node-api` and `libduckdb-sys`, which move with a DuckDB upgr
 Bun is pinned in `package.json` (`engines`, `packageManager`, and `@types/bun`); every workflow reads it from `packageManager` through `setup-bun`'s `bun-version-file`.
 Change the Bun pin, the `oven/bun` image digest in `.github/workflows/ci.yml`, and `@types/bun` together.
 Rust is pinned in `rust-toolchain.toml`, and the `rust` image tag and digest in the workflows must match it.
+The `asan` job in `.github/workflows/ci.yml` alone uses a dated nightly Rust, `NIGHTLY`, for `-Zsanitizer=address`; move it to a newer date when it stops building, independently of the stable pin.
 Pin each image by the digest of its multi-platform index, which `docker buildx imagetools inspect <image>:<tag>` prints first, not by one platform's manifest.
 The linux-x64 and linux-arm64 jobs pull the same reference, and each runner takes its own architecture from the index.
 
@@ -170,3 +171,5 @@ The linux-x64 and linux-arm64 jobs pull the same reference, and each runner take
 | the docker smoke job fails while the test job passes       | a file missing from a package's `files`, or a glibc mismatch                          | `packages/*/package.json`, the `rust` image in the workflows                                 |
 | the release publish job fails with an authentication error | the trusted publisher on npmjs.com does not match the workflow                        | [Publishing to npm](#publishing-to-npm)                                                      |
 | the nightly `Soak` workflow fails a check                  | memory growth, a handle leak, a stalled event loop, or a wrong answer under long load | the `soak-linux-x64` artifact, then `SOAK_SEED=<seed> bun run soak` (CONTRIBUTING.md "Soak") |
+| the `asan` job reports an AddressSanitizer error           | a memory error in the shim                                                            | the stack in the report, `native/src/`                                                       |
+| the `asan` job fails to build                              | the dated nightly no longer builds the shim or its standard library                   | move `NIGHTLY` in `.github/workflows/ci.yml` to a newer date                                 |

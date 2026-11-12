@@ -42,6 +42,20 @@ It fails when any request gets a wrong answer or error, when RSS grows faster th
 It writes `soak.json` and `soak.md` to `--out` (`soak-report/` by default), and `SOAK_SEED=<seed>` repeats a run's choices.
 The `Soak` workflow (`.github/workflows/soak.yml`) runs it nightly on linux-x64 and on demand with a `minutes` input from 1 to 300, and uploads the report as the `soak-linux-x64` artifact.
 
+## AddressSanitizer
+
+The `asan` job in `.github/workflows/ci.yml` runs the shim's cargo tests (`native/tests/*.rs`) with the shim and the standard library built with AddressSanitizer, on a dated nightly Rust.
+To run it locally, set `NIGHTLY` to the toolchain the job's `NIGHTLY` names, install it with the `rust-src` component, and run, from `native/`:
+
+```sh
+rustup toolchain install "$NIGHTLY" --profile minimal --component rust-src
+DUCKDB_LIB_DIR="$(pwd)/../packages/duckdb-bun-linux-x64" RUSTFLAGS=-Zsanitizer=address CARGO_TARGET_DIR=target/asan \
+  ASAN_OPTIONS=detect_leaks=0 cargo "+$NIGHTLY" test -Zbuild-std --target x86_64-unknown-linux-gnu
+```
+
+On macOS, use `darwin-arm64` and `--target aarch64-apple-darwin`.
+The job's comment explains why the Bun suites do not run against an ASan shim.
+
 ## Coverage
 
 `bun run coverage` measures line and function coverage of `src/` and of the Rust shim in `native/src/`, and fails below a floor.
