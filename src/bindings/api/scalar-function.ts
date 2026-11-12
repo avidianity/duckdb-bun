@@ -25,7 +25,7 @@ import type {
   ScalarFunctionMainFunction,
   Vector,
 } from "../generated/contract.ts";
-import { expectFunction, expectString } from "../runtime/convert.ts";
+import { expectFunction, expectReferenceable, expectString } from "../runtime/convert.ts";
 import { allocateId, CallKind, setCallHandler } from "../runtime/dispatch.ts";
 import { type Handle, handleOf, type Kind, unwrap } from "../runtime/handle.ts";
 import { borrow, own } from "../runtime/kinds.ts";
@@ -171,7 +171,8 @@ export function scalar_function_set_return_type(scalar_function: ScalarFunction,
 }
 
 export function scalar_function_set_extra_info(scalar_function: ScalarFunction, extra_info: object): void {
-  stateOf(scalar_function).state.extraInfo = extra_info;
+  const { state } = stateOf(scalar_function);
+  state.extraInfo = expectReferenceable(extra_info);
 }
 
 export function scalar_function_set_bind(scalar_function: ScalarFunction, func: ScalarFunctionBindFunction): void {

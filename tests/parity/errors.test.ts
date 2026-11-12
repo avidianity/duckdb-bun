@@ -1,7 +1,7 @@
 // Error parity: the exact error class and message text for failed queries, closed
 // handles, prepare failures, and bind failures.
-import type { DuckDBConnection, DuckDBPreparedStatement } from "@duckdb/node-api";
-import { type Api, capture, parityFor, withConnection } from "./harness.ts";
+import type { DuckDBConnection, DuckDBDateValue, DuckDBPreparedStatement } from "@duckdb/node-api";
+import { type Api, capture, describeError, parityFor, withConnection } from "./harness.ts";
 
 const parity = parityFor(import.meta.path);
 
@@ -246,4 +246,88 @@ parity(
     prepared.clearBindings();
   }),
   { official: "ok" },
+);
+
+/** The outcome of a call made where a scenario cannot await, such as inside a function callback. */
+function captureSync(fn: () => unknown): { ok: unknown } | { error: { class: string; message: string } } {
+  try {
+    return { ok: fn() };
+  } catch (err) {
+    return { error: describeError(err) };
+  }
+}
+
+// node-addon-api raises "A number was expected", and the string, boolean, and
+// object expectations, as a TypeError. N-API reads the fields of a primitive's
+// wrapper object, so a number given for a date fails on its missing field.
+parity("bind error: arguments of the wrong JavaScript type", (api) =>
+  withConnection(api, async (connection) => {
+    const prepared = await connection.prepare("SELECT $1::INTEGER, $2::VARCHAR, $3::BOOLEAN, $4::DATE");
+    return {
+      integer: captureSync(() => prepared.bindInteger(1, "1" as unknown as number)),
+      varchar: captureSync(() => prepared.bindVarchar(2, 1 as unknown as string)),
+      boolean: captureSync(() => prepared.bindBoolean(3, 1 as unknown as boolean)),
+      date: captureSync(() => prepared.bindDate(4, 5 as unknown as DuckDBDateValue)),
+    };
+  }),
+);
+
+// The official binding keeps extra info, bind data, init data, and scalar
+// function state with napi_create_reference, which refuses null and the number,
+// string, boolean, and bigint primitives with "Invalid argument".
+const USER_DATA: [name: string, data: unknown][] = [
+  ["number", 1],
+  ["string", "s"],
+  ["boolean", true],
+  ["bigint", 1n],
+  ["null", null],
+  ["undefined", undefined],
+  ["symbol", Symbol("s")],
+  ["object", {}],
+];
+
+parity("function user data of every JavaScript type", (api) =>
+  withConnection(api, async (connection) => {
+    const outcomes: Record<string, Record<string, unknown>> = {};
+    for (const [name, value] of USER_DATA) {
+      const data = value as object;
+      const steps: Record<string, unknown> = {};
+      const scalar = api.DuckDBScalarFunction.create({
+        name: `scalar_${name}`,
+        returnType: api.INTEGER,
+        bindFunction: (info) => {
+          steps.scalarBindData = captureSync(() => info.setBindData(data));
+        },
+        initFunction: (info) => {
+          steps.scalarState = captureSync(() => info.setState(data));
+        },
+        mainFunction: () => {},
+      });
+      steps.scalarExtraInfo = captureSync(() => scalar.setExtraInfo(data));
+      connection.registerScalarFunction(scalar);
+      steps.scalarRan = await capture(async () =>
+        (await connection.runAndReadAll(`SELECT scalar_${name}()`)).getRowsJson(),
+      );
+      const table = api.DuckDBTableFunction.create({
+        name: `table_${name}`,
+        bindFunction: (info) => {
+          info.addResultColumn("c", api.INTEGER);
+          steps.tableBindData = captureSync(() => info.setBindData(data));
+        },
+        initFunction: (info) => {
+          steps.tableInitData = captureSync(() => info.setInitData(data));
+        },
+        mainFunction: (_info, output) => {
+          output.rowCount = 0;
+        },
+      });
+      steps.tableExtraInfo = captureSync(() => table.setExtraInfo(data));
+      connection.registerTableFunction(table);
+      steps.tableRan = await capture(async () =>
+        (await connection.runAndReadAll(`SELECT * FROM table_${name}()`)).getRowsJson(),
+      );
+      outcomes[name] = steps;
+    }
+    return outcomes;
+  }),
 );

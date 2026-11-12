@@ -2,12 +2,14 @@
 // bindings/src/conversion_helpers.h (vendored tag), with the same error text.
 // Where the official binding gets a JS value through a node-addon-api cast, a
 // value of the wrong JS type fails with N-API's own message, such as
-// "A number was expected", and these helpers throw the same.
+// "A number was expected", and these helpers throw the same. node-addon-api
+// raises the number, string, boolean, and object expectations as a TypeError and
+// every other N-API status, "A bigint was expected" included, as an Error.
 
 // --- N-API type expectations ----------------------------------------------------------
 
 export function expectNumber(value: unknown): number {
-  if (typeof value !== "number") throw new Error("A number was expected");
+  if (typeof value !== "number") throw new TypeError("A number was expected");
   return value;
 }
 
@@ -17,20 +19,40 @@ export function expectBigInt(value: unknown): bigint {
 }
 
 export function expectString(value: unknown): string {
-  if (typeof value !== "string") throw new Error("A string was expected");
+  if (typeof value !== "string") throw new TypeError("A string was expected");
   return value;
 }
 
 export function expectBoolean(value: unknown): boolean {
-  if (typeof value !== "boolean") throw new Error("A boolean was expected");
+  if (typeof value !== "boolean") throw new TypeError("A boolean was expected");
   return value;
 }
 
+/**
+ * An object argument whose properties the official binding reads with
+ * node-addon-api's Object::Get. N-API converts the value with ToObject first, so
+ * a primitive other than null and undefined reads as its wrapper object, whose
+ * fields are missing, and the field's own check is what fails. For null and
+ * undefined, the official binding under Bun throws Bun's own TypeError, such as
+ * "null is not an object (evaluating '...')", whose text quotes the caller's
+ * source; this throws N-API's object expectation instead.
+ */
 export function expectObject(value: unknown): Record<string, unknown> {
-  if ((typeof value !== "object" && typeof value !== "function") || value === null) {
-    throw new Error("An object was expected");
+  if (value === null || value === undefined) throw new TypeError("An object was expected");
+  return Object(value) as Record<string, unknown>;
+}
+
+/**
+ * A value the official binding keeps with napi_create_reference: extra info,
+ * bind data, init data, and scalar function state. The runtime refuses a
+ * reference to null or to a number, string, boolean, or bigint with
+ * napi_invalid_arg, which node-addon-api reports as "Invalid argument".
+ */
+export function expectReferenceable<T>(value: T): T {
+  if (value === null || ["number", "string", "boolean", "bigint"].includes(typeof value)) {
+    throw new Error("Invalid argument");
   }
-  return value as Record<string, unknown>;
+  return value;
 }
 
 export function expectArray(value: unknown): readonly unknown[] {

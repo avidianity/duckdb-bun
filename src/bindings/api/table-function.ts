@@ -20,7 +20,14 @@ import type {
   TableFunctionMainFunction,
   Value,
 } from "../generated/contract.ts";
-import { expectBoolean, expectFunction, expectString, int64FromNumber, uint32FromNumber } from "../runtime/convert.ts";
+import {
+  expectBoolean,
+  expectFunction,
+  expectReferenceable,
+  expectString,
+  int64FromNumber,
+  uint32FromNumber,
+} from "../runtime/convert.ts";
 import { allocateId, CallKind, setCallHandler } from "../runtime/dispatch.ts";
 import { type Handle, handleOf, type Kind, unwrap } from "../runtime/handle.ts";
 import { borrow, own } from "../runtime/kinds.ts";
@@ -176,7 +183,8 @@ export function table_function_add_named_parameter(
 }
 
 export function table_function_set_extra_info(table_function: TableFunction, extra_info: object): void {
-  stateOf(table_function).state.extraInfo = extra_info;
+  const { state } = stateOf(table_function);
+  state.extraInfo = expectReferenceable(extra_info);
 }
 
 export function table_function_set_bind(table_function: TableFunction, func: TableFunctionBindFunction): void {

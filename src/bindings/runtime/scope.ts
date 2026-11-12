@@ -20,6 +20,7 @@
 // objects live here until the shim reports that DuckDB dropped the id.
 
 import { type Pointer, toArrayBuffer } from "bun:ffi";
+import { expectReferenceable } from "./convert.ts";
 import { allocateId, onRelease } from "./dispatch.ts";
 import { Handle } from "./handle.ts";
 
@@ -88,6 +89,7 @@ const userData = new Map<number, unknown>();
 
 /** Stores `value` under a new id that is dropped when DuckDB releases it. */
 export function storeUserData(value: unknown): number {
+  expectReferenceable(value);
   const id = allocateId();
   userData.set(id, value);
   onRelease(id, () => userData.delete(id));
