@@ -5,6 +5,7 @@
 import { toArrayBuffer } from "bun:ffi";
 import { expect, test } from "bun:test";
 import * as db from "../../src/bindings/api/database.ts";
+import * as query from "../../src/bindings/api/query.ts";
 import { shim } from "../../src/bindings/runtime/native.ts";
 
 function counters(): bigint[] {
@@ -60,4 +61,22 @@ test("config, table name, and catalog arguments take the official JavaScript typ
   expect(() => db.client_context_get_catalog(context, 1 as never)).toThrow(new TypeError("A string was expected"));
   db.disconnect_sync(connection);
   db.close_sync(database);
+});
+
+test("the async workers check their string and index arguments before their handles", () => {
+  const notAHandle = db.create_config() as never;
+  expect(() => query.query(notAHandle, 1 as never)).toThrow(new TypeError("A string was expected"));
+  expect(() => query.prepare(notAHandle, 1 as never)).toThrow(new TypeError("A string was expected"));
+  expect(() => query.extract_statements(notAHandle, 1 as never)).toThrow(new TypeError("A string was expected"));
+  expect(() => query.prepare_extracted_statement(notAHandle, notAHandle, "0" as never)).toThrow(
+    new TypeError("A number was expected"),
+  );
+  expect(() => db.open(1 as never, notAHandle)).toThrow(new TypeError("A string was expected"));
+  expect(() => db.open(null as never)).toThrow(new TypeError("A string was expected"));
+  expect(() => db.get_or_create_from_cache(notAHandle, 1 as never, notAHandle)).toThrow(
+    new TypeError("A string was expected"),
+  );
+  expect(() => db.get_or_create_from_cache(db.create_instance_cache(), null as never)).toThrow(
+    new TypeError("A string was expected"),
+  );
 });

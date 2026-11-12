@@ -84,9 +84,12 @@ function preparedFrom(job: Pointer): PreparedStatement {
 
 // --- query ----------------------------------------------------------------------------
 
+// The official binding's async workers read their string and number arguments
+// before their handles, so these check them first too.
+
 export function query(connection: Connection, sql: string): Promise<Result> {
-  const { ptr, handle } = claim(connection, "connection");
   const { bytes, length } = utf8(expectString(sql));
+  const { ptr, handle } = claim(connection, "connection");
   return runJob(
     callContext("query", sql),
     [handle],
@@ -98,8 +101,8 @@ export function query(connection: Connection, sql: string): Promise<Result> {
 // --- prepared statements ----------------------------------------------------------------
 
 export function prepare(connection: Connection, sql: string): Promise<PreparedStatement> {
-  const { ptr, handle } = claim(connection, "connection");
   const { bytes, length } = utf8(expectString(sql));
+  const { ptr, handle } = claim(connection, "connection");
   return runJob(
     callContext("prepare", sql),
     [handle],
@@ -490,8 +493,8 @@ export function pending_execution_is_finished(pending_state: PendingState): bool
 // --- extracted statements -------------------------------------------------------------------
 
 export function extract_statements(connection: Connection, sql: string): Promise<ExtractedStatementsAndCount> {
-  const { ptr, handle } = claim(connection, "connection");
   const { bytes, length } = utf8(expectString(sql));
+  const { ptr, handle } = claim(connection, "connection");
   return runJob(
     callContext("extract_statements", sql),
     [handle],
@@ -508,9 +511,9 @@ export function prepare_extracted_statement(
   extracted_statements: ExtractedStatements,
   index: number,
 ): Promise<PreparedStatement> {
+  const i = u32(index);
   const { ptr, handle } = claim(connection, "connection");
   const extracted = claim(extracted_statements, "extracted statements");
-  const i = u32(index);
   return runJob(
     callContext("prepare_extracted_statement"),
     [handle, extracted.handle],

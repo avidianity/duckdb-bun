@@ -42,10 +42,12 @@ export function create_instance_cache(): InstanceCache {
   return asHandle(own("instance cache", duckdb.duckdb_create_instance_cache() as Pointer));
 }
 
+// The official binding's async workers read the path before the handles.
+
 export function get_or_create_from_cache(cache: InstanceCache, path?: string, config?: Config): Promise<Database> {
+  const { bytes, length } = utf8(path === undefined ? "" : expectString(path));
   const cacheHandle = handleOf(cache, "instance cache");
   const configHandle = config === undefined ? undefined : handleOf(config, "config");
-  const { bytes, length } = utf8(path ?? "");
   const handles = configHandle ? [cacheHandle, configHandle] : [cacheHandle];
   return runJob(
     callContext("get_or_create_from_cache"),
@@ -63,8 +65,8 @@ export function get_or_create_from_cache(cache: InstanceCache, path?: string, co
 }
 
 export function open(path?: string, config?: Config): Promise<Database> {
+  const { bytes, length } = utf8(path === undefined ? "" : expectString(path));
   const configHandle = config === undefined ? undefined : handleOf(config, "config");
-  const { bytes, length } = utf8(path ?? "");
   return runJob(
     callContext("open"),
     configHandle ? [configHandle] : [],
