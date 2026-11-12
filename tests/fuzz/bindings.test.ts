@@ -56,6 +56,7 @@ import fc from "fast-check";
 import ours from "../../src/bindings/index.ts";
 import { exceptionMessage } from "../../src/bindings/runtime/exception.ts";
 import { assertRealOfficialBinding } from "../official-binding.ts";
+import { HAS_REFERENCE, NO_REFERENCE } from "../reference.ts";
 import { check, RUNS, trace } from "./config.ts";
 
 assertRealOfficialBinding();
@@ -486,6 +487,7 @@ async function sequenceConnection(impl: Impl): Promise<unknown> {
 }
 
 beforeAll(async () => {
+  if (!HAS_REFERENCE) return;
   for (const impl of Object.keys(IMPLS) as Impl[]) {
     const duckdb = IMPLS[impl];
     const database = await duckdb.open(":memory:");
@@ -495,7 +497,10 @@ beforeAll(async () => {
   }
 });
 
+if (!HAS_REFERENCE) console.warn(`tests/fuzz/bindings.test.ts: fuzz parity skipped: ${NO_REFERENCE}`);
+
 afterAll(() => {
+  if (!HAS_REFERENCE) return;
   for (const impl of Object.keys(IMPLS) as Impl[]) {
     const { database, connection } = shared.get(impl) as { database: unknown; connection: unknown };
     IMPLS[impl].disconnect_sync(connection as never);
@@ -620,7 +625,7 @@ function reconcile(sequence: Call[], official: Outcome[], ours: Outcome[]): void
 
 const tally = { calls: 0, ok: 0, nativeExceptions: 0 };
 
-describe("raw binding parity, fuzzed", () => {
+describe.skipIf(!HAS_REFERENCE)("raw binding parity, fuzzed", () => {
   test(
     "random call sequences give the same results and errors",
     async () => {

@@ -3,7 +3,7 @@ import { expect, test } from "bun:test";
 import { DEFAULT_LIMITS, type GateInput, judge, signedRankGreater } from "../bench/gate.ts";
 import { SCENARIOS } from "../bench/scenarios.ts";
 
-/** Runs in pair order: run k of official and run k of ours ran seconds apart. */
+/** Runs in pair order: run k of baseline and run k of ours ran seconds apart. */
 function input(runsMs: number[], runPeaksMiB: number[] = runsMs.map(() => 500)): GateInput {
   return { runsMs, runPeaksMiB, metrics: {} };
 }
@@ -49,21 +49,21 @@ test("a slow spell that slows both runs of a pair passes", () => {
   // The macOS runner on 2026-11-12: runs of one package went from about 140 ms to 300 to 520 ms for a few
   // seconds. Paired children see the spell together.
   const spell = [1, 1, 1, 2.1, 3.7, 3.4, 2.4, 1, 1, 1];
-  const official = spell.map((factor, k) => (steady[k] ?? 100) * factor);
+  const baseline = spell.map((factor, k) => (steady[k] ?? 100) * factor);
   const ours = spell.map((factor, k) => (steady[(k + 3) % 10] ?? 100) * factor * 1.04);
-  expect(judge("s", input(official), input(ours), DEFAULT_LIMITS).failures).toEqual([]);
+  expect(judge("s", input(baseline), input(ours), DEFAULT_LIMITS).failures).toEqual([]);
 });
 
 test("a consistent excess fails even inside a slow spell", () => {
   const spell = [1, 1, 1, 2.1, 3.7, 3.4, 2.4, 1, 1, 1];
-  const official = spell.map((factor, k) => (steady[k] ?? 100) * factor);
-  const ours = official.map((value) => value * 1.3);
-  expect(judge("s", input(official), input(ours), DEFAULT_LIMITS).failures[0]).toStartWith("30.0% slower");
+  const baseline = spell.map((factor, k) => (steady[k] ?? 100) * factor);
+  const ours = baseline.map((value) => value * 1.3);
+  expect(judge("s", input(baseline), input(ours), DEFAULT_LIMITS).failures[0]).toStartWith("30.0% slower");
 });
 
 test("runs that do not pair up fail", () => {
   expect(judge("s", input(steady), input(steady.slice(1)), DEFAULT_LIMITS).failures).toEqual([
-    "unpaired runs: 9 of ours and 10 of official; run k of each must be pair k",
+    "unpaired runs: 9 of ours and 10 of baseline; run k of each must be pair k",
   ]);
 });
 

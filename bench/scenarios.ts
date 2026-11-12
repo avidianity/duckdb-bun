@@ -1,5 +1,5 @@
 // The benchmark scenarios. Each one uses only the public `@duckdb/node-api` surface,
-// so the same code runs against the official package and against ours.
+// so the same code runs against the baseline and against ours.
 import { join } from "node:path";
 import type { DuckDBConnection } from "@duckdb/node-api";
 
@@ -26,7 +26,7 @@ export interface Scenario {
   name: string;
   title: string;
   /**
-   * Rounds of official, ours, ours, official, one child with one measured run each, so each
+   * Rounds of baseline, ours, ours, baseline, one child with one measured run each, so each
    * implementation gets twice this many runs and the gate twice this many pairs (bench/gate.ts).
    */
   rounds: number;

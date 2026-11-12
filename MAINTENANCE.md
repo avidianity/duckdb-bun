@@ -30,7 +30,9 @@ These versions must agree:
 - `version` in `package.json` and in each `packages/*/package.json`, a stable `x.y.z`.
 - The row for that version in the `README.md` `Versions` table.
 - Each platform package's entry in `optionalDependencies` in `package.json`.
-- The `@duckdb/node-api` entry in `devDependencies`, which must wrap the same DuckDB, so that `bun run parity` compares like with like.
+- The `@duckdb/node-api` entry in `devDependencies`, the reference that parity, fuzz and the bench compare against (ADR 0009).
+  It wraps the pinned DuckDB, or an older one while npm has none built on the pin; never a newer one.
+  The Versions row names it, or `none` when it wraps an older DuckDB.
 - The `libduckdb-sys` dependency in `native/Cargo.toml`, which must declare the same DuckDB C API.
 
 ## Checking versions
@@ -68,6 +70,7 @@ The workflow needs the repository setting "Allow GitHub Actions to create and ap
 To land the pull request:
 
 1. Wait for the dispatched CI run; it runs the API and bindings suites, parity, the bench gate, and every other check.
+   When npm has no `@duckdb/node-api` built on the new DuckDB, parity and fuzz report that they have nothing to compare against, and the bench gate compares against the previous release of this package; the release goes ahead.
 2. Do what the pull request lists under "Left for a human", such as steps 4 and 6 below, and push to the branch, which starts CI as usual.
 3. Merge it with CI green, and release the version it set, as [Releasing](#releasing) describes from step 3.
 

@@ -3,11 +3,15 @@
 // implementation and scenario, so RSS numbers never mix between them.
 //
 //   bun bench/runner.ts --impl ours --scenario read-all --data <dir> --work <dir> --out <file> [--runs 1]
+//                       [--baseline-entry <file>]
+//
+// The baseline is the @duckdb/node-api reference, or the module that --baseline-entry names: the entry point of a
+// previous release of this package (bench/baseline.ts).
 import { parseArgs } from "node:util";
 import { assertRealOfficialBinding } from "../tests/official-binding.ts";
 import { SCENARIOS, type ScenarioContext } from "./scenarios.ts";
 
-export const IMPLEMENTATIONS = ["official", "ours"] as const;
+export const IMPLEMENTATIONS = ["baseline", "ours"] as const;
 export type Implementation = (typeof IMPLEMENTATIONS)[number];
 
 export interface ChildResult {
@@ -32,8 +36,10 @@ type Api = typeof import("@duckdb/node-api");
 
 const RSS_SAMPLE_MS = 10;
 
-async function loadApi(impl: Implementation): Promise<Api> {
-  if (impl === "official") {
+async function loadApi(impl: Implementation, baselineEntry: string | undefined): Promise<Api> {
+  if (impl === "baseline") {
+    // A previous release has the same API; the cast bridges the declaration sites, as for ours below.
+    if (baselineEntry) return (await import(baselineEntry)) as unknown as Api;
     assertRealOfficialBinding();
     return import("@duckdb/node-api");
   }
@@ -57,6 +63,7 @@ async function main(): Promise<void> {
       runs: { type: "string" },
       rows: { type: "string" },
       "lag-rows": { type: "string" },
+      "baseline-entry": { type: "string" },
     },
     strict: true,
   });
@@ -86,7 +93,7 @@ async function main(): Promise<void> {
   };
 
   try {
-    const api = await loadApi(impl);
+    const api = await loadApi(impl, values["baseline-entry"]);
     // Extensions this bench needs (json, parquet) are built in; never reach the network.
     const instance = await api.DuckDBInstance.create(":memory:", {
       autoinstall_known_extensions: "false",

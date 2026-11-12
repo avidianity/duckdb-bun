@@ -13,13 +13,14 @@
 import { afterAll, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import * as officialApi from "@duckdb/node-api";
 import { assertRealOfficialBinding } from "../official-binding.ts";
 
 assertRealOfficialBinding();
 
 import * as oursApi from "../../src/neo.ts";
+import { HAS_REFERENCE, NO_REFERENCE } from "../reference.ts";
 
 export type Api = typeof officialApi;
 export type Impl = "official" | "ours";
@@ -244,6 +245,9 @@ async function runInChild(file: string, name: string, impl: Impl, budgetMs: numb
 /** Returns a `parity(name, scenario, options)` test registrar bound to the calling test file. */
 export function parityFor(file: string) {
   afterAll(removeSharedDirs);
+  // Comparing against a @duckdb/node-api built on another DuckDB is not like with like (tests/reference.ts).
+  if (!HAS_REFERENCE && !CHILD_IMPL)
+    console.warn(`${relative(REPO_ROOT, file)}: parity tests skipped: ${NO_REFERENCE}`);
   return function parity(name: string, scenario: Scenario, options: ParityOptions = {}): void {
     const timeout = options.timeout ?? 20_000;
     if (CHILD_IMPL && CHILD_OUT) {
@@ -259,7 +263,7 @@ export function parityFor(file: string) {
       );
       return;
     }
-    test.skipIf(options.skip === true)(
+    test.skipIf(options.skip === true || !HAS_REFERENCE)(
       name,
       async () => {
         const run = (impl: Impl) =>

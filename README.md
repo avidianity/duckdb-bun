@@ -217,7 +217,7 @@ On the macOS runner (3 vCPU, virtualized) runs of one scenario spread by up to 6
 In the same CI run there, ours was slower on `ingest-json` (264 vs 205 ms, p = 0.0086) and used more peak memory on `read-all` (821 vs 658 MiB, p = 0.0057), both still inside the gate's 10% limit at 99% confidence.
 On an Apple M5 Mac, both scenarios were on par in time, and `read-all` used 17% more peak memory without reaching p < 0.01.
 A query that runs out of memory (duckdb-node-neo #3060) rejects with DuckDB's `Out of Memory Error` and leaves the process alive in both packages, on Linux in `oven/bun:1.4.4-slim` and on macOS.
-CI fails any change whose bench runs show ours more than 10% slower or 10% heavier than the official package at 99% confidence; [`bench/README.md`](bench/README.md) describes the scenarios and the gate.
+CI fails any change whose bench runs show ours more than 10% slower or 10% heavier than the baseline at 99% confidence: the official package built on the same DuckDB, or the previous release of this package until npm has one; [`bench/README.md`](bench/README.md) describes the scenarios, the baseline and the gate.
 Each CI run uploads its full tables as the `bench-<platform>` artifact.
 
 ## Known issues

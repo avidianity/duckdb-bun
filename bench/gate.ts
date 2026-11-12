@@ -1,5 +1,7 @@
 // The release gate over a bench run: ours may be at most `maxSlowerPct` slower and use at most
-// `maxMemoryPct` more peak RSS per run than the official package, on every scenario.
+// `maxMemoryPct` more peak RSS per run than the baseline, on every scenario. The baseline is the @duckdb/node-api
+// reference, or the previous release of this package when npm has no reference for the pinned DuckDB
+// (bench/baseline.ts).
 //
 // A CI runner is noisy, and on the macOS runner the runs of one scenario spread by up to 60%, so the
 // gate does not compare two medians against a fixed limit. The bench runs the packages in pairs of
@@ -49,11 +51,11 @@ export interface Verdict {
   scenario: string;
   /** Pairs of runs the test compared. */
   pairs?: number;
-  /** The median over pairs of ours over official run time, minus 1, in percent; positive is slower. */
+  /** The median over pairs of ours over baseline run time, minus 1, in percent; positive is slower. */
   slowerPct?: number;
   /** One-sided p-value that ours is more than the limit slower. */
   slowerP?: number;
-  /** The median over pairs of ours over official run peak RSS, minus 1, in percent; positive is more memory. */
+  /** The median over pairs of ours over baseline run peak RSS, minus 1, in percent; positive is more memory. */
   memoryPct?: number;
   /** One-sided p-value that ours uses more than the limit more memory. */
   memoryP?: number;
@@ -102,52 +104,52 @@ export function signedRankGreater(d: number[]): number {
   return atLeast / 2 ** n;
 }
 
-/** The p-value that ours is more than `limitPct` above official, over pairs of runs. */
-function beyondLimit(ours: number[], official: number[], limitPct: number): number {
+/** The p-value that ours is more than `limitPct` above baseline, over pairs of runs. */
+function beyondLimit(ours: number[], baseline: number[], limitPct: number): number {
   const limit = Math.log(1 + limitPct / 100);
-  return signedRankGreater(ours.map((value, k) => Math.log(value / (official[k] ?? Number.NaN)) - limit));
+  return signedRankGreater(ours.map((value, k) => Math.log(value / (baseline[k] ?? Number.NaN)) - limit));
 }
 
-/** The median over pairs of ours over official, minus 1, in percent. */
-function pairedPct(ours: number[], official: number[]): number {
-  return (median(ours.map((value, k) => value / (official[k] ?? Number.NaN))) - 1) * 100;
+/** The median over pairs of ours over baseline, minus 1, in percent. */
+function pairedPct(ours: number[], baseline: number[]): number {
+  return (median(ours.map((value, k) => value / (baseline[k] ?? Number.NaN))) - 1) * 100;
 }
 
-export function judge(scenario: string, official: GateInput, ours: GateInput, limits: GateLimits): Verdict {
+export function judge(scenario: string, baseline: GateInput, ours: GateInput, limits: GateLimits): Verdict {
   const verdict: Verdict = { scenario, failures: [] };
-  if (official.error) verdict.failures.push(`official failed: ${official.error}`);
+  if (baseline.error) verdict.failures.push(`baseline failed: ${baseline.error}`);
   if (ours.error) verdict.failures.push(`ours failed: ${ours.error}`);
-  if (official.runsMs.length === 0 || ours.runsMs.length === 0) {
+  if (baseline.runsMs.length === 0 || ours.runsMs.length === 0) {
     if (verdict.failures.length === 0) verdict.failures.push("no measured runs");
     return verdict;
   }
 
-  if (official.runsMs.length !== ours.runsMs.length || official.runPeaksMiB.length !== ours.runPeaksMiB.length) {
+  if (baseline.runsMs.length !== ours.runsMs.length || baseline.runPeaksMiB.length !== ours.runPeaksMiB.length) {
     verdict.failures.push(
-      `unpaired runs: ${ours.runsMs.length} of ours and ${official.runsMs.length} of official; run k of each must be pair k`,
+      `unpaired runs: ${ours.runsMs.length} of ours and ${baseline.runsMs.length} of baseline; run k of each must be pair k`,
     );
     return verdict;
   }
 
   verdict.pairs = ours.runsMs.length;
   const oursMs = median(ours.runsMs);
-  const officialMs = median(official.runsMs);
-  verdict.slowerPct = pairedPct(ours.runsMs, official.runsMs);
-  verdict.slowerP = beyondLimit(ours.runsMs, official.runsMs, limits.maxSlowerPct);
-  if (verdict.slowerP < limits.alpha && oursMs - officialMs > limits.timeFloorMs) {
+  const baselineMs = median(baseline.runsMs);
+  verdict.slowerPct = pairedPct(ours.runsMs, baseline.runsMs);
+  verdict.slowerP = beyondLimit(ours.runsMs, baseline.runsMs, limits.maxSlowerPct);
+  if (verdict.slowerP < limits.alpha && oursMs - baselineMs > limits.timeFloorMs) {
     verdict.failures.push(
-      `${verdict.slowerPct.toFixed(1)}% slower (${oursMs.toFixed(1)} vs ${officialMs.toFixed(1)} ms), more than ${limits.maxSlowerPct}% at p = ${verdict.slowerP.toPrecision(2)}`,
+      `${verdict.slowerPct.toFixed(1)}% slower (${oursMs.toFixed(1)} vs ${baselineMs.toFixed(1)} ms), more than ${limits.maxSlowerPct}% at p = ${verdict.slowerP.toPrecision(2)}`,
     );
   }
 
-  if (official.runPeaksMiB.length > 0 && ours.runPeaksMiB.length > 0) {
+  if (baseline.runPeaksMiB.length > 0 && ours.runPeaksMiB.length > 0) {
     const oursMiB = median(ours.runPeaksMiB);
-    const officialMiB = median(official.runPeaksMiB);
-    verdict.memoryPct = pairedPct(ours.runPeaksMiB, official.runPeaksMiB);
-    verdict.memoryP = beyondLimit(ours.runPeaksMiB, official.runPeaksMiB, limits.maxMemoryPct);
-    if (verdict.memoryP < limits.alpha && oursMiB - officialMiB > limits.memoryFloorMiB) {
+    const baselineMiB = median(baseline.runPeaksMiB);
+    verdict.memoryPct = pairedPct(ours.runPeaksMiB, baseline.runPeaksMiB);
+    verdict.memoryP = beyondLimit(ours.runPeaksMiB, baseline.runPeaksMiB, limits.maxMemoryPct);
+    if (verdict.memoryP < limits.alpha && oursMiB - baselineMiB > limits.memoryFloorMiB) {
       verdict.failures.push(
-        `${verdict.memoryPct.toFixed(1)}% more peak RSS per run (${oursMiB.toFixed(0)} vs ${officialMiB.toFixed(0)} MiB), more than ${limits.maxMemoryPct}% at p = ${verdict.memoryP.toPrecision(2)}`,
+        `${verdict.memoryPct.toFixed(1)}% more peak RSS per run (${oursMiB.toFixed(0)} vs ${baselineMiB.toFixed(0)} MiB), more than ${limits.maxMemoryPct}% at p = ${verdict.memoryP.toPrecision(2)}`,
       );
     }
   }
@@ -175,11 +177,11 @@ function probability(value: number | undefined): string {
   return value === undefined ? "-" : value.toPrecision(2);
 }
 
-export function gateTable(verdicts: Verdict[], limits: GateLimits): string {
+export function gateTable(verdicts: Verdict[], limits: GateLimits, baseline: string): string {
   const lines = [
-    `### Gate: fails when ours is more than ${limits.maxSlowerPct}% slower or ${limits.maxMemoryPct}% heavier than official at p < ${limits.alpha}`,
+    `### Gate: fails when ours is more than ${limits.maxSlowerPct}% slower or ${limits.maxMemoryPct}% heavier than the baseline, ${baseline}, at p < ${limits.alpha}`,
     "",
-    "| Scenario | Pairs | Time vs official, median pair | p (slower than limit) | Run peak RSS vs official, median pair | p (heavier than limit) | Result |",
+    "| Scenario | Pairs | Time vs baseline, median pair | p (slower than limit) | Run peak RSS vs baseline, median pair | p (heavier than limit) | Result |",
     "| --- | --- | --- | --- | --- | --- | --- |",
     ...verdicts.map(
       (v) =>

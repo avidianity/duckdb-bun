@@ -8,6 +8,7 @@ import { beforeAll, describe, expect, test } from "bun:test";
 import { DuckDBInstance as OursInstance } from "../src/index.ts";
 import { DUCKDB_VERSION_TAG } from "../src/version.ts";
 import { assertRealOfficialBinding } from "./official-binding.ts";
+import { HAS_REFERENCE, NO_REFERENCE } from "./reference.ts";
 
 // Canonicalize a decoded value from EITHER binding into a comparable primitive.
 // Ours already returns natives (Date/number/bigint/string); the live binding
@@ -63,13 +64,16 @@ const QUERIES = [
 ] as const;
 
 let live: typeof import("@duckdb/node-api") | null = null;
+if (!HAS_REFERENCE) console.warn(`tests/parity.test.ts: parity tests skipped: ${NO_REFERENCE}`);
+
 beforeAll(async () => {
+  if (!HAS_REFERENCE) return;
   // A missing or aliased official binding fails the run rather than skipping the comparison.
   assertRealOfficialBinding();
   live = await import("@duckdb/node-api");
 });
 
-describe("parity with @duckdb/node-api", () => {
+describe.skipIf(!HAS_REFERENCE)("parity with @duckdb/node-api", () => {
   // Guard: the differential comparison is only meaningful if BOTH bindings load
   // the same DuckDB version, and that version matches our pin. Fails loudly if
   // someone bumps src/version.ts or the @duckdb/node-api devDep without the other.
