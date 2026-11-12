@@ -8,6 +8,8 @@
 //!   `bun run fetch-lib`.
 //! - Test binaries get an absolute rpath to that directory, so they run without
 //!   `DYLD_LIBRARY_PATH` or `LD_LIBRARY_PATH`.
+//! - `cfg(coverage)` is declared, so the coverage-only code in src/diag.rs passes the
+//!   `unexpected_cfgs` lint.
 
 use std::env;
 use std::path::PathBuf;
@@ -15,6 +17,9 @@ use std::path::PathBuf;
 fn main() {
     println!("cargo::rerun-if-changed=build.rs");
     println!("cargo::rerun-if-env-changed=DUCKDB_LIB_DIR");
+    // `cargo llvm-cov` builds with `--cfg coverage`; src/diag.rs uses it to write the coverage
+    // profile of a crashing process (`bun run coverage`).
+    println!("cargo::rustc-check-cfg=cfg(coverage)");
 
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();

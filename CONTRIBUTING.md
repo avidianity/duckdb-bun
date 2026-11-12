@@ -24,6 +24,21 @@ Bun is pinned in `package.json` (`engines` and `packageManager`); use that versi
 | `bun run test:bindings`  | the vendored `@duckdb/node-bindings` test suite passes on our bindings |
 | `bun run parity`         | results and error text match the real `@duckdb/node-api` side by side |
 | `bun test`               | everything above plus the stress, leak, crash-report and compile tests |
+| `bun run coverage`       | coverage of `src/` and the Rust shim is at or above its floors        |
+
+## Coverage
+
+`bun run coverage` measures line and function coverage of `src/` and of the Rust shim in `native/src/`, and fails below a floor.
+It builds an instrumented shim, runs `cargo test`, the unit, runtime, official, bindings and parity suites in one `bun test` process, and the crash-report suite, all against that shim.
+It writes `coverage/ts/lcov.info` and `coverage/rust/lcov.info`; `bun run coverage --check` checks the floors of existing reports again.
+CI runs it on linux-x64 and uploads `coverage/` as the `coverage-linux-x64` artifact.
+
+The floors live in `FLOORS` in `scripts/coverage.ts`.
+Each floor is at least 90% of lines and 90% of functions, and a floor only moves up.
+No file is excluded from a report to meet a floor: every source file under `src/` and `native/src/` counts, and a file that no suite loads fails the check.
+Code that only a crashing process runs is measured too: in coverage builds the crash handler writes the profile before the process dies (`native/ABI.md`, "Diagnostics").
+
+It needs the `llvm-tools` component of the pinned Rust toolchain (`rustup component add llvm-tools`) and `cargo-llvm-cov` at the version the `coverage` job in `.github/workflows/ci.yml` installs.
 
 ## Rules
 

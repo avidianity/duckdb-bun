@@ -227,6 +227,7 @@ bun run parity          # side-by-side results against the real @duckdb/node-api
 bun run test:unit       # everything else
 bun run bench           # benchmarks against the real @duckdb/node-api (bench/README.md)
 bun run check           # Biome and the type check
+bun run coverage        # line and function coverage of src/ and the shim, with floors (CONTRIBUTING.md)
 ```
 
 [`CONTRIBUTING.md`](CONTRIBUTING.md) has the rules, and [`MAINTENANCE.md`](MAINTENANCE.md) the upgrade and release procedures.

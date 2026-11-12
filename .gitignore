@@ -25,3 +25,6 @@ dd-neo
 
 # Benchmark output, written by `bun run bench`
 /bench/results/
+
+# Coverage reports, written by `bun run coverage`
+/coverage/

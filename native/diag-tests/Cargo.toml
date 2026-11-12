@@ -11,3 +11,8 @@ libc = "=0.2.191"
 [[bin]]
 name = "diag-crash"
 path = "src/main.rs"
+
+# src/diag.rs has code for coverage builds only, under `cfg(coverage)`, which `cargo llvm-cov` sets.
+# The shim declares that cfg in native/build.rs; this crate has no build script, so it declares it here.
+[lints.rust]
+unexpected_cfgs = { level = "deny", check-cfg = ["cfg(coverage)"] }

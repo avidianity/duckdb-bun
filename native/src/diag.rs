@@ -677,10 +677,27 @@ extern "C" fn handle_fatal_signal(
         }
     }
     restore_previous(&[signal]);
+    #[cfg(coverage)]
+    write_coverage_profile();
     // The signal is blocked while this handler runs, so the re-raised signal stays pending and is
     // delivered to the previous action as soon as this handler returns.
     // SAFETY: raise is async-signal-safe (POSIX).
     unsafe { libc::raise(signal) };
+}
+
+/// Coverage builds only (`cargo llvm-cov` sets `cfg(coverage)`): writes this process's coverage
+/// profile before the signal kills it. The profiler runtime writes the profile from an `atexit`
+/// hook, which a process dying of a signal never runs, so without this call the crash report
+/// code would count as unexecuted. Writing the profile is not async-signal-safe; that is accepted
+/// in a coverage build, and release builds do not contain this function.
+#[cfg(coverage)]
+fn write_coverage_profile() {
+    unsafe extern "C" {
+        /// Part of the LLVM profiler runtime that `-C instrument-coverage` links in.
+        fn __llvm_profile_write_file() -> c_int;
+    }
+    // SAFETY: the profiler runtime is linked into every coverage build; the call takes no arguments.
+    unsafe { __llvm_profile_write_file() };
 }
 
 fn signal_name(signal: c_int) -> &'static str {

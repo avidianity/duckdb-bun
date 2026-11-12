@@ -148,3 +148,5 @@ An entry prints ` text="..."` only when it has text, with control and non-ASCII 
 A thread without a registered name prints as its id; the JS thread is `js`.
 
 Then it restores the previous handler and re-raises the signal, so Bun's own crash report and the exit status stay as they are.
+In a coverage build only (`cfg(coverage)`, which `cargo llvm-cov` sets), it first writes the process's coverage profile with `__llvm_profile_write_file()`, because a process that dies of a signal never runs the profiler's exit hook.
+That call is not async-signal-safe; release builds do not contain it.
