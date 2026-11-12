@@ -155,25 +155,26 @@ for (const [name, sql, bind] of BIND_CASES) {
   parity(`prepared ${name}`, bound(sql, bind), { official: "ok" });
 }
 
-parity(
-  "prepared statement metadata",
-  (api) =>
-    withConnection(api, async (connection) => {
-      await connection.run("CREATE TABLE t (id INTEGER, name VARCHAR)");
-      const statements: Record<string, string> = {
-        select: "SELECT $id::INTEGER AS id, $name AS name, 1.5::DECIMAL(18,3) AS d",
-        insert: "INSERT INTO t VALUES ($1, $2)",
-        update: "UPDATE t SET name = ? WHERE id = ?",
-        delete: "DELETE FROM t WHERE id = $1",
-        create: "CREATE TABLE u (i INTEGER)",
-        explain: "EXPLAIN SELECT 1",
-        pragma: "PRAGMA table_info('t')",
-        set: "SET threads = 2",
-      };
-      const out: Record<string, unknown> = {};
-      for (const [key, sql] of Object.entries(statements)) {
+const METADATA_STATEMENTS: Record<string, string> = {
+  select: "SELECT $id::INTEGER AS id, $name AS name, 1.5::DECIMAL(18,3) AS d",
+  insert: "INSERT INTO t VALUES ($1, $2)",
+  update: "UPDATE t SET name = ? WHERE id = ?",
+  delete: "DELETE FROM t WHERE id = $1",
+  create: "CREATE TABLE u (i INTEGER)",
+  explain: "EXPLAIN SELECT 1",
+  pragma: "PRAGMA table_info('t')",
+  set: "SET threads = 2",
+};
+
+// Isolated: reading the column type of some statements can crash a binding.
+for (const [kind, sql] of Object.entries(METADATA_STATEMENTS)) {
+  parity(
+    `prepared statement metadata: ${kind}`,
+    (api) =>
+      withConnection(api, async (connection) => {
+        await connection.run("CREATE TABLE t (id INTEGER, name VARCHAR)");
         const prepared = await connection.prepare(sql);
-        out[key] = {
+        return {
           statementType: prepared.statementType,
           parameterCount: prepared.parameterCount,
           parameterNames: Array.from({ length: prepared.parameterCount }, (_, i) => prepared.parameterName(i + 1)),
@@ -184,16 +185,17 @@ parity(
             ),
           ),
           columnCount: prepared.columnCount,
-          columns: Array.from({ length: prepared.columnCount }, (_, i) => [
-            prepared.columnName(i),
-            String(prepared.columnType(i)),
-          ]),
+          // Some statements (SET, for example) report a column of an invalid type, which throws.
+          columns: await Promise.all(
+            Array.from({ length: prepared.columnCount }, (_, i) =>
+              capture(() => [prepared.columnName(i), prepared.columnTypeId(i), String(prepared.columnType(i))]),
+            ),
+          ),
         };
-      }
-      return out;
-    }),
-  { official: "ok" },
-);
+      }),
+    { official: "ok", isolate: true },
+  );
+}
 
 parity(
   "prepared statement reruns with new bindings, and rowsChanged",
