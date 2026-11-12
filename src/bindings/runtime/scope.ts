@@ -102,11 +102,17 @@ export function userDataOf(id: number | bigint): unknown {
 // --- running user callbacks ----------------------------------------------------------------
 
 /**
- * The message DuckDB reports for a thrown value: an Error's message, as the
- * official binding's Napi::Error::Message(), or the value as a string.
+ * The message DuckDB reports for a thrown value, as the official binding's
+ * Napi::Error::Message(): the value's "message" property when the value is an
+ * object and that property is a string, otherwise an empty message. A thrown
+ * string therefore fails the query with "Invalid Input Error: " and no text.
  */
 export function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  if ((typeof error === "object" && error !== null) || typeof error === "function") {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string") return message;
+  }
+  return "";
 }
 
 /**

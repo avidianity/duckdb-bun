@@ -109,7 +109,14 @@ test("a thrown error becomes the query's error, whatever was thrown", async () =
     throw "a plain string";
   });
   duckdb.register_scalar_function(connection, throwsString);
-  await expect(duckdb.query(connection, "SELECT throws_string(1)")).rejects.toThrow("a plain string");
+  // The official binding reads a "message" property, which a string lacks, so the text is empty.
+  await expect(duckdb.query(connection, "SELECT throws_string(1)")).rejects.toThrow(/^Invalid Input Error: $/);
+
+  const throwsObject = bigintFunction("throws_object", () => {
+    throw { message: "an object with a message" };
+  });
+  duckdb.register_scalar_function(connection, throwsObject);
+  await expect(duckdb.query(connection, "SELECT throws_object(1)")).rejects.toThrow("an object with a message");
 
   const bindThrows = bigintFunction("bind_throws", () => {});
   duckdb.scalar_function_set_bind(bindThrows, () => {

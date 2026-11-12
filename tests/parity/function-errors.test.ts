@@ -28,13 +28,6 @@ async function runThenRecover(connection: DuckDBConnection, sql: string) {
 const STAGES: Stage[] = ["bind", "init", "main"];
 const FAILURES: Failure[] = ["throw Error", "throw string", "setError"];
 
-/**
- * Known divergence, not yet fixed: when a callback throws a value that is not an Error, the
- * official binding reports an empty message ("Invalid Input Error: ") and ours reports
- * String(value) (src/bindings/runtime/scope.ts). These scenarios run once the two agree.
- */
-const SKIP_NON_ERROR_THROW = (failure: Failure) => failure === "throw string";
-
 function scalarFunction(api: Api, failAt: Stage, failure: Failure) {
   const main: DuckDBScalarMainFunction = (info, input, output) => {
     if (failAt === "main") fail(failure, "scalar main", info);
@@ -61,7 +54,7 @@ for (const stage of STAGES) {
           connection.registerScalarFunction(scalarFunction(api, stage, failure));
           return runThenRecover(connection, "SELECT doubled(i::INTEGER) AS d FROM range(3) t(i)");
         }),
-      { official: "ok", skip: SKIP_NON_ERROR_THROW(failure) },
+      { official: "ok" },
     );
   }
 }
@@ -95,7 +88,7 @@ for (const stage of STAGES) {
           connection.registerTableFunction(tableFunction(api, stage, failure));
           return runThenRecover(connection, "SELECT * FROM one_row()");
         }),
-      { official: "ok", skip: SKIP_NON_ERROR_THROW(failure) },
+      { official: "ok" },
     );
   }
 }
