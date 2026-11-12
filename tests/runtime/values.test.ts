@@ -98,10 +98,12 @@ test("a value's type stays usable while only the type is reachable", () => {
   expect(lt.get_type_id(type)).toBe(Type.SQLNULL);
 });
 
-test("scalar getters refuse a NULL value with the official error instead of aborting the process", () => {
+test("scalar getters throw DuckDB's internal error for a NULL value instead of aborting the process", () => {
   const untyped = v.create_null_value();
   const typed = v.get_list_child(v.create_list_value(lt.create_logical_type(Type.INTEGER), [untyped]), 0);
-  const thrown = new Error("A native exception was thrown");
+  // libduckdb throws a C++ InternalException, which the shim's boundary turns into DuckDB's message.
+  const thrown =
+    /^INTERNAL Error: Calling (GetValueInternal on a value that is NULL|StringValue::Get on a NULL value)\n/;
   for (const value of [untyped, typed]) {
     expect(v.is_null_value(value)).toBe(true);
     expect(() => v.get_bool(value)).toThrow(thrown);
