@@ -7,6 +7,9 @@ on:
   # The upstream-check workflow dispatches CI on the upgrade branches it pushes: a pull request opened with
   # GITHUB_TOKEN starts its pull_request run only after approval, but workflow_dispatch always creates a run.
   workflow_dispatch:
+  # Nightly: the same jobs, with the fuzz step at nightly length (bun run fuzz:nightly).
+  schedule:
+    - cron: "0 3 * * *" # every day 03:00 UTC
 
 permissions:
   contents: read
@@ -118,6 +121,21 @@ jobs:
 
       - name: Parity with @duckdb/node-api
         run: bun run parity
+
+      # Property-based and fuzz tests against the official packages (tests/fuzz/). Pushes and pull requests use a
+      # fixed seed; the nightly run draws a new one and prints it first. A failure prints the command that replays it.
+      - name: Fuzz against @duckdb/node-api and @duckdb/node-bindings
+        run: bun run ${{ github.event_name == 'schedule' && 'fuzz:nightly' || 'fuzz' }}
+
+      # The nightly run keeps the last case each fuzz file started, for a crash fast-check could not report.
+      - name: Upload the fuzz trace
+        if: ${{ failure() && github.event_name == 'schedule' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fuzz-trace-${{ matrix.platform }}
+          path: fuzz-trace/
+          if-no-files-found: ignore
+          retention-days: 30
 
       # The heavy suites run one at a time, each in its own step.
       - name: Compile proof

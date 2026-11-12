@@ -31,3 +31,6 @@ dd-neo
 
 # Soak reports, written by `bun run soak`
 /soak-report/
+
+# Fuzz trace files, written by `bun run fuzz:nightly`
+/fuzz-trace/

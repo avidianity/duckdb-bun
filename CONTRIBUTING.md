@@ -17,16 +17,23 @@ Bun is pinned in `package.json` (`engines` and `packageManager`); use that versi
 
 ## Checks
 
-| Command                    | What it proves                                                           |
-| -------------------------- | ------------------------------------------------------------------------ |
-| `bun run check`            | Biome lint and format, then `bun check` type checking                    |
-| `bun run test:official`    | the vendored `@duckdb/node-api` test suite passes on our bindings        |
-| `bun run test:bindings`    | the vendored `@duckdb/node-bindings` test suite passes on our bindings   |
-| `bun run parity`           | results and error text match the real `@duckdb/node-api` side by side    |
-| `bun run test:concurrency` | concurrent calls of every kind and Workers stay correct and settle       |
-| `bun run soak`             | a long service-like load keeps memory, handles and the event loop steady |
-| `bun test`                 | everything above plus the stress, leak, crash-report and compile tests   |
-| `bun run coverage`         | coverage of `src/` and the Rust shim is at or above its floors           |
+| Command                    | What it proves                                                                                 |
+| -------------------------- | ---------------------------------------------------------------------------------------------- |
+| `bun run check`            | Biome lint and format, then `bun check` type checking                                          |
+| `bun run test:official`    | the vendored `@duckdb/node-api` test suite passes on our bindings                              |
+| `bun run test:bindings`    | the vendored `@duckdb/node-bindings` test suite passes on our bindings                         |
+| `bun run parity`           | results and error text match the real `@duckdb/node-api` side by side                          |
+| `bun run fuzz`             | generated values of every type, and random binding calls, match the real packages side by side |
+| `bun run test:concurrency` | concurrent calls of every kind and Workers stay correct and settle                             |
+| `bun run soak`             | a long service-like load keeps memory, handles and the event loop steady                       |
+| `bun test`                 | everything above plus the stress, leak, crash-report and compile tests                         |
+| `bun run coverage`         | coverage of `src/` and the Rust shim is at or above its floors                                 |
+
+## Fuzz
+
+`bun run fuzz` (`tests/fuzz/`) runs property tests with a fixed seed, so a result never changes across runs of one commit.
+A failure prints the command that replays it; `tests/fuzz/config.ts` lists the knobs (`FUZZ_RUNS`, `FC_SEED`, `FC_PATH`, `FUZZ_TRACE`).
+CI runs it on every push, and every night at nightly length with a new seed (`bun run fuzz:nightly`), which prints its seed first.
 
 ## Concurrency stress
 
