@@ -48,9 +48,16 @@ fn wait_until(what: &str, done: impl Fn() -> bool) {
 }
 
 /// Waits for `job` to be posted, then reads and frees it as JavaScript does.
+///
+/// The job leaves `COMPLETED` before it is freed: the allocator may give its
+/// address to the next job, which must not look completed before it is.
 fn finish(job: *mut Job) -> u64 {
     assert!(!job.is_null(), "job did not start");
     wait_until("a job", || completed().contains(&(job as usize)));
+    COMPLETED
+        .lock()
+        .unwrap()
+        .retain(|&posted| posted != job as usize);
     // SAFETY: a completed job, freed once.
     unsafe {
         assert!(!jobs::dbs_job_failed(job), "job failed");
