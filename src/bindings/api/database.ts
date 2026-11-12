@@ -1,7 +1,7 @@
 // Instance cache, database, config, connection, client context and catalog
 // functions of the @duckdb/node-bindings contract. Semantics and error text
 // follow the official binding (bindings/src/duckdb_node_bindings.cpp and
-// promise_workers.h at the vendored tag).
+// promise_workers.h at the fork tag).
 import type { Pointer } from "bun:ffi";
 import type {
   Catalog,

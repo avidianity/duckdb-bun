@@ -1,5 +1,5 @@
 // JavaScript argument checks and conversions, ported from the official binding's
-// bindings/src/conversion_helpers.h (vendored tag), with the same error text.
+// bindings/src/conversion_helpers.h (fork tag), with the same error text.
 // Where the official binding gets a JS value through a node-addon-api cast, a
 // value of the wrong JS type fails with N-API's own message, such as
 // "A number was expected", and these helpers throw the same. node-addon-api

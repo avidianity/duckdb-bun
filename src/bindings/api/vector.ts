@@ -1,7 +1,7 @@
 // Vector, validity mask and raw data functions of the @duckdb/node-bindings
 // contract. Semantics and error text follow the official binding
 // (bindings/src/duckdb_node_bindings.cpp and conversion_helpers.h at the
-// vendored tag).
+// fork tag).
 //
 // vector_get_data, vector_get_validity and get_data_from_pointer return Buffers
 // over DuckDB's memory, as the official external buffers do, of the byte count

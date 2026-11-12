@@ -86,10 +86,10 @@ jobs:
         working-directory: native
         run: cargo test
 
-      - name: Official @duckdb/node-api suite
+      - name: API suite (tests/api)
         run: bun run test:api
 
-      - name: Official @duckdb/node-bindings suite
+      - name: Bindings suite (tests/bindings)
         run: bun run test:bindings
 
       - name: Parity with @duckdb/node-api
@@ -177,10 +177,10 @@ jobs:
         working-directory: native
         run: cargo test
 
-      - name: Official @duckdb/node-api suite
+      - name: API suite (tests/api)
         run: bun run test:api
 
-      - name: Official @duckdb/node-bindings suite
+      - name: Bindings suite (tests/bindings)
         run: bun run test:bindings
 
       - name: Parity with @duckdb/node-api

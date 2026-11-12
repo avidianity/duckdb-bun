@@ -57,7 +57,7 @@ The upgrade pull request closes the open issue for its DuckDB release; close any
 ### The upgrade pull request
 
 The `upstream-check` workflow upgrades on its own once a `@duckdb/node-api` built on the new DuckDB is on npm.
-It runs `bun run upgrade-duckdb --duckdb <new> --node-api <new>-r.<n>` with a read-only token, which does steps 1 to 6 of the manual procedure below.
+It runs `bun run upgrade-duckdb --duckdb <new> --node-api <new>-r.<n>` with a read-only token, which does steps 1 to 5 of the manual procedure below.
 It then pushes the branch `upgrade/duckdb-<new>-r.<n>`, dispatches `ci.yml` on it, and opens a pull request.
 GitHub starts no `pull_request` run without approval for a pull request that `GITHUB_TOKEN` opened, but a `workflow_dispatch` event always creates a run, so the dispatched run is the pull request's CI.
 The pull request links that run.
@@ -65,28 +65,28 @@ The workflow needs the repository setting "Allow GitHub Actions to create and ap
 
 To land the pull request:
 
-1. Wait for the dispatched CI run; it runs the official suites, parity, the bench gate, and every other check.
-2. Do what the pull request lists under "Left for a human", such as steps 5 and 7 below, and push to the branch, which starts CI as usual.
+1. Wait for the dispatched CI run; it runs the API and bindings suites, parity, the bench gate, and every other check.
+2. Do what the pull request lists under "Left for a human", such as steps 4 and 6 below, and push to the branch, which starts CI as usual.
 3. Merge it with CI green, and release the version it set, as [Releasing](#releasing) describes from step 3.
 
 ### By hand
 
 Upgrade by hand when the workflow opened an issue instead, or to try a release before the workflow runs.
-`bun run upgrade-duckdb` does steps 1 to 6, and `--dry-run` checks the target and prints its plan without writing anything.
+`bun run upgrade-duckdb` does steps 1 to 5, and `--dry-run` checks the target and prints its plan without writing anything.
 
 1. Set `DUCKDB_VERSION` in `src/version.ts`.
 2. Pin the reference with `bun add --dev --exact @duckdb/node-api@<new>-r.<n>`.
-3. Re-vendor `duckdb-node-neo` at the tag of that release, as `vendor/node-api/PROVENANCE.md` describes, and run `bun run gen:contract`.
-4. Run `bun run fetch-lib all`, `bun run vendor:api-spec` and `bun run gen:ffi`.
-5. Set `libduckdb-sys` in `native/Cargo.toml` to the newest `1.<MAJOR><MINOR><PATCH>.x` release, the duckdb-rs scheme in which DuckDB 2.0.1 is `1.20001.x`, and run `cargo update --manifest-path native/Cargo.toml --package libduckdb-sys --precise <version>`.
+3. Run `bun run fetch-lib all`, `bun run vendor:api-spec` and `bun run gen:ffi`.
+4. Set `libduckdb-sys` in `native/Cargo.toml` to the newest `1.<MAJOR><MINOR><PATCH>.x` release, the duckdb-rs scheme in which DuckDB 2.0.1 is `1.20001.x`, and run `cargo update --manifest-path native/Cargo.toml --package libduckdb-sys --precise <version>`.
    When crates.io has no such release yet, keep the old one and repeat this step once duckdb-rs publishes it.
    Dependabot ignores that crate for this reason.
-6. Release as the next minor version (ADR 0004): set it in every `package.json` and in `optionalDependencies`, run `bun install`, and add its row to the `README.md` `Versions` table and its opening sentence.
+5. Release as the next minor version (ADR 0004): set it in every `package.json` and in `optionalDependencies`, run `bun install`, and add its row to the `README.md` `Versions` table and its opening sentence.
    When the table already has a row for the new DuckDB, keep that row's version.
-7. Read `git diff vendor/duckdb.h` for changes to functions that `src/bindings/` or `native/` call.
+6. Read `git diff vendor/duckdb.h` for changes to functions that `src/bindings/` or `native/` call.
    Update both sides and `native/ABI.md` together.
-8. Run `bun run build:native` and every check from the CI workflow, in its order.
-9. Commit with a message such as `build(deps): upgrade DuckDB to v2.1.0`.
+   Port new C API surface that the API should expose: the function in `src/bindings/node-bindings.d.ts` and `src/bindings/`, then its use in `src/api/`, with tests in `tests/bindings/` and `tests/api/` (ADR 0009).
+7. Run `bun run build:native` and every check from the CI workflow, in its order.
+8. Commit with a message such as `build(deps): upgrade DuckDB to v2.1.0`.
 
 ## Releasing
 
@@ -167,7 +167,7 @@ The linux-x64 and linux-arm64 jobs pull the same reference, and each runner take
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | `tests/version.test.ts` fails                              | the fetched `libduckdb` is not the pinned version                                     | run `bun run fetch-lib`                                                                      |
 | `bun run check-version` reports a disagreement             | a version was bumped in one place only                                                | the list in [Packages and versions](#packages-and-versions)                                  |
-| a query diverges in `bun run parity`                       | a value or error differs from the official binding                                    | `src/bindings/`                                                                              |
+| a query diverges in `bun run parity`                       | a value or error differs from the official binding                                    | `src/api/`, `src/bindings/`                                                                  |
 | `bun run fuzz` fails                                       | a generated case differs from the official packages                                   | the printed replay command, then `src/bindings/`                                             |
 | `dlopen` reports an undefined symbol                       | a C function the shim or the bindings call changed                                    | `vendor/duckdb.h`, `native/ABI.md`, `src/bindings/ffi.ts`                                    |
 | a process prints `[duckdb-bun] fatal signal`               | a native crash; the report lists the last binding events                              | `native/ABI.md`, then the ring entries in the report                                         |

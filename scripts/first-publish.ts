@@ -191,10 +191,11 @@ async function checkTarball(pkg: Pkg, version: string, scratch: string): Promise
     "src/bindings/index.ts",
     "src/api/index.ts",
     "src/bindings/node-bindings.d.ts",
+    "src/api/LICENSE",
   ];
   const missing = required.filter((entry) => !entries.includes(entry));
   if (missing.length > 0) fail(`${pkg.name} is missing ${missing.join(", ")}`);
-  const allowed = /^(LICENSE|README\.md|package\.json|src\/.+\.ts|src\/api\/PROVENANCE\.md)$/;
+  const allowed = /^(LICENSE|README\.md|package\.json|src\/.+\.ts|src\/api\/(LICENSE|PROVENANCE\.md))$/;
   const unexpected = entries.filter((entry) => !allowed.test(entry));
   if (unexpected.length > 0) fail(`${pkg.name} holds unexpected files: ${unexpected.join(", ")}`);
   console.log(`  ${pkg.name}: ${entries.length} files`);

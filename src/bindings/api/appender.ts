@@ -1,6 +1,6 @@
 // Appender functions of the @duckdb/node-bindings contract. Semantics and
 // error text follow the official binding (bindings/src/duckdb_node_bindings.cpp
-// at the vendored tag): every failing call throws DuckDB's appender error.
+// at the fork tag): every failing call throws DuckDB's appender error.
 import type { Pointer } from "bun:ffi";
 import type {
   Appender,

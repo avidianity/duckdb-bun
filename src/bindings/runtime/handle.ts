@@ -2,7 +2,7 @@
 // (docs/adr/0002-handles-are-objects-freed-by-a-finalization-registry.md).
 //
 // Each handle mirrors one N-API external of the official binding
-// (bindings/src/externals.h at the vendored tag): it carries a kind that plays
+// (bindings/src/externals.h at the fork tag): it carries a kind that plays
 // the role of the external's type tag, so passing the wrong handle throws the
 // same "Invalid <kind> argument" error, and a destroy function that a
 // FinalizationRegistry runs once the handle is unreachable.

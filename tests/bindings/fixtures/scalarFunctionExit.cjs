@@ -1,3 +1,6 @@
+// Derived from duckdb-node-neo v2.0.0-r.1 (https://github.com/duckdb/duckdb-node-neo).
+// Copyright 2018-2025 Stichting DuckDB Foundation. MIT License; src/api/LICENSE holds the notice.
+
 // Registers a scalar function and then lets the script end, so the parent test
 // can check whether the process exits on its own.
 //

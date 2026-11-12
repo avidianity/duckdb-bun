@@ -1,3 +1,6 @@
+// Derived from duckdb-node-neo v2.0.0-r.1 (https://github.com/duckdb/duckdb-node-neo).
+// Copyright 2018-2025 Stichting DuckDB Foundation. MIT License; src/api/LICENSE holds the notice.
+
 /**
  * Decodes an unsigned LEB128 (little-endian base-128) varint at
  * `view[offset]`. Each byte contributes 7 bits of payload; the high bit is

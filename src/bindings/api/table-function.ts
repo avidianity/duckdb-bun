@@ -1,6 +1,6 @@
 // Table function functions of the @duckdb/node-bindings contract. Semantics
 // and error text follow the official binding (bindings/src/duckdb_node_bindings.cpp
-// and table_function_helpers.h at the vendored tag).
+// and table_function_helpers.h at the fork tag).
 //
 // As for scalar functions (scalar-function.ts), the callbacks and extra info
 // live in one state object per TableFunction, DuckDB holds only ids, and the

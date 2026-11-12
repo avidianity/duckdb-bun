@@ -1,3 +1,6 @@
+// Derived from duckdb-node-neo v2.0.0-r.1 (https://github.com/duckdb/duckdb-node-neo).
+// Copyright 2018-2025 Stichting DuckDB Foundation. MIT License; src/api/LICENSE holds the notice.
+
 /** Matches BLOB-to-VARCHAR conversion behavior of DuckDB. */
 export function stringFromBlob(bytes: Uint8Array): string {
   // String concatenation appears to be faster for this function at smaller sizes.

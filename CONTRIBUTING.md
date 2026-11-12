@@ -21,8 +21,8 @@ Building the shim (`bun run build:native`, `cargo test`) needs the Rust toolchai
 | Command                    | What it proves                                                                                 |
 | -------------------------- | ---------------------------------------------------------------------------------------------- |
 | `bun run check`            | Biome lint and format, then `bun check` type checking                                          |
-| `bun run test:official`    | the vendored `@duckdb/node-api` test suite passes on our bindings                              |
-| `bun run test:bindings`    | the vendored `@duckdb/node-bindings` test suite passes on our bindings                         |
+| `bun run test:api`         | the API suite (`tests/api/`) passes                                                            |
+| `bun run test:bindings`    | the bindings suite (`tests/bindings/`) passes                                                  |
 | `bun run parity`           | results and error text match the real `@duckdb/node-api` side by side                          |
 | `bun run fuzz`             | generated values of every type, and random binding calls, match the real packages side by side |
 | `bun run test:concurrency` | concurrent calls of every kind and Workers stay correct and settle                             |
@@ -67,7 +67,7 @@ The job's comment explains why the Bun suites do not run against an ASan shim.
 ## Coverage
 
 `bun run coverage` measures line and function coverage of `src/` and of the Rust shim in `native/src/`, and fails below a floor.
-It builds an instrumented shim, runs `cargo test`, the unit, runtime, official, bindings and parity suites in one `bun test` process, and the crash-report suite, all against that shim.
+It builds an instrumented shim, runs `cargo test`, the unit, runtime, API, bindings and parity suites in one `bun test` process, and the crash-report suite, all against that shim.
 It also measures `native/diag-tests`, which builds `native/src/diag.rs` on its own and crashes child processes on purpose.
 Its hits count for the shim's own lines and functions in `diag.rs`; code only that crate compiles, such as the unit tests in `diag.rs`, is not added to the shim's total.
 It writes `coverage/ts/lcov.info`, `coverage/rust/lcov.info` and `coverage/rust/diag-tests.lcov`; `bun run coverage --check` checks the floors of existing reports again.
@@ -85,13 +85,19 @@ It needs the `llvm-tools` component of the pinned Rust toolchain (`rustup compon
 
 - Verify every version-specific fact about Bun, `bun:ffi`, or the DuckDB C API against the installed version's docs or source before you rely on it.
   Training data and blog posts go stale; name the source in the pull request.
-- Fix behavior in `src/bindings/`, never in the vendored upstream code under `vendor/`.
-  The official C++ binding is the reference for semantics and error text.
+- The API layer in `src/api/` and its suites in `tests/api/` and `tests/bindings/` are ours, forked from duckdb-node-neo ([ADR 0009](docs/adr/0009-the-api-layer-is-ours.md)).
+  Fix behavior where it lives, in `src/api/` or `src/bindings/`, and keep the DuckDB Foundation notice at the top of each derived file.
+  The official C++ binding at the fork tag in `src/api/PROVENANCE.md` is the reference for the semantics and error text of the bindings it has.
 - Never block the JS thread for the length of a query, and never let a native thread touch memory the JS heap owns.
 - Every behavior change ships with a test; a bug fix starts with a test that reproduces the bug through the public API.
-- Do not edit a vendored test to make it pass.
-- Classify a failing test before fixing it: introduced by your change, pre-existing, or environmental.
-  Fix what you introduced; report the rest in an issue.
+- Never weaken a test to make it pass; change a test only when the behavior it checks changes on purpose.
+- All CI must pass.
+  When a check fails, fix it, even when the cause is a dependency: Bun, libduckdb, a GitHub Action, an npm package, or the runner image.
+  Fix it on our side: a workaround in our code, a pin, a patch in our build, or a test that covers the case.
+  Do not wait for upstream, and never disable or skip a check or mark it as allowed to fail.
+- Classify a failure before fixing it: introduced by your change, pre-existing, or environmental; all three get fixed.
+  Stop after two failed attempts on one root cause.
+  Then, or when no fix on our side is possible, report the failing check, the run URL, the decisive error line, and why it cannot be fixed here, and move on.
 - A flaky test is a bug, not something to retry.
 - Prefer a battle-tested library or the platform API over hand-rolled code, and pin every dependency to an exact version.
 - Record a hard-to-reverse decision as an ADR in `docs/adr/`.

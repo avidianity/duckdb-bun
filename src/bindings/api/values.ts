@@ -1,7 +1,7 @@
 // Value functions of the @duckdb/node-bindings contract: duckdb_create_*,
 // duckdb_get_* and the nested value accessors. Semantics, error text and memory
 // ownership follow the official binding (bindings/src/duckdb_node_bindings.cpp
-// at the vendored tag) and the C API docs in vendor/duckdb.h.
+// at the fork tag) and the C API docs in vendor/duckdb.h.
 import { type Pointer, ptr } from "bun:ffi";
 import type {
   Date_,
