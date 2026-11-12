@@ -22,7 +22,7 @@ Bun is pinned in `package.json` (`engines` and `packageManager`); use that versi
 | `bun run check`          | Biome lint and format, then `bun check` type checking                 |
 | `bun run test:official`  | the vendored `@duckdb/node-api` test suite passes on our bindings     |
 | `bun run test:bindings`  | the vendored `@duckdb/node-bindings` test suite passes on our bindings |
-| `bun run parity`         | results match the real `@duckdb/node-api` side by side                |
+| `bun run parity`         | results and error text match the real `@duckdb/node-api` side by side |
 | `bun test`               | everything above plus the stress, leak, crash-report and compile tests |
 
 ## Rules
