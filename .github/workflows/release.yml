@@ -247,6 +247,13 @@ jobs:
         with:
           bun-version-file: package.json
 
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # The declarations in dist/ that each export's "types" condition names (ADR 0010).
+      - name: Build the type declarations
+        run: bun run build:types
+
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: duckdb-bun-linux-x64

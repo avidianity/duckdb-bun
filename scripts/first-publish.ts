@@ -8,6 +8,7 @@
 //
 //  1. Finds the Release run that built the tag `v<version>` with publish off, and checks every build job passed.
 //  2. Checks the tag out into a temporary worktree and downloads every platform package into it.
+//     Builds the type declarations there (bun run build:types, ADR 0010).
 //  3. Runs `check-version --tag --publish`, packs every tarball, and checks each one: its file list,
 //     its package.json, the CPU architecture of every native library, and the glibc each Linux library needs.
 //  4. Shows the npm account and what it will publish, and asks for confirmation unless --yes.
@@ -19,7 +20,7 @@
 // A version already on npm is skipped, so a failed run can be re-run. Auth comes from the npm config Bun
 // reads (~/.npmrc, or NPM_CONFIG_TOKEN with a short-lived granular token); `bun pm whoami` must succeed.
 
-import { copyFile, mkdtemp, readdir, rm } from "node:fs/promises";
+import { copyFile, mkdtemp, readdir, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
@@ -193,10 +194,13 @@ async function checkTarball(pkg: Pkg, version: string, scratch: string): Promise
     "src/api/index.ts",
     "src/bindings/node-bindings.d.ts",
     "src/api/LICENSE",
+    "dist/neo.d.ts",
+    "dist/index.d.ts",
+    "dist/bindings/node-bindings.d.ts",
   ];
   const missing = required.filter((entry) => !entries.includes(entry));
   if (missing.length > 0) fail(`${pkg.name} is missing ${missing.join(", ")}`);
-  const allowed = /^(LICENSE|README\.md|package\.json|src\/.+\.ts|src\/api\/(LICENSE|PROVENANCE\.md))$/;
+  const allowed = /^(LICENSE|README\.md|package\.json|src\/.+\.ts|dist\/.+\.d\.ts|src\/api\/(LICENSE|PROVENANCE\.md))$/;
   const unexpected = entries.filter((entry) => !allowed.test(entry));
   if (unexpected.length > 0) fail(`${pkg.name} holds unexpected files: ${unexpected.join(", ")}`);
   console.log(`  ${pkg.name}: ${entries.length} files`);
@@ -260,6 +264,11 @@ try {
     }
     console.log(`  ${platform}: ${files.join(", ")}`);
   }
+
+  step("Type declarations");
+  // The worktree has no node_modules; the repository's own give the build TypeScript and Bun's types.
+  await symlink(join(ROOT, "node_modules"), join(worktree, "node_modules"));
+  await $`bun run build:types`.cwd(worktree);
 
   step("Versions and native files");
   await $`bun run check-version --tag ${tag} --publish`.cwd(worktree);

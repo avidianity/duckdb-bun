@@ -13,7 +13,7 @@ It loads libduckdb as a plain shared library, so `bun build --compile` produces 
 import { DuckDBInstance } from "@avidian/duckdb-bun"; // was "@duckdb/node-api"
 ```
 
-Version 1.0.1 bundles DuckDB v2.0.0; [Versions](#versions) maps every release.
+Version 1.0.2 bundles DuckDB v2.0.0; [Versions](#versions) maps every release.
 
 ## Install
 
@@ -34,6 +34,8 @@ Bun installs only the one that matches the host.
 Do not install with `--no-optional`.
 Other platforms are not supported yet, because the native shim is built per platform.
 
+The package ships type declarations in `dist/` for type checkers, and its TypeScript source for Bun to run, so a strict `tsconfig.json` checks only your code ([ADR 0010](docs/adr/0010-the-package-publishes-type-declarations.md)).
+
 ## Versions
 
 The package has its own semantic version, independent of DuckDB's:
@@ -48,6 +50,7 @@ Every release is a stable version, so a range such as `^1.0.0` takes every compa
 | --- | --- | --- |
 | 1.0.0 | 2.0.0 | 2.0.0-r.1 |
 | 1.0.1 | 2.0.0 | 2.0.0-r.1 |
+| 1.0.2 | 2.0.0 | 2.0.0-r.1 |
 
 A release follows a DuckDB release without waiting for `@duckdb/node-api`.
 The last column names the `@duckdb/node-api` release that parity, fuzz and the bench compared it against, built on the same DuckDB, or `none` when npm had none yet.
