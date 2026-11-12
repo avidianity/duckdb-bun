@@ -3,7 +3,7 @@
 // official binding's own messages.
 
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import duckdb, { type Connection, type Database, Type } from "../../src/bindings/next.ts";
+import duckdb, { type Connection, type Database, Type } from "../../src/bindings/index.ts";
 
 let database: Database;
 let connection: Connection;

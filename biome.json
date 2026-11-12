@@ -17,10 +17,14 @@
     "enabled": true,
     "rules": {
       "preset": "recommended",
+      "style": {
+        "useImportType": "error"
+      },
       "suspicious": {
         "noExplicitAny": "off"
       },
       "correctness": {
+        "noUnusedImports": "error",
         "noUnusedVariables": "error"
       }
     }

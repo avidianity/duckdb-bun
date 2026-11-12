@@ -12,7 +12,7 @@ import duckdb, {
   type TableFunctionInfo,
   type TableFunctionInitInfo,
   Type,
-} from "../../src/bindings/next.ts";
+} from "../../src/bindings/index.ts";
 
 let database: Database;
 let connection: Connection;

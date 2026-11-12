@@ -15,9 +15,7 @@
 // in Bun's virtual `/$bunfs/` filesystem that dlopen cannot read.
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, join } from "node:path";
-import shimSource from "../native/shim.c" with { type: "file" };
-import duckdbHeader from "../vendor/duckdb.h" with { type: "file" };
+import { basename, join } from "node:path";
 
 export interface NativePaths {
   /** Absolute path to libduckdb. */
@@ -79,41 +77,4 @@ export function nativePaths(): NativePaths {
     shimPath: copyTo(dir, pkg.shimPath),
   };
   return cached;
-}
-
-// --- legacy TinyCC loader, removed at the cutover ---------------------------------
-
-export interface LegacyNativePaths {
-  /** Absolute path to libduckdb for dlopen + the shim's dlsym. */
-  libPath: string;
-  /** Absolute path to native/shim.c for bun:ffi `cc`. */
-  shimPath: string;
-  /** Directory containing duckdb.h for the shim's `-I` include flag. */
-  includeDir: string;
-}
-
-async function legacyPlatformLibrary(): Promise<string> {
-  return process.env.DUCKDB_BUN_LIBRARY_PATH || platformPackage().default;
-}
-
-let legacyCached: LegacyNativePaths | undefined;
-
-/** @deprecated The TinyCC loader of the old bindings; removed at the cutover to the Rust shim. */
-export async function loadNative(): Promise<LegacyNativePaths> {
-  if (legacyCached) return legacyCached;
-  const lib = await legacyPlatformLibrary();
-  if (!lib.startsWith("/$bunfs/")) {
-    legacyCached = { libPath: lib, shimPath: shimSource, includeDir: dirname(duckdbHeader) };
-    return legacyCached;
-  }
-  const dir = mkdtempSync(join(tmpdir(), "duckdb-bun-"));
-  const libPath = join(dir, basename(lib));
-  const shimPath = join(dir, "shim.c");
-  await Promise.all([
-    Bun.write(libPath, Bun.file(lib)),
-    Bun.write(shimPath, Bun.file(shimSource)),
-    Bun.write(join(dir, "duckdb.h"), Bun.file(duckdbHeader)),
-  ]);
-  legacyCached = { libPath, shimPath, includeDir: dir };
-  return legacyCached;
 }

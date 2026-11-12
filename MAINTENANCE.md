@@ -46,7 +46,7 @@ Close the issue in the change that upgrades.
 1. Set `DUCKDB_VERSION` in `src/version.ts`.
 2. Set the version to `<new>-r.0` in `package.json`, in each `packages/*/package.json`, and in `optionalDependencies`.
 3. Pin the reference with `bun add --dev --exact @duckdb/node-api@<new>-r.<n>`.
-4. Re-vendor `duckdb-node-neo` at the tag of that release, as `vendor/node-api/PROVENANCE.md` describes, and run `bun run gen:bindings` when `node-bindings.d.ts` changed.
+4. Re-vendor `duckdb-node-neo` at the tag of that release, as `vendor/node-api/PROVENANCE.md` describes, and run `bun run gen:contract` when `node-bindings.d.ts` changed.
 5. Set `libduckdb-sys` in `native/Cargo.toml` to the release built from the new `duckdb.h`.
    Dependabot ignores that crate for this reason.
 6. Run `bun run fetch-lib all`, then read `git diff vendor/duckdb.h` for changes to functions that `src/bindings/` or `native/` call.

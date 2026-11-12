@@ -22,12 +22,7 @@ import { plugin } from "bun";
 import "./node-bindings-resolve.ts";
 
 const VITEST_SHIM = join(import.meta.dir, "./vitest-shim.ts");
-// DUCKDB_BUN_NEXT=1 points the vendored suites at the bindings being rebuilt on
-// the Rust shim (src/bindings/next.ts) until they replace src/bindings/index.ts.
-const BINDINGS = join(
-  import.meta.dir,
-  process.env.DUCKDB_BUN_NEXT === "1" ? "../src/bindings/next.ts" : "../src/bindings/index.ts",
-);
+const BINDINGS = join(import.meta.dir, "../src/bindings/index.ts");
 const BINDINGS_RESOLVE = join(import.meta.dir, "./node-bindings-resolve.ts");
 const VENDOR_TEST = /\/vendor\/node-(api|bindings)\/test\/.*\.ts$/;
 

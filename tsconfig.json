@@ -6,7 +6,11 @@
     "moduleResolution": "bundler",
     "moduleDetection": "force",
     "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
+    // Not verbatimModuleSyntax: the vendored @duckdb/node-api code imports types
+    // as values, as its own tsconfig allows. Biome's useImportType keeps type-only
+    // imports explicit in our code, and isolatedModules keeps every file
+    // transpilable on its own, as Bun runs it.
+    "isolatedModules": true,
     "noEmit": true,
     "strict": true,
     "skipLibCheck": true,
@@ -14,8 +18,13 @@
     "paths": {
       // For type checking only: the vendored suites import `vitest`, which is not
       // installed. At run time tests/preload.ts rewrites that import to the shim.
-      "vitest": ["./tests/vitest-shim.ts"]
+      "vitest": ["./tests/vitest-shim.ts"],
+      // The vendored suites import the bindings by package name; tests/preload.ts
+      // points that import at src/bindings/ at run time.
+      "@duckdb/node-bindings": ["./src/bindings/index.ts"]
     }
   },
-  "include": ["src", "tests", "scripts", "examples", "vendor/node-api"]
+  "include": ["src", "tests", "scripts", "examples", "bench", "vendor", "commitlint.config.ts"],
+  // Upstream benchmarks, never run here: they need vitest's bench().
+  "exclude": ["vendor/node-api/test/bench"]
 }

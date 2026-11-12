@@ -24,8 +24,8 @@
   },
   "files": [
     "src",
-    "vendor/duckdb.h",
     "vendor/node-api/src",
+    "vendor/node-api/node-bindings.d.ts",
     "vendor/node-api/LICENSE",
     "vendor/node-api/PROVENANCE.md"
   ],
@@ -35,7 +35,6 @@
   "scripts": {
     "fetch-lib": "bun run scripts/fetch-lib.ts",
     "build:native": "bun run scripts/build-native.ts",
-    "spike": "bun run scripts/spike.ts",
     "bench": "bun run bench/main.ts",
     "test": "bun test",
     "test:official": "bun test tests/official/api.test.ts",
@@ -47,14 +46,12 @@
     "test:crash": "bun test tests/heavy/crash-report.test.ts",
     "test:issue-3060": "bun test tests/heavy/issue-3060.test.ts",
     "test:unit": "bun test --path-ignore-patterns 'tests/official/**' --path-ignore-patterns 'tests/heavy/**' --path-ignore-patterns 'tests/compile/**' --path-ignore-patterns tests/parity.test.ts",
-    "gen:bindings": "bun run scripts/gen-bindings-scaffold.ts",
-    "build:neo": "bun run scripts/build-neo-compile.ts",
     "check-version": "bun run scripts/check-version.ts",
     "lint": "bun --bun biome check src tests scripts examples bench commitlint.config.ts",
     "lint:ci": "bun --bun biome ci src tests scripts examples bench commitlint.config.ts",
     "format": "bun --bun biome format --write src tests scripts examples bench commitlint.config.ts",
-    "typecheck": "bun check --no-script src/bindings/next.ts src/bindings/api src/bindings/runtime src/bindings/generated src/library.ts tests/runtime tests/heavy/crash-report.test.ts tests/heavy/fixtures/crash-child.ts tests/vitest-shim.ts tests/preload.ts tests/node-bindings-resolve.ts scripts/gen-ffi.ts scripts/gen-contract.ts scripts/vendor-api-spec.ts scripts/check-version.ts scripts/build-native.ts commitlint.config.ts",
-    "check": "bun run lint && bun check",
+    "typecheck": "bun check --no-script",
+    "check": "bun run lint && bun run typecheck",
     "gen:ffi": "bun run scripts/gen-ffi.ts",
     "vendor:api-spec": "bun run scripts/vendor-api-spec.ts",
     "gen:contract": "bun run scripts/gen-contract.ts"

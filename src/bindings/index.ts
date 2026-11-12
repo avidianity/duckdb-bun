@@ -1,17 +1,10 @@
-// Our bun:ffi reimplementation of the `@duckdb/node-bindings` module contract.
-// The entire vendored `@duckdb/node-api` TypeScript layer imports this module as
-// `import duckdb from '@duckdb/node-bindings'` (default), `import * as duckdb`
-// (namespace), and `import { fn } from '@duckdb/node-bindings'` (named) — so we
-// expose all three: named re-exports for the values/types + a real default
-// object built from them (ESM has no synthetic default at runtime).
-//
-// Phase 0 ships stubs (throw NotImplemented); each phase swaps in real FFI.
-export * from "./enums.ts";
-export * from "./functions.ts";
-export type * from "./types.ts";
+// Our reimplementation of the `@duckdb/node-bindings` contract
+// (vendor/node-api/node-bindings.d.ts) over the libduckdb C API, through bun:ffi
+// and the Rust shim. The vendored `@duckdb/node-api` imports it as a default
+// (`import duckdb from ...`), a namespace and by name, so it exports all three.
+// The default export is a namespace, so `duckdb.Database` and the other contract
+// types resolve through it as they do through the official module.
+import * as duckdb from "./api/index.ts";
 
-import * as enums from "./enums.ts";
-import * as functions from "./functions.ts";
-
-const duckdb = { ...enums, ...functions };
+export * from "./api/index.ts";
 export default duckdb;

@@ -17,12 +17,7 @@
 import Module from "node:module";
 import { join } from "node:path";
 
-// DUCKDB_BUN_NEXT=1 points the vendored suites at the bindings being rebuilt on
-// the Rust shim (src/bindings/next.ts) until they replace src/bindings/index.ts.
-const BINDINGS = join(
-  import.meta.dir,
-  process.env.DUCKDB_BUN_NEXT === "1" ? "../src/bindings/next.ts" : "../src/bindings/index.ts",
-);
+const BINDINGS = join(import.meta.dir, "../src/bindings/index.ts");
 const VENDOR_BINDINGS_TEST = /[\\/]vendor[\\/]node-bindings[\\/]test[\\/]/;
 
 type ResolveFilename = (request: string, parent: { filename?: string } | undefined, ...rest: unknown[]) => string;

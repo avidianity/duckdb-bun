@@ -31,7 +31,7 @@ test(
       reader.getRowObjectsJson();
       statement.bindInteger(1, (i % 9) + 1);
       const result = await statement.stream();
-      for await (const chunk of result) chunk.getRowObjects();
+      for await (const chunk of result) chunk.getRows();
     }
 
     for (let i = 0; i < WARM_UP; i++) await round(i);

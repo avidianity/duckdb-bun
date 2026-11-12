@@ -8,11 +8,3 @@ declare module "*.dylib" {
   const path: string;
   export default path;
 }
-declare module "*.c" {
-  const path: string;
-  export default path;
-}
-declare module "*.h" {
-  const path: string;
-  export default path;
-}
