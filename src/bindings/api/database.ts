@@ -16,6 +16,7 @@ import type {
   QueryProgress,
   Value,
 } from "../generated/contract.ts";
+import { expectString, integerFromNumber } from "../runtime/convert.ts";
 import { jobOut0, runJob } from "../runtime/dispatch.ts";
 import { type Handle, handleOf, unwrap } from "../runtime/handle.ts";
 import { own } from "../runtime/kinds.ts";
@@ -159,6 +160,17 @@ export function get_table_names(connection: Connection, query: string, qualified
 
 // --- catalog ------------------------------------------------------------------------
 
+/** DUCKDB_CATALOG_ENTRY_TYPE_DATABASE, the highest catalog entry type. */
+const CATALOG_ENTRY_TYPE_DATABASE = 9;
+
+/** Entry types the built-in duckdb catalog cannot look up, by duckdb_catalog_entry_type value. */
+const UNSUPPORTED_DUCKDB_CATALOG_ENTRY_TYPES: Readonly<Record<number, string>> = {
+  0: "INVALID",
+  2: "SCHEMA",
+  5: "PREPARED_STATEMENT",
+  9: "DATABASE",
+};
+
 export function client_context_get_catalog(context: ClientContext, catalog_name: string): Catalog | null {
   const catalog = duckdb.duckdb_client_context_get_catalog(
     unwrap(context, "client context"),
@@ -178,12 +190,26 @@ export function catalog_get_entry(
   schema_name: string,
   entry_name: string,
 ): CatalogEntry | null {
+  const catalogPtr = unwrap(catalog, "catalog");
+  const contextPtr = unwrap(context, "client context");
+  const type = integerFromNumber(entry_type, "uint32", "entry_type");
+  if (type > CATALOG_ENTRY_TYPE_DATABASE) throw new RangeError("Invalid catalog entry type");
+  const schema = expectString(schema_name);
+  const name = expectString(entry_name);
+  if (schema.includes("\0") || name.includes("\0")) {
+    throw new Error("Catalog entry names must not contain null bytes");
+  }
+  // Extension catalogs may support different lookup categories.
+  const unsupported = UNSUPPORTED_DUCKDB_CATALOG_ENTRY_TYPES[type];
+  if (unsupported && catalog_get_type_name(catalog) === "duckdb") {
+    throw new Error(`Catalog entry type ${unsupported} is not supported by duckdb catalog lookups`);
+  }
   const entry = duckdb.duckdb_catalog_get_entry(
-    unwrap(catalog, "catalog"),
-    unwrap(context, "client context"),
-    entry_type,
-    cstr(schema_name),
-    cstr(entry_name),
+    catalogPtr,
+    contextPtr,
+    type,
+    cstr(schema),
+    cstr(name),
   ) as Pointer | null;
   return entry === null ? null : asHandle(own("catalog entry", entry));
 }
