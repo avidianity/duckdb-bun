@@ -1071,6 +1071,56 @@ mod tests {
         unsafe { current.assume_init() }
     }
 
+    /// The op and state names a crash report prints are the ones native/ABI.md documents: the
+    /// job ops in the jobs table's order from 1, the JavaScript-recorded ops, and the states.
+    #[test]
+    fn op_and_state_names_match_the_abi() {
+        let abi = include_str!("../ABI.md");
+        let jobs = abi
+            .split("| Export | Inputs | Outputs |")
+            .nth(1)
+            .expect("ABI.md has the jobs table");
+        let job_ops: Vec<&str> = jobs
+            .lines()
+            .skip(2)
+            .take_while(|line| line.starts_with("| `dbs_job_"))
+            .map(|line| line["| `dbs_job_".len()..].split('`').next().unwrap())
+            .collect();
+        assert_eq!(job_ops.len(), 11, "{job_ops:?}");
+        for (index, name) in job_ops.iter().enumerate() {
+            assert_eq!(op_name(index as u32 + 1), *name);
+        }
+
+        let codes = abi
+            .lines()
+            .find(|line| line.starts_with("Op codes are"))
+            .and_then(|line| line.split("then ").nth(1))
+            .expect("ABI.md lists the op codes");
+        let mut listed = 0;
+        for pair in codes.trim_end_matches('.').split(", ") {
+            let (code, words) = pair.split_once(' ').unwrap();
+            assert_eq!(op_name(code.parse().unwrap()), words.replace(' ', "_"));
+            listed += 1;
+        }
+        assert_eq!(listed, 11);
+
+        let states = abi
+            .split("state (")
+            .nth(1)
+            .and_then(|rest| rest.split(')').next())
+            .expect("ABI.md lists the states");
+        for pair in states.split(", ") {
+            let (code, name) = pair.split_once(' ').unwrap();
+            assert_eq!(state_name(code.parse().unwrap()), name);
+        }
+
+        for unknown in [0, 12, 31, 43, u32::MAX] {
+            assert_eq!(op_name(unknown), "unknown_op");
+        }
+        assert_eq!(state_name(0), "unknown_state");
+        assert_eq!(state_name(5), "unknown_state");
+    }
+
     #[test]
     fn native_thread_start_installs_our_alternate_stack_and_names_the_thread() {
         let installed = std::thread::Builder::new()
