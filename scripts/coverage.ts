@@ -14,6 +14,10 @@
 // `cargo test`. The release shim is put back afterwards. Processes that die of a signal (the crash-report suite)
 // write their profile from the crash handler, under `cfg(coverage)` in native/src/diag.rs.
 //
+// native/src/diag.rs is also built on its own by native/diag-tests, whose `cargo test` runs its unit tests and
+// crashes child processes on purpose. That crate is measured too, and its hits count for the shim's lines and
+// functions in diag.rs; lines only it compiles, such as diag.rs's own tests, are left out.
+//
 // Requires cargo-llvm-cov and the llvm-tools rustup component (CONTRIBUTING.md "Coverage" says how to install them).
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -35,6 +39,8 @@ const NATIVE = join(ROOT, "native");
  */
 const COVERAGE_TARGET = join(NATIVE, "target", "llvm-cov-target");
 const OUT = join(ROOT, "coverage");
+const DIAG_TESTS = join(NATIVE, "diag-tests");
+const DIAG_TESTS_LCOV = join(OUT, "rust", "diag-tests.lcov");
 
 /** Shim file names per platform package, as scripts/build-native.ts writes them. */
 const SHIM_FILES: Record<string, string> = {
@@ -62,6 +68,8 @@ const HEAVY = ["tests/heavy/crash-report.test.ts"];
 
 export interface FileCoverage {
   lines: Map<number, number>;
+  /** Hits per function, keyed by the line it starts on, when the report names its functions (FN, FNDA). */
+  functions: Map<number, number>;
   functionsFound: number;
   functionsHit: number;
 }
@@ -77,20 +85,33 @@ export interface Totals {
 export function parseLcov(text: string, root = ROOT): Map<string, FileCoverage> {
   const files = new Map<string, FileCoverage>();
   let current: FileCoverage | undefined;
+  let starts = new Map<string, number>();
   for (const line of text.split("\n")) {
     const colon = line.indexOf(":");
     const tag = colon < 0 ? line : line.slice(0, colon);
     const value = line.slice(colon + 1);
     if (tag === "SF") {
       const path = value.startsWith("/") ? relative(root, value) : value;
-      current = files.get(path) ?? { lines: new Map(), functionsFound: 0, functionsHit: 0 };
+      current = files.get(path) ?? { lines: new Map(), functions: new Map(), functionsFound: 0, functionsHit: 0 };
       files.set(path, current);
+      starts = new Map();
     } else if (tag === "end_of_record") {
       current = undefined;
     } else if (current && tag === "DA") {
       const [lineNumber, hits] = value.split(",");
       const number = Number(lineNumber);
       current.lines.set(number, Math.max(current.lines.get(number) ?? 0, Number(hits)));
+    } else if (current && tag === "FN") {
+      const comma = value.indexOf(",");
+      const start = Number(value.slice(0, comma));
+      starts.set(value.slice(comma + 1), start);
+      current.functions.set(start, current.functions.get(start) ?? 0);
+    } else if (current && tag === "FNDA") {
+      const comma = value.indexOf(",");
+      const start = starts.get(value.slice(comma + 1));
+      if (start !== undefined) {
+        current.functions.set(start, Math.max(current.functions.get(start) ?? 0, Number(value.slice(0, comma))));
+      }
     } else if (current && tag === "FNF") {
       current.functionsFound = Number(value);
     } else if (current && tag === "FNH") {
@@ -105,10 +126,28 @@ export function totals(files: Iterable<FileCoverage>): Totals {
   for (const file of files) {
     sum.linesFound += file.lines.size;
     for (const hits of file.lines.values()) if (hits > 0) sum.linesHit += 1;
-    sum.functionsFound += file.functionsFound;
-    sum.functionsHit += file.functionsHit;
+    if (file.functions.size > 0) {
+      sum.functionsFound += file.functions.size;
+      for (const hits of file.functions.values()) if (hits > 0) sum.functionsHit += 1;
+    } else {
+      sum.functionsFound += file.functionsFound;
+      sum.functionsHit += file.functionsHit;
+    }
   }
   return sum;
+}
+
+/**
+ * Adds the hits `other` has on lines and functions that `base` already measures, so another build of the
+ * same source counts as a test of it without adding code only that build compiles, such as its own tests.
+ */
+export function addHits(base: Map<string, FileCoverage>, other: Map<string, FileCoverage>): void {
+  for (const [path, file] of base) {
+    const extra = other.get(path);
+    if (!extra) continue;
+    for (const [line, hits] of file.lines) file.lines.set(line, hits + (extra.lines.get(line) ?? 0));
+    for (const [start, hits] of file.functions) file.functions.set(start, hits + (extra.functions.get(start) ?? 0));
+  }
 }
 
 export function percent(hit: number, found: number): number {
@@ -215,12 +254,19 @@ async function measure(): Promise<void> {
   const lcov = join(OUT, "rust", "lcov.info");
   await $`cargo llvm-cov report --lcov --output-path ${lcov}`.cwd(NATIVE).env(env);
   await $`cargo llvm-cov report --summary-only`.cwd(NATIVE).env(env);
+
+  // Its own target directory, for the reason COVERAGE_TARGET gives; `cargo llvm-cov` runs `cargo test` there.
+  const diagEnv = { ...process.env, CARGO_TARGET_DIR: join(DIAG_TESTS, "target", "llvm-cov-target") };
+  await $`cargo llvm-cov clean --workspace`.cwd(DIAG_TESTS).env(diagEnv);
+  const diag = await $`cargo llvm-cov --lcov --output-path ${DIAG_TESTS_LCOV}`.cwd(DIAG_TESTS).env(diagEnv).nothrow();
+  if (diag.exitCode !== 0) failures.push(`cargo llvm-cov in native/diag-tests exited with ${diag.exitCode}`);
   if (failures.length > 0) throw new Error(`coverage: ${failures.join("; ")}`);
 }
 
 function checkReports(): void {
   const ts = parseLcov(readFileSync(join(OUT, "ts", "lcov.info"), "utf8"));
   const rust = parseLcov(readFileSync(join(OUT, "rust", "lcov.info"), "utf8"));
+  addHits(rust, parseLcov(readFileSync(DIAG_TESTS_LCOV, "utf8")));
   const problems = [
     ...check("TypeScript", ts, "src", ".ts", FLOORS.ts),
     ...check("Rust shim", rust, "native/src", ".rs", FLOORS.rust),

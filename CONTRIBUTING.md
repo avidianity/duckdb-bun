@@ -68,7 +68,9 @@ The job's comment explains why the Bun suites do not run against an ASan shim.
 
 `bun run coverage` measures line and function coverage of `src/` and of the Rust shim in `native/src/`, and fails below a floor.
 It builds an instrumented shim, runs `cargo test`, the unit, runtime, official, bindings and parity suites in one `bun test` process, and the crash-report suite, all against that shim.
-It writes `coverage/ts/lcov.info` and `coverage/rust/lcov.info`; `bun run coverage --check` checks the floors of existing reports again.
+It also measures `native/diag-tests`, which builds `native/src/diag.rs` on its own and crashes child processes on purpose.
+Its hits count for the shim's own lines and functions in `diag.rs`; code only that crate compiles, such as the unit tests in `diag.rs`, is not added to the shim's total.
+It writes `coverage/ts/lcov.info`, `coverage/rust/lcov.info` and `coverage/rust/diag-tests.lcov`; `bun run coverage --check` checks the floors of existing reports again.
 CI runs it on linux-x64 and uploads `coverage/` as the `coverage-linux-x64` artifact.
 
 The floors live in `FLOORS` in `scripts/coverage.ts`.
