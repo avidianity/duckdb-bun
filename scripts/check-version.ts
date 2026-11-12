@@ -4,7 +4,8 @@
 //   bun run check-version --tag v2.0.0-r.0   also: every package version equals the release tag
 //   bun run check-version --publish          also: every platform package holds its native files and lists
 //                                            them in "files", so npm publishes them (release workflow)
-//   bun run check-version --upstream-json    only the upstream report, as JSON (upstream-check workflow);
+//   bun run check-version --upstream-json    only the upstream report, as JSON (upstream-check workflow),
+//                                            with the upgrade it should open a pull request for;
 //                                            exits 1 when upstream cannot be reached
 //
 // A newer upstream release is informational; it never fails the default mode.
@@ -13,6 +14,7 @@ import { extname, join } from "node:path";
 import { parseArgs } from "node:util";
 import { DUCKDB_VERSION, DUCKDB_VERSION_TAG } from "../src/version.ts";
 import { TARGETS } from "./fetch-lib.ts";
+import { upgradeTarget } from "./upgrade-plan.ts";
 
 const ROOT = join(import.meta.dir, "..");
 const NODE_API = "@duckdb/node-api";
@@ -27,7 +29,12 @@ type PackageJson = {
 };
 
 type Upstream = { pinned: string; latest: string; newer: boolean; url: string };
-type UpstreamReport = { duckdb: Upstream; nodeApi: Upstream };
+/**
+ * `upgrade` is the pair the upstream-check workflow opens an upgrade pull request for: the latest
+ * @duckdb/node-api when it is newer than the pin and built on the latest DuckDB release. It is null
+ * while a newer DuckDB waits for its @duckdb/node-api, and when nothing is newer.
+ */
+type UpstreamReport = { duckdb: Upstream; nodeApi: Upstream; upgrade: { duckdb: string; nodeApi: string } | null };
 
 const { values } = parseArgs({
   args: Bun.argv.slice(2),
@@ -84,6 +91,7 @@ async function latestNodeApi(): Promise<string> {
 async function upstreamReport(nodeApiPin: string): Promise<UpstreamReport> {
   const [duckdb, nodeApi] = await Promise.all([latestDuckDB(), latestNodeApi()]);
   return {
+    upgrade: upgradeTarget(duckdb, nodeApi, nodeApiPin),
     duckdb: {
       pinned: DUCKDB_VERSION,
       latest: duckdb,
