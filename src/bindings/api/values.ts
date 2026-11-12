@@ -60,14 +60,26 @@ function valuePointer(value: unknown): Pointer | null {
 }
 
 /**
- * The pointer of a value a scalar getter may read. For a NULL value, libduckdb's
- * scalar getters (all but get_decimal) throw a C++ exception. Bun's N-API turns
- * any C++ exception into this Error for the official binding, but one that
- * crosses bun:ffi aborts the process, so this refuses the NULL value first.
+ * The pointer of a value a scalar getter may read. get_table_names gives a value
+ * without a pointer for SQL that does not parse, which libduckdb's scalar
+ * getters dereference; the official binding dies with SIGSEGV there, and ours
+ * refuses it instead.
  */
-function nonNullValuePointer(value: unknown): Pointer | null {
+function presentValuePointer(value: unknown): Pointer {
   const pointer = valuePointer(value);
-  if (pointer !== null && duckdb.duckdb_is_null_value(pointer)) throw new Error("A native exception was thrown");
+  if (pointer === null) throw new Error("Invalid value argument");
+  return pointer;
+}
+
+/**
+ * Like `presentValuePointer`, and also refuses a NULL value. For a NULL value,
+ * libduckdb's scalar getters (all but get_decimal) throw a C++ exception. Bun's
+ * N-API turns any C++ exception into this Error for the official binding, but
+ * one that crosses bun:ffi aborts the process, so this refuses it first.
+ */
+function nonNullValuePointer(value: unknown): Pointer {
+  const pointer = presentValuePointer(value);
+  if (duckdb.duckdb_is_null_value(pointer)) throw new Error("A native exception was thrown");
   return pointer;
 }
 
@@ -340,7 +352,7 @@ export function get_bignum(value: Value): bigint {
 
 export function get_decimal(value: Value): Decimal {
   // duckdb_get_decimal reads a NULL value without throwing.
-  return getStruct<Decimal>("decimal", shim.dbs_get_decimal, value, valuePointer);
+  return getStruct<Decimal>("decimal", shim.dbs_get_decimal, value, presentValuePointer);
 }
 
 export function get_float(value: Value): number {

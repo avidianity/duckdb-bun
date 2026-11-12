@@ -2,6 +2,7 @@
 // failure messages, and the value type a value lends out.
 
 import { expect, test } from "bun:test";
+import * as db from "../../src/bindings/api/database.ts";
 import * as lt from "../../src/bindings/api/logical-types.ts";
 import * as v from "../../src/bindings/api/values.ts";
 import { Type } from "../../src/bindings/generated/contract.ts";
@@ -117,4 +118,20 @@ test("scalar getters refuse a NULL value with the official error instead of abor
     // duckdb_get_decimal reads a NULL value without throwing.
     expect(v.get_decimal(value)).toMatchObject({ width: expect.any(Number), scale: expect.any(Number) });
   }
+});
+
+test("the table names of SQL that does not parse fail in the scalar getters instead of crashing", async () => {
+  const database = await db.open();
+  const connection = await db.connect(database);
+  // DuckDB returns no value for SQL that does not parse; the official binding
+  // wraps that, and its scalar getters then die with SIGSEGV.
+  const names = db.get_table_names(connection, "SELEC 1", false);
+  expect(v.get_list_size(names)).toBe(0);
+  const invalid = new Error("Invalid value argument");
+  expect(() => v.get_varchar(names)).toThrow(invalid);
+  expect(() => v.get_int32(names)).toThrow(invalid);
+  expect(() => v.get_decimal(names)).toThrow(invalid);
+  expect(() => v.get_blob(names)).toThrow(invalid);
+  db.disconnect_sync(connection);
+  db.close_sync(database);
 });
