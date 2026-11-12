@@ -148,3 +148,21 @@ parity(
     }),
   { official: "ok" },
 );
+
+parity(
+  "every accessor over the types the fuzz targets cover, with NULLs at every level",
+  (api) =>
+    withConnection(api, async (connection) =>
+      readEveryWay(
+        await connection.runAndReadAll(`
+          SELECT TIME_NS '13:45:06.123456789' AS tns, '2026-07-12 13:45:06.123456789+00'::TIMESTAMPTZ_NS AS tstzns,
+            'POINT(1 2)'::GEOMETRY AS g, {'a': [1, NULL], 'b': 'x'}::VARIANT AS v,
+            [{'v': 42::VARIANT, 'g': NULL::GEOMETRY}, NULL] AS nested,
+            MAP {'k': [NULL, 'POINT(3 4)'::GEOMETRY]} AS m
+          UNION ALL
+          SELECT NULL, NULL, NULL, NULL, [NULL], MAP {'k': NULL}
+        `),
+      ),
+    ),
+  { official: "ok" },
+);

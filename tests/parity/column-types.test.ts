@@ -59,6 +59,12 @@ const TYPES: [type: string, literal: string][] = [
   ["INTEGER[3]", "[1, 2, 3]"],
   ["STRUCT(a INTEGER[], m MAP(VARCHAR, DATE))[]", "[{'a': [1], 'm': MAP {'d': DATE '2026-01-01'}}]"],
   ["JSON", "'{\"a\": [1, 2]}'"],
+  // Types the fuzz targets in tests/fuzz/ cover.
+  ["TIME_NS", "'13:45:06.123456789'"],
+  ["TIMESTAMPTZ_NS", "'2026-07-12 13:45:06.123456789+00'"],
+  ["GEOMETRY", "'POINT(1 2)'"],
+  ["VARIANT", "{'a': [1, NULL], 'b': 'x'}"],
+  ["STRUCT(v VARIANT, t TIME_NS)[]", "[{'v': 42, 't': '00:00:00.000000001'}, NULL]"],
 ];
 
 for (const [type, literal] of TYPES) {
