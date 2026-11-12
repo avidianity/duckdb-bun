@@ -186,6 +186,28 @@ Include the report when you open an issue.
 
 The design decisions are recorded in [`docs/adr/`](docs/adr/).
 
+## Performance
+
+On par with the official `@duckdb/node-api`: no scenario in the bench is faster or slower by more than the runner's own noise.
+Both packages run the same DuckDB, so query time is DuckDB's; the bindings differ only in the calls around it.
+The gain is `bun build --compile` support, not speed.
+
+Latest CI numbers, Linux x64 (GitHub runner, 4 vCPU AMD EPYC), Bun 1.4.4, DuckDB 2.0.0, median of 10 runs in ABBA order:
+
+| Scenario | Official (ms) | Ours (ms) | Ours vs official | Runner noise |
+| --- | --- | --- | --- | --- |
+| `ingest-json`, 1M rows | 189.5 | 189.8 | +0.1% | 2.8% |
+| `ingest-csv`, 1M rows | 141.9 | 142.4 | +0.4% | 4.1% |
+| `parquet-write`, 1M rows | 203.0 | 189.0 | -6.9% | 24.5% |
+| `read-all`, 1M rows to objects | 846.4 | 829.9 | -1.9% | 0.9% |
+| `prepared`, 10,000 bind and run | 6272.9 | 6227.0 | -0.7% | 0.5% |
+| `event-loop-lag`, largest timer gap | 10.6 | 10.7 | on par | 1.3% |
+
+Peak memory per run is within 4% in every scenario.
+A query that runs out of memory (duckdb-node-neo #3060) rejects with DuckDB's `Out of Memory Error` and leaves the process alive in both packages, on Linux in `oven/bun:1.4.4-slim` and on macOS.
+CI fails any change that makes ours more than 10% slower or 10% heavier than the official package, or the runner's noise where that is larger; [`bench/README.md`](bench/README.md) describes the scenarios and the gate.
+Each CI run uploads its full tables as the `bench-<platform>` artifact.
+
 ## Develop
 
 ```sh
