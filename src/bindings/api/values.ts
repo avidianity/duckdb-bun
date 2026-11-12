@@ -59,6 +59,18 @@ function valuePointer(value: unknown): Pointer | null {
   return unwrap(value, "value");
 }
 
+/**
+ * The pointer of a value a scalar getter may read. For a NULL value, libduckdb's
+ * scalar getters (all but get_decimal) throw a C++ exception. Bun's N-API turns
+ * any C++ exception into this Error for the official binding, but one that
+ * crosses bun:ffi aborts the process, so this refuses the NULL value first.
+ */
+function nonNullValuePointer(value: unknown): Pointer | null {
+  const pointer = valuePointer(value);
+  if (pointer !== null && duckdb.duckdb_is_null_value(pointer)) throw new Error("A native exception was thrown");
+  return pointer;
+}
+
 function logicalTypePointer(logical_type: unknown): Pointer | null {
   return unwrap(logical_type, "logical type");
 }
@@ -70,8 +82,13 @@ function ownValueOrThrow(pointer: Pointer | null, message: string): Value {
 }
 
 /** Calls a shim `dbs_get_<x>(value, out)` wrapper and decodes the struct it wrote. */
-function getStruct<T>(layout: LayoutName, call: (value: Pointer | null, out: Uint8Array) => void, value: Value): T {
-  const pointer = valuePointer(value);
+function getStruct<T>(
+  layout: LayoutName,
+  call: (value: Pointer | null, out: Uint8Array) => void,
+  value: Value,
+  pointerOf: (value: unknown) => Pointer | null = nonNullValuePointer,
+): T {
+  const pointer = pointerOf(value);
   const out = structBuffer(layout);
   call(pointer, out);
   return decode<T>(layout, out);
@@ -273,39 +290,39 @@ export function create_null_value(): Value {
 // --- get ----------------------------------------------------------------------------
 
 export function get_bool(value: Value): boolean {
-  return duckdb.duckdb_get_bool(valuePointer(value));
+  return duckdb.duckdb_get_bool(nonNullValuePointer(value));
 }
 
 export function get_int8(value: Value): number {
-  return duckdb.duckdb_get_int8(valuePointer(value));
+  return duckdb.duckdb_get_int8(nonNullValuePointer(value));
 }
 
 export function get_uint8(value: Value): number {
-  return duckdb.duckdb_get_uint8(valuePointer(value));
+  return duckdb.duckdb_get_uint8(nonNullValuePointer(value));
 }
 
 export function get_int16(value: Value): number {
-  return duckdb.duckdb_get_int16(valuePointer(value));
+  return duckdb.duckdb_get_int16(nonNullValuePointer(value));
 }
 
 export function get_uint16(value: Value): number {
-  return duckdb.duckdb_get_uint16(valuePointer(value));
+  return duckdb.duckdb_get_uint16(nonNullValuePointer(value));
 }
 
 export function get_int32(value: Value): number {
-  return duckdb.duckdb_get_int32(valuePointer(value));
+  return duckdb.duckdb_get_int32(nonNullValuePointer(value));
 }
 
 export function get_uint32(value: Value): number {
-  return duckdb.duckdb_get_uint32(valuePointer(value));
+  return duckdb.duckdb_get_uint32(nonNullValuePointer(value));
 }
 
 export function get_int64(value: Value): bigint {
-  return BigInt(duckdb.duckdb_get_int64(valuePointer(value)));
+  return BigInt(duckdb.duckdb_get_int64(nonNullValuePointer(value)));
 }
 
 export function get_uint64(value: Value): bigint {
-  return BigInt(duckdb.duckdb_get_uint64(valuePointer(value)));
+  return BigInt(duckdb.duckdb_get_uint64(nonNullValuePointer(value)));
 }
 
 export function get_hugeint(value: Value): bigint {
@@ -322,15 +339,16 @@ export function get_bignum(value: Value): bigint {
 }
 
 export function get_decimal(value: Value): Decimal {
-  return getStruct<Decimal>("decimal", shim.dbs_get_decimal, value);
+  // duckdb_get_decimal reads a NULL value without throwing.
+  return getStruct<Decimal>("decimal", shim.dbs_get_decimal, value, valuePointer);
 }
 
 export function get_float(value: Value): number {
-  return duckdb.duckdb_get_float(valuePointer(value));
+  return duckdb.duckdb_get_float(nonNullValuePointer(value));
 }
 
 export function get_double(value: Value): number {
-  return duckdb.duckdb_get_double(valuePointer(value));
+  return duckdb.duckdb_get_double(nonNullValuePointer(value));
 }
 
 export function get_date(value: Value): Date_ {
@@ -402,7 +420,7 @@ export function get_uuid(value: Value): bigint {
 }
 
 export function get_varchar(value: Value): string {
-  const text = takeCString(duckdb.duckdb_get_varchar(valuePointer(value)) as Pointer | null);
+  const text = takeCString(duckdb.duckdb_get_varchar(nonNullValuePointer(value)) as Pointer | null);
   // Napi::String::New throws this for the null DuckDB returns when malloc fails.
   if (text === null) throw new Error("Invalid argument");
   return text;

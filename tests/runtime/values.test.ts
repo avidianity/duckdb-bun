@@ -95,3 +95,26 @@ test("a value's type stays usable while only the type is reachable", () => {
   type = v.get_value_type(v.create_null_value());
   expect(lt.get_type_id(type)).toBe(Type.SQLNULL);
 });
+
+test("scalar getters refuse a NULL value with the official error instead of aborting the process", () => {
+  const untyped = v.create_null_value();
+  const typed = v.get_list_child(v.create_list_value(lt.create_logical_type(Type.INTEGER), [untyped]), 0);
+  const thrown = new Error("A native exception was thrown");
+  for (const value of [untyped, typed]) {
+    expect(v.is_null_value(value)).toBe(true);
+    expect(() => v.get_bool(value)).toThrow(thrown);
+    expect(() => v.get_int32(value)).toThrow(thrown);
+    expect(() => v.get_uint64(value)).toThrow(thrown);
+    expect(() => v.get_double(value)).toThrow(thrown);
+    expect(() => v.get_hugeint(value)).toThrow(thrown);
+    expect(() => v.get_bignum(value)).toThrow(thrown);
+    expect(() => v.get_date(value)).toThrow(thrown);
+    expect(() => v.get_timestamp_ns(value)).toThrow(thrown);
+    expect(() => v.get_interval(value)).toThrow(thrown);
+    expect(() => v.get_blob(value)).toThrow(thrown);
+    expect(() => v.get_uuid(value)).toThrow(thrown);
+    expect(() => v.get_varchar(value)).toThrow(thrown);
+    // duckdb_get_decimal reads a NULL value without throwing.
+    expect(v.get_decimal(value)).toMatchObject({ width: expect.any(Number), scale: expect.any(Number) });
+  }
+});
