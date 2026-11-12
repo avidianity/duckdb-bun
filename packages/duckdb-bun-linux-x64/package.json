@@ -1,6 +1,6 @@
 {
   "name": "@avidian/duckdb-bun-linux-x64",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "The libduckdb shared library for @avidian/duckdb-bun on linux-x64.",
   "author": "John Michael Manlupig",
   "license": "MIT",

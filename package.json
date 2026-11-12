@@ -1,6 +1,6 @@
 {
   "name": "@avidian/duckdb-bun",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Bun-native, drop-in reimplementation of @duckdb/node-api via bun:ffi over the libduckdb C API. Embeds libduckdb so `bun build --compile` yields a self-contained binary.",
   "author": "John Michael Manlupig",
   "license": "MIT",
@@ -78,9 +78,9 @@
     "analytics"
   ],
   "optionalDependencies": {
-    "@avidian/duckdb-bun-darwin-arm64": "1.0.2",
-    "@avidian/duckdb-bun-linux-arm64": "1.0.2",
-    "@avidian/duckdb-bun-linux-x64": "1.0.2"
+    "@avidian/duckdb-bun-darwin-arm64": "1.0.3",
+    "@avidian/duckdb-bun-linux-arm64": "1.0.3",
+    "@avidian/duckdb-bun-linux-x64": "1.0.3"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7",
