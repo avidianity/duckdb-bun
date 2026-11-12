@@ -89,10 +89,14 @@ npm requires a new trusted publisher configuration to complete its first success
 Trusted publishing can only be configured for a package that already exists on npm.
 To publish the first version of a new package:
 
-1. Publish the GitHub release; the publish job fails, but the build jobs upload the platform packages.
-2. Download them over the checked-out tag with `gh run download <run-id> --name duckdb-bun-<platform> --dir packages/duckdb-bun-<platform>`.
-3. Create a short-lived granular access token on npmjs.com, and run `NPM_CONFIG_TOKEN=<token> bun publish --access public --tag latest` in each new package's directory, platform packages first.
-4. Revoke the token, and configure the trusted publisher as above.
+1. Push the tag `v<version>`, and run the release workflow without its publish job: `gh workflow run release.yml -f tag=v<version> -f publish=false`.
+2. Log in to npm so that `bun pm whoami` prints your account, through `~/.npmrc` or a short-lived granular access token in `NPM_CONFIG_TOKEN`.
+3. Run `bun run first-publish` (`--dry-run` first, to see the checks without publishing).
+   It downloads both platform packages from the green run into a worktree at the tag, packs the three tarballs, and checks their files, versions, `repository.url`, library architectures and the linux-x64 shim's glibc floor.
+   After you type `publish`, it runs `bun publish --access public --tag next` for each package not yet on npm, platform packages first.
+   npm asks for two-factor authentication in the terminal or the browser.
+4. Revoke the token if you made one, and configure the trusted publisher of each package as above.
+5. Within 2 days, release the next version through the release workflow, which validates the three configurations and sets `latest`.
 
 That first version has no provenance statement, because `bun publish` cannot generate one.
 
