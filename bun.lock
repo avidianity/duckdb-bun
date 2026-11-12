@@ -17,11 +17,16 @@
       },
       "optionalDependencies": {
         "@avidian/duckdb-bun-darwin-arm64": "1.0.0",
+        "@avidian/duckdb-bun-linux-arm64": "1.0.0",
         "@avidian/duckdb-bun-linux-x64": "1.0.0",
       },
     },
     "packages/duckdb-bun-darwin-arm64": {
       "name": "@avidian/duckdb-bun-darwin-arm64",
+      "version": "1.0.0",
+    },
+    "packages/duckdb-bun-linux-arm64": {
+      "name": "@avidian/duckdb-bun-linux-arm64",
       "version": "1.0.0",
     },
     "packages/duckdb-bun-linux-x64": {
@@ -34,6 +39,8 @@
   ],
   "packages": {
     "@avidian/duckdb-bun-darwin-arm64": ["@avidian/duckdb-bun-darwin-arm64@workspace:packages/duckdb-bun-darwin-arm64"],
+
+    "@avidian/duckdb-bun-linux-arm64": ["@avidian/duckdb-bun-linux-arm64@workspace:packages/duckdb-bun-linux-arm64"],
 
     "@avidian/duckdb-bun-linux-x64": ["@avidian/duckdb-bun-linux-x64@workspace:packages/duckdb-bun-linux-x64"],
 

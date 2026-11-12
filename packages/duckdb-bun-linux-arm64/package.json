@@ -1,0 +1,29 @@
+{
+  "name": "@avidian/duckdb-bun-linux-arm64",
+  "version": "1.0.0",
+  "description": "The libduckdb shared library for @avidian/duckdb-bun on linux-arm64.",
+  "author": "John Michael Manlupig",
+  "license": "MIT",
+  "homepage": "https://github.com/avidianity/duckdb-bun#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avidianity/duckdb-bun.git",
+    "directory": "packages/duckdb-bun-linux-arm64"
+  },
+  "bugs": {
+    "url": "https://github.com/avidianity/duckdb-bun/issues"
+  },
+  "type": "module",
+  "os": ["linux"],
+  "cpu": ["arm64"],
+  "libc": ["glibc"],
+  "main": "index.ts",
+  "types": "index.ts",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": ["index.ts", "libduckdb.so", "libduckdb_bun_shim.so", "LICENSE"]
+}

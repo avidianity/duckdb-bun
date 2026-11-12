@@ -5,12 +5,13 @@ This document holds the procedures for upgrading DuckDB, releasing, publishing t
 
 ## Packages and versions
 
-The repository publishes three npm packages:
+The repository publishes four npm packages:
 
 | Package                            | Directory                          | Contents                                         |
 | ---------------------------------- | ---------------------------------- | ------------------------------------------------ |
 | `@avidian/duckdb-bun`              | `.`                                | the TypeScript API and bindings                  |
 | `@avidian/duckdb-bun-linux-x64`    | `packages/duckdb-bun-linux-x64`    | `libduckdb.so` and `libduckdb_bun_shim.so`       |
+| `@avidian/duckdb-bun-linux-arm64`  | `packages/duckdb-bun-linux-arm64`  | `libduckdb.so` and `libduckdb_bun_shim.so`       |
 | `@avidian/duckdb-bun-darwin-arm64` | `packages/duckdb-bun-darwin-arm64` | `libduckdb.dylib` and `libduckdb_bun_shim.dylib` |
 
 The main package lists each platform package in `optionalDependencies`, the way `@duckdb/node-api` ships its native addon.
@@ -136,11 +137,16 @@ That first version has no provenance statement, because `bun publish` cannot gen
 
 ## Adding a platform
 
-1. Add the platform to `TARGETS` in `scripts/fetch-lib.ts`.
-2. Copy a platform package directory to `packages/duckdb-bun-<platform>/`, and set `name`, `os`, `cpu`, `libc` and `files` for the new libraries.
-3. Add the package to `optionalDependencies` and to `PLATFORM_PACKAGES` and the imports in `src/library.ts`.
-4. Add the platform to the CI matrix, add a build job to the release workflow, and publish the package before the main package.
-5. Record the change in an ADR, because the published package layout is hard to reverse.
+1. Add the platform to `TARGETS` in `scripts/fetch-lib.ts`, to `SHIM_FILES` in `scripts/build-native.ts`, and to the platform match in `native/build.rs`.
+2. Copy a platform package directory to `packages/duckdb-bun-<platform>/`, and set `name`, `description`, `repository.directory`, `os`, `cpu`, `libc` and `files` for the new libraries.
+3. Add the package to `optionalDependencies` and run `bun install`, then add its branch to `platformPackage()` and its name to `SUPPORTED` in `src/library.ts`.
+4. Add a row to the platform table in `README.md` and to the table in [Packages and versions](#packages-and-versions).
+   `tests/platform-packages.test.ts` fails until steps 1 to 4 agree.
+5. Add the platform to the CI test matrix, add a build job to the release workflow and to the `needs` of its publish job, and publish the package before the main package.
+   `scripts/first-publish.ts` reads the platforms from `TARGETS`; teach its `architectures()` the new CPU if it is not there yet.
+6. Record the change in an ADR, because the published package layout is hard to reverse.
+7. Publish the package's first version by hand, as [Publishing to npm](#publishing-to-npm) describes, and configure its trusted publisher.
+   The script skips the packages already on npm.
 
 ## Dependency updates
 

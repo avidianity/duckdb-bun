@@ -26,8 +26,10 @@ The package depends on one optional package per platform, which ships libduckdb 
 | Platform | Package |
 | --- | --- |
 | Linux x64, glibc 2.36 or newer | `@avidian/duckdb-bun-linux-x64` |
+| Linux arm64, glibc 2.36 or newer | `@avidian/duckdb-bun-linux-arm64` |
 | macOS arm64 | `@avidian/duckdb-bun-darwin-arm64` |
 
+The linux-arm64 package also serves Docker containers on Apple silicon Macs, which run arm64 Linux images by default.
 Bun installs only the one that matches the host.
 Do not install with `--no-optional`.
 Other platforms are not supported yet, because the native shim is built per platform.

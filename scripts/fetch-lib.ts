@@ -13,6 +13,7 @@ type Target = { asset: string; lib: string };
 /** One entry per platform package under packages/. */
 export const TARGETS: Record<string, Target> = {
   "linux-x64": { asset: "duckdb-shared-libs-linux-amd64", lib: "libduckdb.so" },
+  "linux-arm64": { asset: "duckdb-shared-libs-linux-arm64", lib: "libduckdb.so" },
   "darwin-arm64": { asset: "duckdb-shared-libs-osx-arm64", lib: "libduckdb.dylib" },
 };
 

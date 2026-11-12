@@ -46,6 +46,7 @@ fn main() {
             let platform = match (target_os.as_str(), target_arch.as_str()) {
                 ("macos", "aarch64") => "darwin-arm64",
                 ("linux", "x86_64") => "linux-x64",
+                ("linux", "aarch64") => "linux-arm64",
                 _ => return,
             };
             manifest_dir

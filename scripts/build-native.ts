@@ -15,14 +15,15 @@
 // DYLD_LIBRARY_PATH or LD_LIBRARY_PATH.
 //
 // There is no cross build: each platform builds on its own runner. The
-// linux-x64 release build runs in the rust:1.99.1-bookworm image (ADR 0003).
+// Linux release builds run in the rust:1.99.1-bookworm image (ADR 0003, ADR 0005).
 import { join } from "node:path";
 import { $ } from "bun";
 
 /** The shim file name per platform package. */
-const SHIM_FILES: Record<string, string> = {
+export const SHIM_FILES: Record<string, string> = {
   "darwin-arm64": "libduckdb_bun_shim.dylib",
   "linux-x64": "libduckdb_bun_shim.so",
+  "linux-arm64": "libduckdb_bun_shim.so",
 };
 
 const ROOT = join(import.meta.dir, "..");

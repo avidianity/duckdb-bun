@@ -68,6 +68,7 @@
   ],
   "optionalDependencies": {
     "@avidian/duckdb-bun-darwin-arm64": "1.0.0",
+    "@avidian/duckdb-bun-linux-arm64": "1.0.0",
     "@avidian/duckdb-bun-linux-x64": "1.0.0"
   },
   "devDependencies": {

@@ -29,7 +29,7 @@ interface PlatformPackage {
   shimPath: string;
 }
 
-const SUPPORTED = "the supported platforms are linux-x64 (glibc) and darwin-arm64";
+const SUPPORTED = "the supported platforms are linux-x64 (glibc), linux-arm64 (glibc) and darwin-arm64";
 
 function load(name: string, require: () => unknown): PlatformPackage {
   try {
@@ -47,6 +47,9 @@ function platformPackage(): PlatformPackage {
   // whose native files are absent on this machine.
   if (process.platform === "linux" && process.arch === "x64") {
     return load("@avidian/duckdb-bun-linux-x64", () => require("@avidian/duckdb-bun-linux-x64"));
+  }
+  if (process.platform === "linux" && process.arch === "arm64") {
+    return load("@avidian/duckdb-bun-linux-arm64", () => require("@avidian/duckdb-bun-linux-arm64"));
   }
   if (process.platform === "darwin" && process.arch === "arm64") {
     return load("@avidian/duckdb-bun-darwin-arm64", () => require("@avidian/duckdb-bun-darwin-arm64"));

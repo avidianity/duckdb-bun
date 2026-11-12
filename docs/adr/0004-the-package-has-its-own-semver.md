@@ -11,7 +11,7 @@ Nothing had been published under the old scheme when this was decided.
 
 ## Decision
 
-The three packages share one stable semantic version, independent of DuckDB's, starting at 1.0.0 for DuckDB 2.0.0.
+The main package and every platform package share one stable semantic version, independent of DuckDB's, starting at 1.0.0 for DuckDB 2.0.0.
 A DuckDB upgrade, minor or patch, that keeps the API bumps the minor version.
 A fix of our own bumps the patch version.
 An API break bumps the major version.
