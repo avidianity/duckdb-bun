@@ -18,22 +18,22 @@
         "typescript": "7.0.2",
       },
       "optionalDependencies": {
-        "@avidian/duckdb-bun-darwin-arm64": "1.0.2",
-        "@avidian/duckdb-bun-linux-arm64": "1.0.2",
-        "@avidian/duckdb-bun-linux-x64": "1.0.2",
+        "@avidian/duckdb-bun-darwin-arm64": "1.0.3",
+        "@avidian/duckdb-bun-linux-arm64": "1.0.3",
+        "@avidian/duckdb-bun-linux-x64": "1.0.3",
       },
     },
     "packages/duckdb-bun-darwin-arm64": {
       "name": "@avidian/duckdb-bun-darwin-arm64",
-      "version": "1.0.2",
+      "version": "1.0.3",
     },
     "packages/duckdb-bun-linux-arm64": {
       "name": "@avidian/duckdb-bun-linux-arm64",
-      "version": "1.0.2",
+      "version": "1.0.3",
     },
     "packages/duckdb-bun-linux-x64": {
       "name": "@avidian/duckdb-bun-linux-x64",
-      "version": "1.0.2",
+      "version": "1.0.3",
     },
   },
   "trustedDependencies": [
