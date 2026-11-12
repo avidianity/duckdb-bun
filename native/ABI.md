@@ -131,7 +131,7 @@ On a fatal signal the handler writes to fd 2, with async-signal-safe calls only:
 
 ```
 [duckdb-bun] fatal signal 11 (SIGSEGV) on thread duckdb-bun:query
-[duckdb-bun] package 2.0.0-r.0, duckdb v2.0.0, bun 1.4.4, shim 0.1.0
+[duckdb-bun] package 1.0.0, duckdb v2.0.0, bun 1.4.4, shim 0.1.0
 [duckdb-bun] in flight: 2 native calls, 2 threads
 [duckdb-bun] last binding events, oldest first:
 [duckdb-bun]   #812 +0.004s query start conn=3 handle=0x... thread=0x...

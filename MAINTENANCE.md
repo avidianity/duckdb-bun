@@ -15,12 +15,19 @@ The repository publishes three npm packages:
 
 The main package lists each platform package in `optionalDependencies`, the way `@duckdb/node-api` ships its native addon.
 
-Every package version is `<duckdb>-r.<n>`, the scheme `@duckdb/node-api` uses.
-`2.0.0-r.0` wraps DuckDB 2.0.0, a release that keeps DuckDB bumps `<n>`, and a new DuckDB resets `<n>` to 0.
+The packages share one stable semantic version, independent of DuckDB's (ADR 0004):
+
+- Minor: a DuckDB upgrade, minor or patch, that keeps the API.
+- Patch: a fix of our own between DuckDB releases.
+- Major: an API break.
+
+Never publish a prerelease: `^1.0.0` ranges skip one.
+The `Versions` table in `README.md` maps each package version to the DuckDB it bundles and the `@duckdb/node-api` it matches; add a row in every release.
 These versions must agree:
 
 - `DUCKDB_VERSION` in `src/version.ts`, the one DuckDB pin.
-- `version` in `package.json` and in each `packages/*/package.json`.
+- `version` in `package.json` and in each `packages/*/package.json`, a stable `x.y.z`.
+- The row for that version in the `README.md` `Versions` table.
 - Each platform package's entry in `optionalDependencies` in `package.json`.
 - The `@duckdb/node-api` entry in `devDependencies`, which must wrap the same DuckDB, so that `bun run parity` compares like with like.
 - The `libduckdb-sys` dependency in `native/Cargo.toml`, which must declare the same DuckDB C API.
@@ -31,9 +38,9 @@ These versions must agree:
 bun run check-version
 ```
 
-It exits with status 1 when a version above disagrees, or when this platform's package lacks `libduckdb` or the shim.
+It exits with status 1 when a version above disagrees, when the package version is not a stable `x.y.z`, or when this platform's package lacks `libduckdb` or the shim.
 It also prints the latest DuckDB release and the latest `@duckdb/node-api` on npm; a newer upstream release never fails it.
-`bun run check-version --tag v2.0.0-r.0` also requires every package version to equal the tag.
+`bun run check-version --tag v1.0.0` also requires every package version to equal the tag.
 `bun run check-version --publish` also requires every platform package to hold its native files and to list them in `files`.
 CI runs the plain form, and the release workflow runs the other two.
 
@@ -44,8 +51,8 @@ Close the issue in the change that upgrades.
 ## Upgrading DuckDB
 
 1. Set `DUCKDB_VERSION` in `src/version.ts`.
-2. Set the version to `<new>-r.0` in `package.json`, in each `packages/*/package.json`, and in `optionalDependencies`.
-3. Pin the reference with `bun add --dev --exact @duckdb/node-api@<new>-r.<n>`.
+2. Pin the reference with `bun add --dev --exact @duckdb/node-api@<new>-r.<n>`.
+3. Leave the package version alone; the release sets it (see Releasing).
 4. Re-vendor `duckdb-node-neo` at the tag of that release, as `vendor/node-api/PROVENANCE.md` describes, and run `bun run gen:contract` when `node-bindings.d.ts` changed.
 5. Set `libduckdb-sys` in `native/Cargo.toml` to the release built from the new `duckdb.h`.
    Dependabot ignores that crate for this reason.
@@ -56,18 +63,19 @@ Close the issue in the change that upgrades.
 
 ## Releasing
 
-1. Set the new version in every `package.json` and in `optionalDependencies`, and run `bun run check-version`.
+1. Set the new version in every `package.json` and in `optionalDependencies`, add its row to the `README.md` `Versions` table, and run `bun run check-version`.
+   Bump the minor version for a DuckDB upgrade, the patch version for a fix of our own, and the major version for an API break.
 2. Merge to `main` with CI green.
-3. Publish a GitHub release whose tag is `v` followed by the version, such as `gh release create v2.0.0-r.1 --generate-notes`.
+3. Publish a GitHub release whose tag is `v` followed by the version, such as `gh release create v1.0.1 --generate-notes`.
 
 The `Release` workflow (`.github/workflows/release.yml`) then:
 
 1. Builds the linux-x64 shim in the `rust:1.99.1-bookworm` image and the darwin-arm64 shim on `macos-latest`, runs every test suite on each, and uploads each platform package directory.
 2. Checks that every version equals the tag and that each platform package holds and lists its native files.
-3. Publishes the two platform packages, then the main package, with the `latest` dist-tag.
+3. Publishes the two platform packages, then the main package, with the `latest` dist-tag and a provenance statement.
 
 A version that is already on npm is skipped, so a failed run can be re-run.
-To rebuild a tag without a new release, run the workflow by hand with `gh workflow run release.yml -f tag=v2.0.0-r.1`.
+To rebuild a tag without a new release, run the workflow by hand with `gh workflow run release.yml -f tag=v1.0.1`.
 
 ## Publishing to npm
 
@@ -93,10 +101,10 @@ To publish the first version of a new package:
 2. Log in to npm so that `bun pm whoami` prints your account, through `~/.npmrc` or a short-lived granular access token in `NPM_CONFIG_TOKEN`.
 3. Run `bun run first-publish` (`--dry-run` first, to see the checks without publishing).
    It downloads both platform packages from the green run into a worktree at the tag, packs the three tarballs, and checks their files, versions, `repository.url`, library architectures and the linux-x64 shim's glibc floor.
-   After you type `publish`, it runs `bun publish --access public --tag next` for each package not yet on npm, platform packages first.
+   After you type `publish`, it runs `bun publish --access public --tag latest` for each package not yet on npm, platform packages first.
    npm asks for two-factor authentication in the terminal or the browser.
 4. Revoke the token if you made one, and configure the trusted publisher of each package as above.
-5. Within 2 days, release the next version through the release workflow, which validates the three configurations and sets `latest`.
+5. Within 2 days, release the next patch version through the release workflow, which validates the three configurations.
 
 That first version has no provenance statement, because `bun publish` cannot generate one.
 

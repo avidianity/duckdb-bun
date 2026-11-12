@@ -11,7 +11,7 @@
 //  3. Runs `check-version --tag --publish`, packs the three tarballs, and checks each one: its file list,
 //     its package.json, the CPU architecture of every native library, and the glibc the linux-x64 shim needs.
 //  4. Shows the npm account and what it will publish, and asks for confirmation unless --yes.
-//  5. Runs `bun publish <tarball> --access public --tag next`, platform packages first. npm asks for
+//  5. Runs `bun publish <tarball> --access public --tag latest`, platform packages first. npm asks for
 //     two-factor authentication in the terminal or the browser; the script never sees it.
 //  6. Waits until npm serves each version, then prints the trusted publisher settings to enter on npmjs.com.
 //
@@ -29,7 +29,7 @@ const REPO = "avidianity/duckdb-bun";
 const REPOSITORY_URL = "git+https://github.com/avidianity/duckdb-bun.git";
 const WORKFLOW = "release.yml";
 const ENVIRONMENT = "npm";
-const DIST_TAG = "next";
+const DIST_TAG = "latest";
 const REGISTRY = "https://registry.npmjs.org";
 const SHIM = "libduckdb_bun_shim";
 // The linux-x64 shim is built in rust:1.99.1-bookworm (docs/adr/0003); the README promises glibc 2.36.
@@ -352,8 +352,8 @@ try {
       `  Repository: ${REPO.split("/")[1]}`,
       `  Workflow filename: ${WORKFLOW}`,
       `  Environment name: ${ENVIRONMENT}`,
-      "Each configuration must complete a publish within 2 days, or it expires: release the next version",
-      '(MAINTENANCE.md, "Releasing") within 2 days of saving them.',
+      "Each configuration must complete a publish within 2 days, or it expires: release the next patch",
+      'version (MAINTENANCE.md, "Releasing") within 2 days of saving them.',
     ].join("\n"),
   );
 } finally {

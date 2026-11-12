@@ -1,7 +1,7 @@
 // Checks that every version in this repository agrees with the DuckDB pin, and reports newer upstream releases.
 //
 //   bun run check-version                    consistency, then the upstream report; exits 1 on an inconsistency
-//   bun run check-version --tag v2.0.0-r.0   also: every package version equals the release tag
+//   bun run check-version --tag v1.0.0       also: every package version equals the release tag
 //   bun run check-version --publish          also: every platform package holds its native files and lists
 //                                            them in "files", so npm publishes them (release workflow)
 //   bun run check-version --upstream-json    only the upstream report, as JSON (upstream-check workflow);
@@ -43,9 +43,31 @@ async function readPackage(dir: string): Promise<PackageJson> {
   return (await Bun.file(join(ROOT, dir, "package.json")).json()) as PackageJson;
 }
 
-/** The base DuckDB version of a `<duckdb>-r.<n>` version, or undefined when it has another shape. */
+/** The base DuckDB version of a `@duckdb/node-api` version, `<duckdb>-r.<n>`, or undefined for another shape. */
 function duckdbBase(version: string | undefined): string | undefined {
   return /^(\d+\.\d+\.\d+)-r\.\d+$/.exec(version ?? "")?.[1];
+}
+
+/** A stable semver version: our packages never publish a prerelease, so `^1` ranges match every release. */
+const STABLE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+
+/**
+ * The README's "Versions" table, which maps each package version to the DuckDB it bundles and the
+ * `@duckdb/node-api` it matches, as rows of [package, duckdb, nodeApi].
+ */
+async function versionTable(): Promise<string[][]> {
+  const readme = await Bun.file(join(ROOT, "README.md")).text();
+  const section = readme.split(/^## /m).find((part) => part.startsWith("Versions"));
+  if (!section) return [];
+  return section
+    .split("\n")
+    .filter((line) => /^\|\s*\d/.test(line))
+    .map((line) =>
+      line
+        .split("|")
+        .slice(1, -1)
+        .map((cell) => cell.trim().replaceAll("`", "")),
+    );
 }
 
 /** The native files a platform package ships: libduckdb and the shim built from native/. */
@@ -115,8 +137,16 @@ console.log(`DuckDB pin (src/version.ts):     ${DUCKDB_VERSION_TAG}`);
 console.log(`package version (package.json): ${root.version}`);
 console.log(`${NODE_API} devDependency:   ${nodeApiPin || "missing"}`);
 
-if (duckdbBase(root.version) !== DUCKDB_VERSION) {
-  problems.push(`package.json version ${root.version} is not ${DUCKDB_VERSION}-r.<n>; it must wrap the DuckDB pin.`);
+if (!STABLE.test(root.version ?? "")) {
+  problems.push(
+    `package.json version ${root.version} is not a stable x.y.z version; the packages never publish a prerelease.`,
+  );
+}
+const row = (await versionTable()).find(([version]) => version === root.version);
+if (row?.[1] !== DUCKDB_VERSION || row?.[2] !== nodeApiPin) {
+  problems.push(
+    `README.md "Versions" has no row "| ${root.version} | ${DUCKDB_VERSION} | ${nodeApiPin} |" for this package version.`,
+  );
 }
 if (duckdbBase(nodeApiPin) !== DUCKDB_VERSION) {
   problems.push(

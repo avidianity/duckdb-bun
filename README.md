@@ -13,8 +13,7 @@ It loads libduckdb as a plain shared library, so `bun build --compile` produces 
 import { DuckDBInstance } from "@avidian/duckdb-bun"; // was "@duckdb/node-api"
 ```
 
-It targets DuckDB v2.0.0 and `@duckdb/node-api` 2.0.0-r.1.
-The package version follows the same scheme: `2.0.0-r.<n>`.
+Version 1.0.0 bundles DuckDB v2.0.0 and matches `@duckdb/node-api` 2.0.0-r.1; [Versions](#versions) maps every release.
 
 ## Install
 
@@ -32,6 +31,28 @@ The package depends on one optional package per platform, which ships libduckdb 
 Bun installs only the one that matches the host.
 Do not install with `--no-optional`.
 Other platforms are not supported yet, because the native shim is built per platform.
+
+## Versions
+
+The package has its own semantic version, independent of DuckDB's:
+
+- A minor release upgrades DuckDB without breaking the API.
+- A patch release fixes the binding between DuckDB releases.
+- A major release breaks the API.
+
+Every release is a stable version, so a range such as `^1.0.0` takes every compatible release.
+
+| `@avidian/duckdb-bun` | DuckDB | `@duckdb/node-api` it matches |
+| --- | --- | --- |
+| 1.0.0 | 2.0.0 | 2.0.0-r.1 |
+
+At run time, `DUCKDB_VERSION` holds the bundled DuckDB version, and `diagnostics().versions` holds all of them:
+
+```ts
+import { DUCKDB_VERSION } from "@avidian/duckdb-bun";
+
+console.log(DUCKDB_VERSION); // "2.0.0"
+```
 
 ## Usage
 
@@ -71,7 +92,7 @@ console.log(diagnostics());
 
 ```js
 {
-  versions: { package: "2.0.0-r.0", duckdb: "v2.0.0", bun: "1.4.4", shim: "0.1.0" },
+  versions: { package: "1.0.0", duckdb: "v2.0.0", bun: "1.4.4", shim: "0.1.0" },
   paths: { libduckdb: "/…/libduckdb.so", shim: "/…/libduckdb_bun_shim.so" },
   crashHandler: "installed",
   flags: { debug: false, traceSql: false, crashHandler: true },
@@ -129,7 +150,7 @@ On a fatal signal (SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT) the binding writes 
 
 ```
 [duckdb-bun] fatal signal 11 (SIGSEGV) on thread duckdb-bun:query
-[duckdb-bun] package 2.0.0-r.0, duckdb v2.0.0, bun 1.4.4, shim 0.1.0
+[duckdb-bun] package 1.0.0, duckdb v2.0.0, bun 1.4.4, shim 0.1.0
 [duckdb-bun] in flight: 1 native calls, 1 threads
 [duckdb-bun] last binding events, oldest first:
 [duckdb-bun]   #5 +0.009s query event conn=0 handle=0x0 thread=0x1b8849f text="SELECT 1"
