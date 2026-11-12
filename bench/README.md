@@ -28,14 +28,14 @@ bun run bench --lag-rows 600000000           # rows the event-loop lag query has
 
 ## Scenarios
 
-| Scenario         | What one run does                                                                                       | Runs |
-| ---------------- | ------------------------------------------------------------------------------------------------------- | ---- |
-| `ingest-json`    | `CREATE OR REPLACE TABLE ... AS SELECT * FROM read_json_auto(...)` over a newline-delimited JSON file   | 5    |
-| `ingest-csv`     | The same over a CSV file with the same rows, through `read_csv`                                         | 5    |
-| `parquet-write`  | `COPY` a table of mixed types to a `.parquet` file                                                      | 5    |
-| `read-all`       | `runAndReadAll("SELECT * FROM mixed")`, then `getRowObjects()`                                          | 5    |
-| `prepared`       | `prepare` once, then `bindInteger` and `runAndReadAll` 10,000 times, each returning one row             | 5    |
-| `event-loop-lag` | `SELECT sum(hash(i)) FROM range(N) t(i)` while a 10 ms `setInterval` records the gaps between its ticks | 3    |
+| Scenario         | What one run does                                                                                       | Runs per child |
+| ---------------- | ------------------------------------------------------------------------------------------------------- | -------------- |
+| `ingest-json`    | `CREATE OR REPLACE TABLE ... AS SELECT * FROM read_json_auto(...)` over a newline-delimited JSON file   | 5              |
+| `ingest-csv`     | The same over a CSV file with the same rows, through `read_csv`                                         | 5              |
+| `parquet-write`  | `COPY` a table of mixed types to a `.parquet` file                                                      | 5              |
+| `read-all`       | `runAndReadAll("SELECT * FROM mixed")`, then `getRowObjects()`                                          | 5              |
+| `prepared`       | `prepare` once, then `bindInteger` and `runAndReadAll` 10,000 times, each returning one row             | 5              |
+| `event-loop-lag` | `SELECT sum(hash(i)) FROM range(N) t(i)` while a 10 ms `setInterval` records the gaps between its ticks | 3              |
 
 The mixed table has 1M rows of INTEGER, VARCHAR, DOUBLE, TIMESTAMP, DECIMAL(18,2) and INTEGER[] columns.
 The bench writes the JSON and CSV inputs with plain JavaScript before any child starts, so neither implementation pays for generating them.
@@ -46,6 +46,8 @@ After the measured runs, each scenario checks its result (row counts, the prepar
 
 The parent, `bench/main.ts`, starts one child process (`bench/runner.ts`) per implementation and scenario, one at a time.
 So RSS of one implementation or scenario never mixes with another.
+Each scenario runs in ABBA order, official, ours, ours, official, and each row merges the runs of both children.
+A fixed order is biased: with official always first, `getRowObjects` measured 25% slower for ours, and about 10% faster when ours went first.
 The child opens an in-memory database with DuckDB's default thread count, runs the scenario, and writes its raw numbers as JSON for the parent.
 A child that crashes, hangs for more than 15 minutes, or throws is reported with its error text, and the bench moves on.
 

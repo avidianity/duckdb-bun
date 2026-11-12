@@ -90,6 +90,23 @@ async function runChild(
   }
 }
 
+/** One result from the children that ran the same implementation and scenario. */
+function merge(raws: ChildResult[]): ChildResult {
+  const [first, ...rest] = raws;
+  if (!first) throw new Error("merge needs at least one child result");
+  const merged: ChildResult = { ...first, runsMs: [...first.runsMs], metrics: structuredClone(first.metrics) };
+  for (const raw of rest) {
+    merged.runsMs.push(...raw.runsMs);
+    for (const [key, values] of Object.entries(raw.metrics)) {
+      merged.metrics[key] = [...(merged.metrics[key] ?? []), ...values];
+    }
+    merged.peakRssBytes = Math.max(merged.peakRssBytes, raw.peakRssBytes);
+    merged.maxRssBytes = Math.max(merged.maxRssBytes, raw.maxRssBytes);
+    merged.error ??= raw.error;
+  }
+  return merged;
+}
+
 function summarize(scenario: Scenario, raw: ChildResult): Summary {
   const summary: Summary = {
     impl: raw.impl,
@@ -191,12 +208,15 @@ async function main(): Promise<void> {
     }
     console.log(`## duckdb-bun benchmark (${process.platform}-${process.arch}, Bun ${Bun.version})\n`);
     for (const scenario of SCENARIOS.filter((s) => scenarioNames.includes(s.name))) {
-      const summaries: Summary[] = [];
-      for (const impl of impls) {
+      // ABBA order: each implementation runs once early and once late, so a machine that warms up or
+      // throttles during a scenario slows both alike. A fixed order made the second one look slower.
+      const raws = new Map<Implementation, ChildResult[]>(impls.map((impl) => [impl, []]));
+      for (const impl of [...impls, ...[...impls].reverse()]) {
         console.error(`Running ${scenario.name} on ${impl} ...`);
         const raw = await runChild(impl, scenario, { data, root }, { runs: values.runs, rows, lagRows });
-        summaries.push(summarize(scenario, raw));
+        raws.get(impl)?.push(raw);
       }
+      const summaries = impls.map((impl) => summarize(scenario, merge(raws.get(impl) ?? [])));
       results[scenario.name] = summaries;
       console.log(table(scenario, summaries));
     }
