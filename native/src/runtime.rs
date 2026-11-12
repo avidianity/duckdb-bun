@@ -118,6 +118,8 @@ pub extern "C" fn dbs_init(
     let id = contexts.len();
     drop(contexts);
     crate::diag::set_counter_block(crate::counters::block());
+    #[cfg(all(coverage, target_os = "linux"))]
+    write_coverage_profile_at_quick_exit();
     i32::try_from(id).unwrap_or(-3)
 }
 
@@ -149,4 +151,30 @@ pub extern "C" fn dbs_context_close() {
             *slot = None;
         }
     }
+}
+
+/// Coverage builds on Linux only (`cargo llvm-cov` sets `cfg(coverage)`). The profiler runtime
+/// writes the coverage profile from an `atexit` hook, but Bun 1.4.4 ends a process on Linux with
+/// `quick_exit` (`src/bun_core/Global.rs`), which runs only `at_quick_exit` hooks, so the shim's
+/// profile from every Bun process was lost. Release builds do not contain this function.
+#[cfg(all(coverage, target_os = "linux"))]
+fn write_coverage_profile_at_quick_exit() {
+    use std::ffi::c_int;
+    use std::sync::Once;
+
+    unsafe extern "C" {
+        /// C11 and glibc: registers a function `quick_exit` calls.
+        fn at_quick_exit(function: extern "C" fn()) -> c_int;
+        /// Part of the LLVM profiler runtime that `-C instrument-coverage` links in.
+        fn __llvm_profile_write_file() -> c_int;
+    }
+    extern "C" fn write() {
+        // SAFETY: the profiler runtime is linked into every coverage build; the call takes no arguments.
+        unsafe { __llvm_profile_write_file() };
+    }
+    static REGISTER: Once = Once::new();
+    // SAFETY: `write` is a plain function that lives for the whole process.
+    REGISTER.call_once(|| unsafe {
+        at_quick_exit(write);
+    });
 }
