@@ -1,4 +1,4 @@
-// A real Error subclass so callers (e.g. oscar-backend workspace.ts) can keep
+// A real Error subclass so callers can keep
 // using `err instanceof Error` and message regex checks (e.g. /Out of Memory/i).
 export class DuckDBError extends Error {
   readonly duckdbMessage: string;

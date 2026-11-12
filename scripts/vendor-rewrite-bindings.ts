@@ -1,7 +1,7 @@
 // Rewrites the vendored @duckdb/node-api source so its `@duckdb/node-bindings`
 // imports resolve to OUR bun:ffi bindings via a relative path. This is what makes
 // the published package a self-contained drop-in — consumers import
-// `@joshcano/duckdb-bun` and the vendored TS layer loads our bindings directly,
+// `@avidian/duckdb-bun` and the vendored TS layer loads our bindings directly,
 // with no test preload / build plugin needed.
 //
 // Idempotent. Re-run after re-vendoring on a DuckDB bump (see

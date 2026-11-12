@@ -1,5 +1,5 @@
-// Mirrors the exact DuckDB usage in oscar-backend/src/mcp/workspace.ts so the
-// import swap there is safe: SET pragmas, read_json_auto ingest, INSERT BY NAME,
+// Mirrors the DuckDB usage of a typical analytics workspace service, so swapping
+// the import there is safe: SET pragmas, read_json_auto ingest, INSERT BY NAME,
 // ALTER ADD COLUMN, information_schema, PRAGMA table_info, COUNT(*), read-only query.
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { rmSync } from "node:fs";

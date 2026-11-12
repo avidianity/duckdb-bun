@@ -1,5 +1,5 @@
-// A faithful port of oscar-backend/src/mcp/workspace.ts onto duckdb-bun, proving
-// the migration is a mechanical drop-in. Two changes vs the original:
+// A per-user analytics workspace on duckdb-bun, ported from a service that used
+// @duckdb/node-api, proving the migration is a mechanical drop-in. Two changes:
 //   1. import from "duckdb-bun" instead of "@duckdb/node-api"
 //   2. sanitizeValue() loses its DuckDB*Value class branches — this binding
 //      returns native JS values (Date / number / bigint / string / null) directly,
@@ -66,7 +66,10 @@ async function ensureWorkspace(userId: number, companyId: number): Promise<Works
   }
   const instance = await DuckDBInstance.create(":memory:");
   const conn = await instance.connect();
-  const tempDir = path.join(os.tmpdir(), `oscar-duck-${userId}-${companyId}-${crypto.randomBytes(4).toString("hex")}`);
+  const tempDir = path.join(
+    os.tmpdir(),
+    `duckdb-bun-ws-${userId}-${companyId}-${crypto.randomBytes(4).toString("hex")}`,
+  );
   fs.mkdirSync(tempDir, { recursive: true });
   await conn.run(`SET memory_limit = '${WORKSPACE_MEMORY_LIMIT}'`);
   await conn.run(`SET max_temp_directory_size = '${WORKSPACE_TEMP_DIR_SIZE}'`);
@@ -110,7 +113,7 @@ function quoteIdent(name: string): string {
 }
 
 function writeNdjson(rows: Record<string, unknown>[]): string {
-  const file = path.join(os.tmpdir(), `oscar-ws-${crypto.randomBytes(6).toString("hex")}.ndjson`);
+  const file = path.join(os.tmpdir(), `duckdb-bun-ws-${crypto.randomBytes(6).toString("hex")}.ndjson`);
   const stream = rows.map((r) => JSON.stringify(r, bigintReplacer)).join("\n");
   fs.writeFileSync(file, stream);
   return file;

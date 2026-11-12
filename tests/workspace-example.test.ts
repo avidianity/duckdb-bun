@@ -1,5 +1,5 @@
 // Exercises the ported examples/workspace.ts end to end: the same append/query/
-// list/drop flow oscar-backend's MCP workspace tools drive.
+// list/drop flow a workspace service drives.
 import { expect, test } from "bun:test";
 import { appendRows, clearAllTables, dropTable, listTables, runQuery, sanitizeValue } from "../examples/workspace.ts";
 
