@@ -16,7 +16,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  # The release image for the linux-x64 shim (docs/adr/0003) and the production runtime image.
+  # The release image for the Linux shims (docs/adr/0003, 0005) and the production runtime image.
+  # Both digests pin a multi-platform image index, so each runner pulls its own architecture's image.
   RUST_IMAGE: rust:1.99.1-bookworm@sha256:e6f2cff35d0f309acf8433b4f05878ed77092602c5065cc81801177da0bb3a9c
   BUN_IMAGE: oven/bun:1.4.4-slim@sha256:1846adf22496bd711036aae8be147e57bdebbaea2e5264e3e0b5af1db187d9a4
 
@@ -31,6 +32,9 @@ jobs:
         include:
           - os: ubuntu-latest
             platform: linux-x64
+          # GitHub-hosted arm64 Linux runner, free for public repositories (docs/adr/0005).
+          - os: ubuntu-24.04-arm
+            platform: linux-arm64
           - os: macos-latest
             platform: darwin-arm64
     env:
@@ -210,9 +214,19 @@ jobs:
           retention-days: 90
 
   docker-smoke:
-    name: docker smoke (linux-x64)
-    runs-on: ubuntu-latest
+    name: docker smoke (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-x64
+          - os: ubuntu-24.04-arm
+            platform: linux-arm64
+    env:
+      PLATFORM: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -230,14 +244,14 @@ jobs:
         id: libduckdb
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: packages/duckdb-bun-linux-x64/libduckdb.*
-          key: libduckdb-linux-x64-${{ hashFiles('src/version.ts', 'scripts/fetch-lib.ts') }}
+          path: packages/duckdb-bun-${{ matrix.platform }}/libduckdb.*
+          key: libduckdb-${{ matrix.platform }}-${{ hashFiles('src/version.ts', 'scripts/fetch-lib.ts') }}
 
       - name: Fetch libduckdb
         if: steps.libduckdb.outputs.cache-hit != 'true'
-        run: bun run fetch-lib linux-x64
+        run: bun run fetch-lib "$PLATFORM"
 
-      # The same image the release workflow builds the linux-x64 shim in.
+      # The same image the release workflow builds the Linux shims in.
       # The runner's Bun binary is mounted in, so `bun run build:native` runs unchanged.
       - name: Build the native shim in the release image
         env:
@@ -247,20 +261,20 @@ jobs:
             --volume "$GITHUB_WORKSPACE:/work" \
             --volume "$BUN_PATH:/usr/local/bin/bun:ro" \
             --workdir /work \
-            --env DUCKDB_LIB_DIR=/work/packages/duckdb-bun-linux-x64 \
+            --env "DUCKDB_LIB_DIR=/work/packages/duckdb-bun-$PLATFORM" \
             "$RUST_IMAGE" \
             bash -euo pipefail -c 'rustup toolchain install && bun run build:native'
 
-      - name: Pack the main and linux-x64 packages
+      - name: Pack the main and platform packages
         run: |
           mkdir -p "$RUNNER_TEMP/packages"
           bun pm pack --destination "$RUNNER_TEMP/packages"
-          cd packages/duckdb-bun-linux-x64
+          cd "packages/duckdb-bun-$PLATFORM"
           bun pm pack --destination "$RUNNER_TEMP/packages"
           ls -l "$RUNNER_TEMP/packages"
 
       # A fresh project that installs the two tarballs, as a user installs the published packages.
-      # The override points the main package's optional dependency at the local linux-x64 tarball.
+      # The override points the main package's optional dependency at the local platform tarball.
       - name: Create the consumer project
         run: |
           version="$(bun -p 'require("./package.json").version')"
@@ -275,7 +289,7 @@ jobs:
               "@avidian/duckdb-bun": "file:/packages/avidian-duckdb-bun-${version}.tgz"
             },
             "overrides": {
-              "@avidian/duckdb-bun-linux-x64": "file:/packages/avidian-duckdb-bun-linux-x64-${version}.tgz"
+              "@avidian/duckdb-bun-${PLATFORM}": "file:/packages/avidian-duckdb-bun-${PLATFORM}-${version}.tgz"
             }
           }
           EOF

@@ -1,6 +1,6 @@
 // Smoke test for the packed packages, run by the docker-smoke CI job inside the oven/bun image that
-// production uses. It runs in a fresh project that installed the main tarball and the linux-x64 tarball,
-// so it imports the package by name, the way a user does.
+// production uses. It runs in a fresh project that installed the main tarball and the tarball of the
+// host's Linux platform package, so it imports the package by name, the way a user does.
 //
 //   bun smoke.ts           queries, extensions, diagnostics, then the crash report in a child process
 //   bun smoke.ts --crash   the child: crashes on purpose through the package's crash test hook
@@ -25,7 +25,7 @@ async function crashChild(): Promise<void> {
   const connection = await instance.connect();
   await connection.run("SELECT 1");
   // The crash hook is not public API: open the shim the package already loaded and call it directly.
-  const { shimPath } = await import("@avidian/duckdb-bun-linux-x64");
+  const { shimPath } = await import(`@avidian/duckdb-bun-${process.platform}-${process.arch}`);
   const { symbols } = dlopen(shimPath, { dbs_crash_for_test: { args: ["u32"], returns: "void" } });
   symbols.dbs_crash_for_test(1);
   fail("the crash test hook returned instead of crashing the process");

@@ -155,6 +155,8 @@ It ignores `@duckdb/node-api` and `libduckdb-sys`, which move with a DuckDB upgr
 Bun is pinned in `package.json` (`engines`, `packageManager`, and `@types/bun`); every workflow reads it from `packageManager` through `setup-bun`'s `bun-version-file`.
 Change the Bun pin, the `oven/bun` image digest in `.github/workflows/ci.yml`, and `@types/bun` together.
 Rust is pinned in `rust-toolchain.toml`, and the `rust` image tag and digest in the workflows must match it.
+Pin each image by the digest of its multi-platform index, which `docker buildx imagetools inspect <image>:<tag>` prints first, not by one platform's manifest.
+The linux-x64 and linux-arm64 jobs pull the same reference, and each runner takes its own architecture from the index.
 
 ## When something breaks
 
