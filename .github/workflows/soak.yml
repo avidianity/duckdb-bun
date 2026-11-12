@@ -1,0 +1,90 @@
+name: Soak
+
+# A service-like load for a long time on one instance (scripts/soak.ts, CONTRIBUTING.md "Soak"):
+# it fails when RSS keeps growing, native handles leak, or the event loop stalls.
+on:
+  schedule:
+    # Nightly, on the default branch.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: Minutes of load, 1 to 300
+        type: number
+        default: 45
+
+permissions:
+  contents: read
+
+concurrency:
+  group: soak-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  soak:
+    name: soak (linux-x64)
+    runs-on: ubuntu-latest
+    # The 6-hour limit of a job on a GitHub-hosted runner: 300 minutes of load, plus the build and the report.
+    timeout-minutes: 360
+    env:
+      PLATFORM: linux-x64
+      MINUTES: ${{ inputs.minutes || 45 }}
+    steps:
+      - name: Check the duration
+        run: |
+          if ! [[ "$MINUTES" =~ ^[0-9]+$ ]] || (( MINUTES < 1 || MINUTES > 300 )); then
+            echo "minutes must be a whole number from 1 to 300, got $MINUTES" >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      # rustup installs the toolchain and components that rust-toolchain.toml pins.
+      - name: Install the Rust toolchain
+        run: |
+          rustup toolchain install
+          rustc --version
+          cargo --version
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: native -> target
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Point the Rust build at this platform's libduckdb
+        run: echo "DUCKDB_LIB_DIR=$GITHUB_WORKSPACE/packages/duckdb-bun-$PLATFORM" >> "$GITHUB_ENV"
+
+      - name: Cache libduckdb
+        id: libduckdb
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: packages/duckdb-bun-linux-x64/libduckdb.*
+          key: libduckdb-linux-x64-${{ hashFiles('src/version.ts', 'scripts/fetch-lib.ts') }}
+
+      - name: Fetch libduckdb
+        if: steps.libduckdb.outputs.cache-hit != 'true'
+        run: bun run fetch-lib "$PLATFORM"
+
+      - name: Build the native shim
+        run: bun run build:native
+
+      # The summary goes to the job summary too; SOAK_SEED from the log repeats a run's choices.
+      - name: Soak
+        run: bun run soak --minutes "$MINUTES" --out soak-report
+
+      - name: Upload the soak report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: soak-linux-x64
+          path: soak-report/
+          if-no-files-found: warn
+          retention-days: 90

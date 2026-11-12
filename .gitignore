@@ -28,3 +28,6 @@ dd-neo
 
 # Coverage reports, written by `bun run coverage`
 /coverage/
+
+# Soak reports, written by `bun run soak`
+/soak-report/

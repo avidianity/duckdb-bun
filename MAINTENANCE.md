@@ -160,12 +160,13 @@ The linux-x64 and linux-arm64 jobs pull the same reference, and each runner take
 
 ## When something breaks
 
-| Symptom                                                    | Likely cause                                                   | Where to look                                                |
-| ---------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------ |
-| `tests/version.test.ts` fails                              | the fetched `libduckdb` is not the pinned version              | run `bun run fetch-lib`                                      |
-| `bun run check-version` reports a disagreement             | a version was bumped in one place only                         | the list in [Packages and versions](#packages-and-versions)  |
-| a query diverges in `bun run parity`                       | a value or error differs from the official binding             | `src/bindings/`                                              |
-| `dlopen` reports an undefined symbol                       | a C function the shim or the bindings call changed             | `vendor/duckdb.h`, `native/ABI.md`, `src/bindings/ffi.ts`    |
-| a process prints `[duckdb-bun] fatal signal`               | a native crash; the report lists the last binding events       | `native/ABI.md`, then the ring entries in the report         |
-| the docker smoke job fails while the test job passes       | a file missing from a package's `files`, or a glibc mismatch   | `packages/*/package.json`, the `rust` image in the workflows |
-| the release publish job fails with an authentication error | the trusted publisher on npmjs.com does not match the workflow | [Publishing to npm](#publishing-to-npm)                      |
+| Symptom                                                    | Likely cause                                                                          | Where to look                                                                                |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `tests/version.test.ts` fails                              | the fetched `libduckdb` is not the pinned version                                     | run `bun run fetch-lib`                                                                      |
+| `bun run check-version` reports a disagreement             | a version was bumped in one place only                                                | the list in [Packages and versions](#packages-and-versions)                                  |
+| a query diverges in `bun run parity`                       | a value or error differs from the official binding                                    | `src/bindings/`                                                                              |
+| `dlopen` reports an undefined symbol                       | a C function the shim or the bindings call changed                                    | `vendor/duckdb.h`, `native/ABI.md`, `src/bindings/ffi.ts`                                    |
+| a process prints `[duckdb-bun] fatal signal`               | a native crash; the report lists the last binding events                              | `native/ABI.md`, then the ring entries in the report                                         |
+| the docker smoke job fails while the test job passes       | a file missing from a package's `files`, or a glibc mismatch                          | `packages/*/package.json`, the `rust` image in the workflows                                 |
+| the release publish job fails with an authentication error | the trusted publisher on npmjs.com does not match the workflow                        | [Publishing to npm](#publishing-to-npm)                                                      |
+| the nightly `Soak` workflow fails a check                  | memory growth, a handle leak, a stalled event loop, or a wrong answer under long load | the `soak-linux-x64` artifact, then `SOAK_SEED=<seed> bun run soak` (CONTRIBUTING.md "Soak") |

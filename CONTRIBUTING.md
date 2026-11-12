@@ -17,21 +17,30 @@ Bun is pinned in `package.json` (`engines` and `packageManager`); use that versi
 
 ## Checks
 
-| Command                    | What it proves                                                         |
-| -------------------------- | ---------------------------------------------------------------------- |
-| `bun run check`            | Biome lint and format, then `bun check` type checking                  |
-| `bun run test:official`    | the vendored `@duckdb/node-api` test suite passes on our bindings      |
-| `bun run test:bindings`    | the vendored `@duckdb/node-bindings` test suite passes on our bindings |
-| `bun run parity`           | results and error text match the real `@duckdb/node-api` side by side  |
-| `bun run test:concurrency` | concurrent calls of every kind and Workers stay correct and settle     |
-| `bun test`                 | everything above plus the stress, leak, crash-report and compile tests |
-| `bun run coverage`         | coverage of `src/` and the Rust shim is at or above its floors         |
+| Command                    | What it proves                                                           |
+| -------------------------- | ------------------------------------------------------------------------ |
+| `bun run check`            | Biome lint and format, then `bun check` type checking                    |
+| `bun run test:official`    | the vendored `@duckdb/node-api` test suite passes on our bindings        |
+| `bun run test:bindings`    | the vendored `@duckdb/node-bindings` test suite passes on our bindings   |
+| `bun run parity`           | results and error text match the real `@duckdb/node-api` side by side    |
+| `bun run test:concurrency` | concurrent calls of every kind and Workers stay correct and settle       |
+| `bun run soak`             | a long service-like load keeps memory, handles and the event loop steady |
+| `bun test`                 | everything above plus the stress, leak, crash-report and compile tests   |
+| `bun run coverage`         | coverage of `src/` and the Rust shim is at or above its floors           |
 
 ## Concurrency stress
 
 `bun run test:concurrency` (`tests/heavy/concurrency-stress.test.ts`) runs every kind of call on one instance at once for `STRESS_SECONDS` seconds of load, 8 by default, then waits for the job pool's idle timeout and sends calls across it.
 A run takes about 12 seconds plus the load, and up to 15 seconds more on Linux, where it also checks that idle pool threads exit.
 Each run prints its seed; `STRESS_SEED=<seed> bun run test:concurrency` repeats that run's choices of queries, sizes and pauses, though not the interleaving across threads.
+
+## Soak
+
+`bun run soak` (`scripts/soak.ts`) runs a service-like load on one long-lived instance for `--minutes` minutes, 45 by default: eight handlers send NDJSON, CSV and Parquet reads over temp files, prepared statements, `?` and `$n` parameters, streamed reads, short queries and errors, with a pause of up to 20 ms between requests.
+Every `--sample-seconds` seconds, 5 by default, it records RSS, the JS heap, `diagnostics().liveHandles`, jobs in flight, running native jobs, OS and job pool threads (Linux), and event loop timer gaps.
+It fails when any request gets a wrong answer or error, when RSS grows faster than `MAX_RSS_SLOPE_MIB_PER_MINUTE` (1 MiB a minute) on a least-squares line through the second half of the samples, when the p99 event loop gap reaches 50 ms, when a job is still in flight after the load, when live handles do not return to their baseline after everything is closed and collected, or, on Linux, when idle job pool threads do not exit.
+It writes `soak.json` and `soak.md` to `--out` (`soak-report/` by default), and `SOAK_SEED=<seed>` repeats a run's choices.
+The `Soak` workflow (`.github/workflows/soak.yml`) runs it nightly on linux-x64 and on demand with a `minutes` input from 1 to 300, and uploads the report as the `soak-linux-x64` artifact.
 
 ## Coverage
 
