@@ -49,6 +49,7 @@ import { cstr, encode, type LayoutName, readCString, slot, slotValue, takeCStrin
 import { duckdb, shim } from "../runtime/native.ts";
 import { RingOp, record } from "../runtime/ring.ts";
 import { callContext } from "../runtime/trace.ts";
+import { create_data_chunk } from "./data-chunk.ts";
 
 /** The duckdb_type value DuckDB returns for an out-of-range column. */
 const DUCKDB_TYPE_INVALID = 0;
@@ -589,7 +590,9 @@ export function fetch_chunk(result: Result): Promise<DataChunk | null> {
     () => shim.dbs_job_fetch_chunk(ptr) as Pointer | null,
     (job) => {
       const chunk = jobOut0(job);
-      return chunk === null ? null : asHandle<DataChunk>(own("data chunk", chunk));
+      // Past the end, duckdb_fetch_chunk returns null and the official binding
+      // resolves to a chunk with no columns and no rows, never to null.
+      return chunk === null ? create_data_chunk([]) : asHandle<DataChunk>(own("data chunk", chunk));
     },
   );
 }

@@ -704,3 +704,24 @@ parity(
   },
   { official: "ok", skip: OFFLINE, timeout: 180_000 },
 );
+
+/** What a caller sees of one fetchChunk() answer. */
+function chunkShape(chunk: { rowCount: number; columnCount: number; getRows(): unknown[][] } | null) {
+  return chunk === null ? null : { rowCount: chunk.rowCount, columnCount: chunk.columnCount, rows: chunk.getRows() };
+}
+
+parity(
+  "fetchChunk() past the end of a streamed and a materialized result",
+  (api) =>
+    withConnection(api, async (connection) => {
+      const read = async (result: DuckDBResult) => [
+        chunkShape(await result.fetchChunk()),
+        chunkShape(await result.fetchChunk()),
+        chunkShape(await result.fetchChunk()),
+      ];
+      const streamed = await read(await connection.stream("select i from range(3) t(i)"));
+      const materialized = await read(await connection.run("select i from range(3) t(i)"));
+      return { streamed, materialized };
+    }),
+  OK,
+);

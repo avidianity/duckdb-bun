@@ -3,6 +3,7 @@
 // vendored suites cannot reach until the value and chunk families land.
 
 import { afterAll, beforeAll, expect, test } from "bun:test";
+import * as dc from "../../src/bindings/api/data-chunk.ts";
 import * as db from "../../src/bindings/api/database.ts";
 import * as q from "../../src/bindings/api/query.ts";
 import { StatementType, Type } from "../../src/bindings/generated/contract.ts";
@@ -29,7 +30,10 @@ test("query returns column metadata and official out-of-range errors", async () 
   expect(q.result_is_streaming(result)).toBe(false);
   expect(() => q.column_name(result, 5)).toThrow(new RangeError("column index 5 is out of range (count: 2)"));
   expect(await q.fetch_chunk(result)).not.toBeNull();
-  expect(await q.fetch_chunk(result)).toBeNull();
+  // Past the end, the official binding answers a chunk with no columns and no rows.
+  const end = await q.fetch_chunk(result);
+  expect(end).not.toBeNull();
+  if (end) expect([dc.data_chunk_get_column_count(end), dc.data_chunk_get_size(end)]).toEqual([0, 0]);
   q.destroy_result_sync(result);
   q.destroy_result_sync(result);
   expect(() => q.column_count(result)).toThrow(new Error("Result destroyed"));

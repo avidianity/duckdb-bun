@@ -43,12 +43,6 @@
 // Here create_bit() gets valid bit strings only; tests/runtime/values.test.ts
 // covers the rest.
 //
-// Official bug, not mirrored: at the end of a result, the official fetch_chunk()
-// resolves to a chunk with no columns and no rows, a handle around the null
-// pointer duckdb_fetch_chunk() returned, where the contract and ours give null.
-// DuckDBResult.fetchChunk() passes that on, so it gives an empty chunk in the
-// official package and null in ours. A chunk without columns counts as null here.
-//
 // Official bug, not mirrored: get_bignum() on a value that is not a BIGNUM
 // returns a wrong number from the official binding (0n for INTEGER 7, 5n for
 // HUGEINT 2^70 + 5), where ours returns the cast value. Successful get_bignum()
@@ -581,9 +575,7 @@ async function run(impl: Impl, sequence: Call[], skip = new Map<number, Outcome>
     trace(`${impl}, call ${step}: ${name}`, sequence);
     const args = recipes.map((recipe) => resolve(world, recipe));
     try {
-      let result = await (duckdb[name] as (...args: unknown[]) => unknown)(...args);
-      // See the official bug about fetch_chunk() at the top of the file.
-      if (name === "fetch_chunk" && result && duckdb.data_chunk_get_column_count(result as never) === 0) result = null;
+      const result = await (duckdb[name] as (...args: unknown[]) => unknown)(...args);
       if (returns !== undefined && result !== null && result !== undefined) world[returns].push(result);
       outcomes.push({ ok: plain(result, returns) });
     } catch (error) {
