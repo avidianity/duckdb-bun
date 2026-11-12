@@ -1,17 +1,19 @@
 // Native memory handed to JavaScript, and what a function callback hands out.
 //
-// Views. The official binding returns vector data, validity masks and string
-// bytes as external buffers over DuckDB's memory (Napi::Buffer::NewOrCopy), and
-// nothing keeps the owner of that memory alive. Here each view's ArrayBuffer is
-// mapped to the handle that owns the memory, so a reachable view keeps its
-// vector, and through the vector its data chunk, from being collected.
+// Copies. The official binding returns vector data, validity masks and string
+// bytes with Napi::Buffer::NewOrCopy under NODE_API_NO_EXTERNAL_BUFFERS_ALLOWED
+// (src/napi_setup.h), so each is a copy: writes reach the vector only through
+// copy_data_to_vector. Each copy is mapped to the handle that owns the memory it
+// came from, so get_data_from_pointer can follow a string pointer in the copy
+// only while that memory is alive, and a reachable copy keeps its vector, and
+// through the vector its data chunk, from being collected.
 //
 // Callback scopes. The info, data chunk and vector a function callback receives
 // are borrowed for the length of the call: DuckDB frees or reuses them once the
-// callback returns. A scope collects those handles, every handle derived from
-// them (a chunk's vectors, a vector's children) and every view over their
-// memory, then invalidates the handles and detaches the views when the callback
-// returns, so a use after the callback throws instead of touching freed memory.
+// callback returns. A scope collects those handles and every handle derived from
+// them (a chunk's vectors, a vector's children), then invalidates them when the
+// callback returns, so a use after the callback throws instead of touching freed
+// memory.
 //
 // User data. JavaScript objects handed to DuckDB (bind data, init data, scalar
 // function state) cross as ids (native/ABI.md, "Function callbacks"); the
@@ -19,7 +21,7 @@
 
 import { type Pointer, toArrayBuffer } from "bun:ffi";
 import { allocateId, onRelease } from "./dispatch.ts";
-import type { Handle } from "./handle.ts";
+import { Handle } from "./handle.ts";
 
 // --- callback scopes ------------------------------------------------------------------
 
@@ -27,7 +29,6 @@ const scopes = new WeakMap<object, CallbackScope>();
 
 export class CallbackScope {
   readonly #handles: Handle[] = [];
-  readonly #buffers: ArrayBuffer[] = [];
 
   /** Adds a handle that dies with the callback. */
   adopt<T extends Handle>(handle: T): T {
@@ -36,19 +37,10 @@ export class CallbackScope {
     return handle;
   }
 
-  addBuffer(buffer: ArrayBuffer): void {
-    this.#buffers.push(buffer);
-    scopes.set(buffer, this);
-  }
-
-  /** Invalidates every handle and detaches every view the callback was given or derived. */
+  /** Invalidates every handle the callback was given or derived. */
   close(): void {
     for (const handle of this.#handles) handle.invalidate();
-    // transfer(0) detaches the view's buffer without copying or freeing the
-    // native memory behind it, so later reads see an empty buffer.
-    for (const buffer of this.#buffers) buffer.transfer(0);
     this.#handles.length = 0;
-    this.#buffers.length = 0;
   }
 }
 
@@ -61,29 +53,33 @@ export function derived<T extends Handle>(owner: object, handle: T): T {
   return handle;
 }
 
-// --- views over native memory ----------------------------------------------------------
+// --- copies of native memory ----------------------------------------------------------
 
-/** The handle that owns the memory behind each view's ArrayBuffer. */
-const owners = new WeakMap<ArrayBuffer, object>();
+/** The handle that owns the memory each copy came from. */
+const owners = new WeakMap<ArrayBuffer, Handle>();
 
 /**
- * A Buffer over `length` bytes of native memory at `pointer`, owned by `owner`.
- * A null pointer or a zero length gives an empty Buffer, since bun:ffi cannot
- * view either.
+ * A Buffer holding a copy of `length` bytes of native memory at `pointer`, owned
+ * by `owner`. A null pointer or a zero length gives an empty Buffer.
  */
-export function nativeView(pointer: Pointer | number | null, length: number, owner: object | undefined): Buffer {
+export function nativeCopy(pointer: Pointer | number | null, length: number, owner: Handle | undefined): Buffer {
   if (!pointer || length === 0) return Buffer.alloc(0);
-  const buffer = toArrayBuffer(pointer as Pointer, 0, length);
-  if (owner !== undefined) {
-    owners.set(buffer, owner);
-    scopes.get(owner)?.addBuffer(buffer);
-  }
-  return Buffer.from(buffer);
+  const copy = Buffer.from(new Uint8Array(toArrayBuffer(pointer as Pointer, 0, length)));
+  if (owner !== undefined) owners.set(copy.buffer as ArrayBuffer, owner);
+  return copy;
 }
 
-/** The owner of a view's memory, so a view derived from it (a string's bytes) can share it. */
-export function ownerOfBuffer(buffer: ArrayBuffer): object | undefined {
-  return owners.get(buffer);
+/**
+ * The owner of the memory a copy came from, so a string pointer inside the copy
+ * can be followed. Throws when that memory is gone: its handle, or a handle it
+ * borrows from, was destroyed or belonged to a callback that has returned.
+ */
+export function liveOwnerOfBuffer(buffer: ArrayBuffer): Handle | undefined {
+  const owner = owners.get(buffer);
+  for (let handle: unknown = owner; handle instanceof Handle; handle = handle.owner) {
+    if (handle.ptr === null) throw new Error(`Invalid ${handle.kind} argument`);
+  }
+  return owner;
 }
 
 // --- user data ---------------------------------------------------------------------------

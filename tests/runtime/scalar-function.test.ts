@@ -1,6 +1,6 @@
 // Scalar functions of the new bindings (src/bindings/api/scalar-function.ts):
 // callbacks DuckDB makes from its own worker threads, errors thrown by a
-// callback, and borrowed handles and views that die when the callback returns.
+// callback, and borrowed handles that die when the callback returns.
 
 import { toArrayBuffer } from "bun:ffi";
 import { afterAll, beforeAll, expect, test } from "bun:test";
@@ -11,7 +11,7 @@ import duckdb, {
   type ScalarFunctionInfo,
   Type,
   type Vector,
-} from "../../src/bindings/next.ts";
+} from "../../src/bindings/index.ts";
 import { shim } from "../../src/bindings/runtime/native.ts";
 
 let database: Database;
@@ -119,7 +119,7 @@ test("a thrown error becomes the query's error, whatever was thrown", async () =
   await expect(duckdb.query(connection, "SELECT bind_throws(1)")).rejects.toThrow("my bind error");
 });
 
-test("handles and views a callback received die when it returns", async () => {
+test("handles a callback received die when it returns, and copies outlive them", async () => {
   let saved:
     | { info: ScalarFunctionInfo; input: DataChunk; output: Vector; vector: Vector; data: Uint8Array }
     | undefined;
@@ -139,7 +139,10 @@ test("handles and views a callback received die when it returns", async () => {
   expect(() => duckdb.data_chunk_get_size(input)).toThrow(new Error("Invalid data chunk argument"));
   expect(() => duckdb.vector_get_data(output, 8)).toThrow(new Error("Invalid vector argument"));
   expect(() => duckdb.vector_get_data(vector, 8)).toThrow(new Error("Invalid vector argument"));
-  expect(data.byteLength).toBe(0);
+  expect(data.byteLength).toBe(8);
+  expect(() => duckdb.get_data_from_pointer(data.buffer as ArrayBuffer, 0, 1)).toThrow(
+    new Error("Invalid vector argument"),
+  );
 });
 
 test("registration needs a main function, and setters check their arguments", () => {

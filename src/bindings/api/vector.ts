@@ -20,7 +20,7 @@ import { type Handle, handleOf, unwrap } from "../runtime/handle.ts";
 import { borrow, own } from "../runtime/kinds.ts";
 import { slot, utf8 } from "../runtime/marshal.ts";
 import { duckdb } from "../runtime/native.ts";
-import { derived, nativeView, ownerOfBuffer } from "../runtime/scope.ts";
+import { derived, liveOwnerOfBuffer, nativeCopy } from "../runtime/scope.ts";
 
 function asHandle<T>(handle: Handle): T {
   return handle as unknown as T;
@@ -65,7 +65,7 @@ export function vector_get_data(vector: Vector, byte_count: number): Uint8Array 
   const handle = handleOf(vector, "vector");
   const byteCount = uint32FromNumber(byte_count);
   const data = duckdb.duckdb_vector_get_data(handle.ptr) as Pointer | null;
-  return nativeView(data, byteCount, handle);
+  return nativeCopy(data, byteCount, handle);
 }
 
 export function vector_get_validity(vector: Vector, byte_count: number): Uint8Array {
@@ -75,7 +75,7 @@ export function vector_get_validity(vector: Vector, byte_count: number): Uint8Ar
   // The contract types this as Uint8Array, but the official binding returns
   // null for a vector without a validity mask, and callers rely on it.
   if (validity === null) return null as unknown as Uint8Array;
-  return nativeView(validity, byteCount, handle);
+  return nativeCopy(validity, byteCount, handle);
 }
 
 export function vector_ensure_validity_writable(vector: Vector): void {
@@ -200,9 +200,9 @@ export function validity_set_row_valid(validity: Uint8Array, row_index: number):
 
 /**
  * The `byte_count` bytes a pointer stored at `pointer_offset` of `array_buffer`
- * points to: the out-of-line bytes of a duckdb_string_t in a vector's data. The
- * view shares the owner of `array_buffer`, since the string lives in its
- * vector's string heap.
+ * points to: the out-of-line bytes of a duckdb_string_t in a copy of a vector's
+ * data, copied as the official binding does. It throws when that vector is gone,
+ * since the string lives in the vector's string heap.
  */
 export function get_data_from_pointer(
   array_buffer: ArrayBuffer,
@@ -212,8 +212,9 @@ export function get_data_from_pointer(
   const buffer = arrayBufferOf(array_buffer);
   const offset = uint32FromNumber(pointer_offset);
   const byteCount = uint32FromNumber(byte_count);
+  const owner = liveOwnerOfBuffer(buffer);
   const pointer = Number(new DataView(buffer).getBigUint64(offset, true));
-  return nativeView(pointer, byteCount, ownerOfBuffer(buffer));
+  return nativeCopy(pointer, byteCount, owner);
 }
 
 function copyInto(

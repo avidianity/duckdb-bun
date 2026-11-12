@@ -5,7 +5,7 @@
 
 import { ptr } from "bun:ffi";
 import { expect, test } from "bun:test";
-import duckdb, { Type } from "../../src/bindings/next.ts";
+import duckdb, { Type } from "../../src/bindings/index.ts";
 import { duckdb as capi } from "../../src/bindings/runtime/native.ts";
 
 const INTEGER = () => duckdb.create_logical_type(Type.INTEGER);
@@ -58,6 +58,8 @@ test("vector_get_validity is null until the mask is made writable", () => {
   const mask = duckdb.vector_get_validity(vector, 8);
   expect(mask[0]).toBe(0xff);
   duckdb.validity_set_row_invalid(mask, 3);
+  expect(duckdb.validity_row_is_valid(duckdb.vector_get_validity(vector, 8), 3)).toBe(true);
+  duckdb.copy_data_to_vector_validity(vector, 0, mask.buffer as ArrayBuffer, 0, 8);
   expect(duckdb.validity_row_is_valid(duckdb.vector_get_validity(vector, 8), 3)).toBe(false);
 });
 
@@ -83,6 +85,17 @@ test("validity functions agree bit for bit with DuckDB's duckdb_validity_* funct
   expect(() => duckdb.validity_set_row_valid(ours, 128)).toThrow(
     new RangeError("row index 128 is out of range for a validity mask of 16 bytes (128 rows)"),
   );
+});
+
+test("vector_get_data returns a copy, as the official binding does", () => {
+  const chunk = duckdb.create_data_chunk([INTEGER()]);
+  duckdb.data_chunk_set_size(chunk, 1);
+  const vector = duckdb.data_chunk_get_vector(chunk, 0);
+  const data = duckdb.vector_get_data(vector, 4);
+  new DataView(data.buffer).setInt32(0, 42, true);
+  expect(new DataView(duckdb.vector_get_data(vector, 4).buffer).getInt32(0, true)).not.toBe(42);
+  duckdb.copy_data_to_vector(vector, 0, data.buffer as ArrayBuffer, 0, 4);
+  expect(new DataView(duckdb.vector_get_data(vector, 4).buffer).getInt32(0, true)).toBe(42);
 });
 
 test("get_data_from_pointer reads a long string's bytes and shares the vector's lifetime", () => {
