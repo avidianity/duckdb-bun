@@ -6,6 +6,7 @@ import * as db from "../../src/bindings/api/database.ts";
 import * as lt from "../../src/bindings/api/logical-types.ts";
 import * as v from "../../src/bindings/api/values.ts";
 import { Type } from "../../src/bindings/generated/contract.ts";
+import { DuckDBBitValue, DuckDBInstance } from "../../src/neo.ts";
 
 test("blobs and bits come back as Buffers holding exactly the bytes given", () => {
   const backing = new Uint8Array([9, 9, 1, 0, 2, 9]);
@@ -134,4 +135,30 @@ test("the table names of SQL that does not parse fail in the scalar getters inst
   expect(() => v.get_blob(names)).toThrow(invalid);
   db.disconnect_sync(connection);
   db.close_sync(database);
+});
+
+// DuckDB keeps the padding, the bit string's first byte, below 8 and asserts it only in
+// debug builds. A larger padding made its BIT to VARCHAR cast write past its buffer,
+// which killed the process, in the official binding too; a padding over the bit
+// count made it throw a C++ exception, which aborts the process through bun:ffi.
+test("a bit string with an invalid padding fails instead of crashing the process", async () => {
+  const invalid = [[], [1], [8, 0xff], [0x30, 0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]].map(
+    (bytes) => new Uint8Array(bytes),
+  );
+  for (const bytes of invalid) {
+    expect(() => v.create_bit(bytes)).toThrow(new Error("Failed to create bit value: invalid padding"));
+  }
+  expect(v.get_varchar(v.create_bit(new Uint8Array([0])))).toBe("");
+  expect(v.get_varchar(v.create_bit(new Uint8Array([7, 0xff, 0x0f])))).toBe("100001111");
+
+  const instance = await DuckDBInstance.create();
+  const connection = await instance.connect();
+  const bit = new DuckDBBitValue(new Uint8Array([0x30, 0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]));
+  await expect(connection.run("SELECT $1::VARCHAR AS v", [bit])).rejects.toThrow(
+    "Failed to create bit value: invalid padding",
+  );
+  const valid = new DuckDBBitValue(new Uint8Array([2, 0xff]));
+  expect((await connection.runAndReadAll("SELECT $1::VARCHAR AS v", [valid])).getRows()).toEqual([["111111"]]);
+  connection.closeSync();
+  instance.closeSync();
 });

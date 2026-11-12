@@ -286,8 +286,21 @@ export function create_blob(data: Uint8Array): Value {
   return ownValue(duckdb.duckdb_create_blob(nonEmpty(bytes), bytes.byteLength) as Pointer | null);
 }
 
+/**
+ * True for the bit strings DuckDB can read: a padding byte below 8 that leaves a bit
+ * count of zero or more. DuckDB asserts this only in debug builds; past it, its BIT
+ * to VARCHAR cast writes beyond its buffer or throws a C++ exception, and either one
+ * ends the process. The official binding passes such bytes on and crashes.
+ */
+function validBitString(bytes: Uint8Array): boolean {
+  const padding = bytes[0];
+  return padding !== undefined && padding < 8 && (bytes.length > 1 || padding === 0);
+}
+
 export function create_bit(data: Uint8Array): Value {
-  const bit = structWithData("bit", {}, typedArrayBytes(data));
+  const bytes = typedArrayBytes(data);
+  if (!validBitString(bytes)) throw new Error("Failed to create bit value: invalid padding");
+  const bit = structWithData("bit", {}, bytes);
   return ownValue(shim.dbs_create_bit(bit) as Pointer | null);
 }
 
