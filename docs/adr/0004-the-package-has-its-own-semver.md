@@ -1,6 +1,6 @@
 # 0004 The package has its own semantic version
 
-Status: accepted, 2026-11-12.
+Status: accepted, 2026-11-12; amended 2026-11-12 by ADR 0009 for the `@duckdb/node-api` column.
 
 ## Context
 
@@ -17,7 +17,7 @@ A fix of our own bumps the patch version.
 An API break bumps the major version.
 No version is a prerelease.
 
-The `Versions` table in `README.md` maps each package version to the DuckDB it bundles and the `@duckdb/node-api` it matches, and `bun run check-version` fails when the current version has no row.
+The `Versions` table in `README.md` maps each package version to the DuckDB it bundles and the `@duckdb/node-api` reference it was compared against, or `none` (ADR 0009), and `bun run check-version` fails when the current version has no row.
 At run time, the package exports `DUCKDB_VERSION`, and `diagnostics().versions` reports the package, DuckDB, Bun and shim versions.
 
 ## Rejected options

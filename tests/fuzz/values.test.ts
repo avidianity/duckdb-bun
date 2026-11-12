@@ -25,6 +25,7 @@ import * as official from "@duckdb/node-api";
 import fc from "fast-check";
 import * as oursApi from "../../src/neo.ts";
 import { capture, normalize } from "../parity/harness.ts";
+import { HAS_REFERENCE, NO_REFERENCE } from "../reference.ts";
 import {
   ALL_KINDS,
   apiType,
@@ -50,6 +51,7 @@ type Scenario = (api: Api, connection: DuckDBConnection) => Promise<unknown>;
 const connections = new Map<Impl, { instance: DuckDBInstance; connection: DuckDBConnection }>();
 
 beforeAll(async () => {
+  if (!HAS_REFERENCE) return;
   for (const impl of ["official", "ours"] as const) {
     const instance = await APIS[impl].DuckDBInstance.create(":memory:");
     const connection = await instance.connect();
@@ -57,6 +59,8 @@ beforeAll(async () => {
     connections.set(impl, { instance, connection });
   }
 });
+
+if (!HAS_REFERENCE) console.warn(`tests/fuzz/values.test.ts: fuzz parity skipped: ${NO_REFERENCE}`);
 
 afterAll(() => {
   for (const { instance, connection } of connections.values()) {
@@ -273,7 +277,7 @@ function appenderScenario(
 
 const cases = caseArb(3);
 
-describe("value conversion parity, fuzzed", () => {
+describe.skipIf(!HAS_REFERENCE)("value conversion parity, fuzzed", () => {
   fuzz(
     "SQL literals read back through every accessor",
     fc.asyncProperty(cases, (fuzzCase) =>

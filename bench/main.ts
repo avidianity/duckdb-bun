@@ -1,15 +1,19 @@
-// `bun run bench`: generates the input files, runs every scenario against the official
-// `@duckdb/node-api` and against ours, each in its own child process, prints one
+// `bun run bench`: generates the input files, runs every scenario against the baseline (the `@duckdb/node-api`
+// reference, or the previous release of this package: bench/baseline.ts) and against ours, each in its own
+// child process, prints one
 // Markdown table per scenario and writes the results to `bench/results/`, as JSON and Markdown.
 //
 //   bun run bench [--scenario read-all,prepared] [--impl ours] [--rounds 3] [--rows 1000000] [--lag-rows 600000000]
 //                 [--gate] [--max-slower 10] [--max-memory 10]
 //
 // --gate exits 1 when ours is slower or uses more memory than the limits allow on any scenario (bench/gate.ts).
+// With no baseline, before the first release on a DuckDB that npm has no @duckdb/node-api for, it runs ours alone
+// and the gate has nothing to judge.
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { cpus, tmpdir, totalmem } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
+import { type Baseline, baselineLabel, resolveBaseline } from "./baseline.ts";
 import { writeDataFiles } from "./data.ts";
 import { DEFAULT_LIMITS, type GateInput, type GateLimits, gateTable, judge, median, type Verdict } from "./gate.ts";
 import { type ChildResult, IMPLEMENTATIONS, type Implementation } from "./runner.ts";
@@ -54,7 +58,7 @@ async function runChild(
   impl: Implementation,
   scenario: Scenario,
   dirs: { data: string; root: string },
-  options: { rows: string; lagRows: string },
+  options: { rows: string; lagRows: string; baselineEntry: string | undefined },
   index: number,
 ): Promise<ChildResult> {
   const work = join(dirs.root, `work-${impl}-${scenario.name}-${index}`);
@@ -63,6 +67,7 @@ async function runChild(
   const args = [
     ...["--impl", impl, "--scenario", scenario.name, "--data", dirs.data, "--work", work, "--out", out],
     ...["--rows", options.rows, "--lag-rows", options.lagRows, "--runs", "1"],
+    ...(impl === "baseline" && options.baselineEntry ? ["--baseline-entry", options.baselineEntry] : []),
   ];
   const child = Bun.spawn([process.execPath, RUNNER, ...args], {
     stdout: "inherit",
@@ -220,11 +225,26 @@ async function main(): Promise<void> {
     maxMemoryPct: Number(values["max-memory"]),
   };
   const scenarioNames = list(values.scenario, SCENARIO_NAMES, "--scenario");
-  const impls = list(values.impl, IMPLEMENTATIONS, "--impl") as Implementation[];
+  let impls = list(values.impl, IMPLEMENTATIONS, "--impl") as Implementation[];
   const rows = values.rows;
   const lagRows = values["lag-rows"];
-  const root = await mkdtemp(join(tmpdir(), "duckdb-bun-bench-"));
   if (values.gate && impls.length !== IMPLEMENTATIONS.length) throw new Error("--gate needs both implementations");
+  const root = await mkdtemp(join(tmpdir(), "duckdb-bun-bench-"));
+  const oursVersion = await packageVersion(join(import.meta.dir, "..", "package.json"));
+  let baseline: Baseline | undefined;
+  if (impls.includes("baseline")) {
+    baseline = await resolveBaseline(oursVersion, join(root, "baseline"));
+    if (baseline) {
+      console.error(`Baseline: ${baselineLabel(baseline)}`);
+    } else {
+      console.error(
+        "No baseline: npm has no @duckdb/node-api built on the pinned DuckDB and no earlier release of this package," +
+          " so the bench runs ours alone and the gate has nothing to judge.",
+      );
+      impls = impls.filter((impl) => impl !== "baseline");
+    }
+  }
+  const baselineEntry = baseline?.kind === "release" ? baseline.entry : undefined;
   const results: Record<string, Summary[]> = {};
   const tables: string[] = [];
   const verdicts: Verdict[] = [];
@@ -240,8 +260,8 @@ async function main(): Promise<void> {
     tables.push(heading);
     console.log(heading);
     for (const scenario of SCENARIOS.filter((s) => scenarioNames.includes(s.name))) {
-      // Rounds of official, ours, ours, official, one child with one measured run each. Each adjacent
-      // official and ours child is a pair that ran seconds apart, so a slow spell on the runner slows
+      // Rounds of baseline, ours, ours, baseline, one child with one measured run each. Each adjacent
+      // baseline and ours child is a pair that ran seconds apart, so a slow spell on the runner slows
       // both halves of a pair alike, and the k-th run of each implementation belong to pair k
       // (bench/gate.ts). Two children per implementation in plain ABBA order put both ours runs
       // back to back, and one slow spell made ours look 28% slower on the macOS runner.
@@ -253,7 +273,7 @@ async function main(): Promise<void> {
       for (let round = 1; round <= rounds; round++) {
         for (const impl of [...impls, ...[...impls].reverse()]) {
           console.error(`Running ${scenario.name} on ${impl}, round ${round} of ${rounds} ...`);
-          const raw = await runChild(impl, scenario, { data, root }, { rows, lagRows }, child++);
+          const raw = await runChild(impl, scenario, { data, root }, { rows, lagRows, baselineEntry }, child++);
           raws.get(impl)?.push(raw);
         }
       }
@@ -262,9 +282,9 @@ async function main(): Promise<void> {
       const rendered = table(scenario, summaries);
       tables.push(rendered);
       console.log(rendered);
-      const official = summaries.find((s) => s.impl === "official");
+      const baseline = summaries.find((s) => s.impl === "baseline");
       const ours = summaries.find((s) => s.impl === "ours");
-      if (official && ours) verdicts.push(judge(scenario.name, gateInput(official), gateInput(ours), limits));
+      if (baseline && ours) verdicts.push(judge(scenario.name, gateInput(baseline), gateInput(ours), limits));
     }
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -273,7 +293,7 @@ async function main(): Promise<void> {
   const platform = `${process.platform}-${process.arch}`;
   const date = new Date().toISOString().slice(0, 10);
   const file = join(RESULTS_DIR, `${date}-${platform}.json`);
-  const gate = verdicts.length > 0 ? gateTable(verdicts, limits) : "";
+  const gate = baseline && verdicts.length > 0 ? gateTable(verdicts, limits, baselineLabel(baseline)) : "";
   if (gate) console.log(gate);
   await mkdir(RESULTS_DIR, { recursive: true });
   const report = {
@@ -283,10 +303,8 @@ async function main(): Promise<void> {
     cpu: cpus()[0]?.model,
     cpuCount: cpus().length,
     totalMemoryMiB: Math.round(totalmem() / MIB),
-    versions: {
-      ours: await packageVersion(join(import.meta.dir, "..", "package.json")),
-      official: await packageVersion(join(import.meta.dir, "..", "node_modules/@duckdb/node-api/package.json")),
-    },
+    versions: { ours: oursVersion },
+    baseline: baseline ? { kind: baseline.kind, name: baseline.name, version: baseline.version } : null,
     options: {
       rows: Number(rows),
       lagRows: Number(lagRows),

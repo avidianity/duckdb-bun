@@ -15,7 +15,7 @@ import { extname, join } from "node:path";
 import { parseArgs } from "node:util";
 import { DUCKDB_VERSION, DUCKDB_VERSION_TAG } from "../src/version.ts";
 import { TARGETS } from "./fetch-lib.ts";
-import { referenceFor, upgradeTarget, versionRows } from "./upgrade-plan.ts";
+import { NO_REFERENCE, referenceFor, upgradeTarget, versionRows } from "./upgrade-plan.ts";
 
 const ROOT = join(import.meta.dir, "..");
 const NODE_API = "@duckdb/node-api";
@@ -63,10 +63,6 @@ function duckdbBase(version: string | undefined): string | undefined {
 /** A stable semver version: our packages never publish a prerelease, so `^1` ranges match every release. */
 const STABLE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 
-/**
- * The README's "Versions" table, which maps each package version to the DuckDB it bundles and the
- * `@duckdb/node-api` it matches, as rows of [package, duckdb, nodeApi].
- */
 /** The native files a platform package ships: libduckdb and the shim built from native/. */
 function nativeFiles(platform: string): string[] {
   const target = TARGETS[platform];
@@ -140,15 +136,24 @@ if (!STABLE.test(root.version ?? "")) {
     `package.json version ${root.version} is not a stable x.y.z version; the packages never publish a prerelease.`,
   );
 }
-const row = versionRows(await Bun.file(join(ROOT, "README.md")).text()).find(([version]) => version === root.version);
-if (row?.[1] !== DUCKDB_VERSION || row?.[2] !== nodeApiPin) {
+// The @duckdb/node-api devDependency is the reference that parity, fuzz and the bench compare against (ADR 0009).
+// It is built on the pinned DuckDB, or on an older one while npm has none for the pin; never on a newer one.
+const referenceBase = duckdbBase(nodeApiPin);
+const hasReference = referenceBase === DUCKDB_VERSION;
+console.log(
+  `reference:                       ${hasReference ? "built on the pinned DuckDB" : `none for DuckDB ${DUCKDB_VERSION} yet; parity and fuzz do not compare, and the bench compares against the previous release`}`,
+);
+if (referenceBase === undefined || Bun.semver.order(referenceBase, DUCKDB_VERSION) > 0) {
   problems.push(
-    `README.md "Versions" has no row "| ${root.version} | ${DUCKDB_VERSION} | ${nodeApiPin} |" for this package version.`,
+    `${NODE_API} ${nodeApiPin || "(missing)"} is not <duckdb>-r.<n> built on DuckDB ${DUCKDB_VERSION} or older.`,
   );
 }
-if (duckdbBase(nodeApiPin) !== DUCKDB_VERSION) {
+// A release names its reference, or none; a reference that npm publishes after the release may not have been used.
+const allowed = hasReference ? [nodeApiPin, NO_REFERENCE] : [NO_REFERENCE];
+const row = versionRows(await Bun.file(join(ROOT, "README.md")).text()).find(([version]) => version === root.version);
+if (row?.[1] !== DUCKDB_VERSION || !allowed.includes(row?.[2] ?? "")) {
   problems.push(
-    `${NODE_API} ${nodeApiPin || "(missing)"} is not ${DUCKDB_VERSION}-r.<n>; the parity test would compare against another DuckDB.`,
+    `README.md "Versions" has no row "| ${root.version} | ${DUCKDB_VERSION} | ${allowed.join(" or ")} |" for this package version.`,
   );
 }
 
@@ -193,7 +198,7 @@ if (values.tag !== undefined) {
 try {
   const upstream = await upstreamReport(nodeApiPin);
   console.log(`latest DuckDB release:           v${upstream.duckdb.latest}`);
-  console.log(`newest ${NODE_API} on it:    ${upstream.nodeApi.reference ?? "none on npm yet"}`);
+  console.log(`newest ${NODE_API} for it:  ${upstream.nodeApi.reference ?? "none on npm yet"}`);
   if (upstream.upgrade) {
     const { duckdb, nodeApi } = upstream.upgrade;
     console.log(

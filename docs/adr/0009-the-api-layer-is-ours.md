@@ -1,6 +1,6 @@
 # 0009 The API layer is ours
 
-Status: accepted, 2026-11-12.
+Status: accepted, 2026-11-12; amended 2026-11-12 with the upgrade path and the reference.
 
 ## Context
 
@@ -28,15 +28,34 @@ The API layer and its suites are ours, forked from duckdb-node-neo `v2.0.0-r.1` 
 The public contract stays the `@duckdb/node-api` API: same classes, same value objects, same error text.
 The official C++ binding at the fork tag stays the reference for the semantics of the bindings that exist at that tag.
 
+### Amendment: upgrades follow DuckDB core alone
+
+A DuckDB upgrade needs only DuckDB's own release: `bun run upgrade-duckdb --duckdb <new>` sets `DUCKDB_VERSION`, fetches libduckdb and `duckdb.h` from the release assets, regenerates the FFI tables from DuckDB's C API spec, and runs our suites in CI.
+The `upstream-check` workflow opens the upgrade pull request as soon as DuckDB publishes a release newer than the pin.
+New C API surface reaches the API when we port it to `src/bindings/node-bindings.d.ts`, `src/bindings/` and `src/api/`.
+
+### Amendment: `@duckdb/node-api` is a reference, never a gate
+
+`@duckdb/node-api` stays a development dependency only, never a runtime dependency, as the reference that parity, fuzz and the bench compare against (`tests/reference.ts`).
+It is built on the pinned DuckDB, or on an older one while npm has none for the pin.
+
+- When it is built on the pinned DuckDB, parity, fuzz and the bench gate compare against it.
+- When it is not, parity and fuzz report that they have nothing to compare against, and the bench gate compares against the previous release of this package on npm (`bench/baseline.ts`).
+  A comparison across two DuckDB versions would fail on DuckDB's own changes, and would hold a release back on a package we do not control.
+- The upgrade pins the newest `@duckdb/node-api` built on the new DuckDB when npm has one, and `upstream-check` opens a pull request that moves the reference once npm publishes one later.
+- The `Versions` table names the reference each release was compared against, or `none`.
+
 ## Rejected options
 
 - Keeping the vendored layer and contributing every fix upstream: a fix waits for an upstream review and a release, and a DuckDB upgrade waits for duckdb-node-neo.
 - Keeping the vendored layer and patching it on disk with a patch series: every re-vendor has to replay the series, and the layer still follows duckdb-node-neo's release cadence.
 - Rewriting the API layer from scratch: the forked layer already passes its own suites and our parity tests, and a rewrite would risk drift from the public contract for no gain.
+- Comparing against an `@duckdb/node-api` built on an older DuckDB: differences in DuckDB itself would fail parity and hold the release back.
+- Dropping the `@duckdb/node-api` comparison: it is the only check that the public contract still behaves like the official package.
 
 ## Consequences
 
 The API layer can change without upstream, and a DuckDB upgrade depends only on DuckDB's own release (MAINTENANCE.md, "Upgrading DuckDB").
 New C API surface reaches the API layer only when we port it: duckdb-node-neo no longer does that work for us.
 Biome and the type check now cover the forked code, which was reformatted once to the repository's style.
-`@duckdb/node-api` stays a development dependency, the reference that parity, fuzz and the bench compare against.
+While npm has no `@duckdb/node-api` for the pinned DuckDB, nothing checks parity with the official package; the window closes when the reference pull request merges.

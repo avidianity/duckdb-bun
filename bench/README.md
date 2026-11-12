@@ -1,8 +1,20 @@
 # Benchmarks
 
-The bench compares duckdb-bun ("ours", loaded from `src/neo.ts`, the public entry) with the official `@duckdb/node-api` ("official", the version in `devDependencies`).
+The bench compares duckdb-bun ("ours", loaded from `src/neo.ts`, the public entry) with a baseline ("baseline").
 Both run under the same Bun, on the same machine, through the same public `@duckdb/node-api` calls.
-Bun loads the official N-API addon, so no Node is involved.
+
+## Baseline
+
+`bench/baseline.ts` picks the baseline (ADR 0009):
+
+1. The `@duckdb/node-api` reference in `devDependencies`, when it is built on the pinned DuckDB (`tests/reference.ts`).
+   Bun loads its N-API addon, so no Node is involved.
+2. Otherwise, after an upgrade to a DuckDB release that npm has no `@duckdb/node-api` for yet, the previous release of this package on npm.
+   The bench installs it with `bun add` into its temporary directory, with its platform package, and runs it from there.
+   This measures the new release against the last one, so a DuckDB upgrade never waits for `@duckdb/node-api`.
+3. Otherwise, before the first release on npm, nothing: the bench runs ours alone and the gate has nothing to judge.
+
+The report names the baseline in the gate's heading and in `baseline` in the JSON.
 
 ## Run
 
@@ -46,9 +58,9 @@ After the measured runs, each scenario checks its result (row counts, the prepar
 
 The parent, `bench/main.ts`, starts one child process (`bench/runner.ts`) at a time, and each child does one measured run of one scenario on one implementation.
 So RSS of one implementation or scenario never mixes with another.
-Each scenario runs in rounds of official, ours, ours, official: 5 rounds, so 10 runs of each implementation, and 4 rounds for `event-loop-lag`.
-Each official child and the ours child next to it form a pair, which ran seconds apart, and each row merges the runs of all the children.
-A fixed order is biased: with official always first, `getRowObjects` measured 25% slower for ours, and about 10% faster when ours went first.
+Each scenario runs in rounds of baseline, ours, ours, baseline: 5 rounds, so 10 runs of each implementation, and 4 rounds for `event-loop-lag`.
+Each baseline child and the ours child next to it form a pair, which ran seconds apart, and each row merges the runs of all the children.
+A fixed order is biased: with the baseline always first, `getRowObjects` measured 25% slower for ours, and about 10% faster when ours went first.
 The child opens an in-memory database with DuckDB's default thread count, runs the scenario, and writes its raw numbers as JSON for the parent.
 A child that crashes, hangs for more than 15 minutes, or throws is reported with its error text, and the bench moves on.
 
@@ -76,7 +88,7 @@ Pick `--lag-rows` so the lag query takes about 5 seconds on the machine; the def
 
 ## Gate
 
-`bun run bench --gate` fails, with exit status 1, when ours does worse than official on any scenario:
+`bun run bench --gate` fails, with exit status 1, when ours does worse than the baseline on any scenario:
 
 - The runs show ours more than 10% slower (`--max-slower`) at 99% confidence, and the medians differ by more than 5 ms.
 - The run peaks show ours using more than 10% more RSS (`--max-memory`) at 99% confidence, and the medians differ by more than 16 MiB, which covers the baseline difference between the two packages at start-up.
@@ -85,7 +97,7 @@ Pick `--lag-rows` so the lag query takes about 5 seconds on the machine; the def
 - Either implementation fails or returns a wrong result.
 
 The confidence comes from a one-sided Wilcoxon signed-rank test, a rank test that assumes no particular distribution, over the pairs.
-For each pair it takes the log of ours over official, minus the log of 1.1 for the 10% limit, and asks whether those differences lie above zero.
+For each pair it takes the log of ours over the baseline, minus the log of 1.1 for the 10% limit, and asks whether those differences lie above zero.
 The p-value is exact: it counts every way of giving signs to the ranks, so 10 pairs can reach 1/1024 and 8 pairs 1/256.
 The gate table prints the number of pairs, the median pair ratio and each p-value; a scenario fails below 0.01.
 

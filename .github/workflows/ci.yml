@@ -163,8 +163,9 @@ jobs:
       - name: Remaining tests
         run: bun run test:unit
 
-      # Paired runs against @duckdb/node-api on this runner; fails when ours is slower or heavier than bench/gate.ts allows.
-      - name: Bench gate against @duckdb/node-api
+      # Paired runs against the baseline on this runner (bench/baseline.ts): the @duckdb/node-api reference, or the
+      # previous release when npm has no reference for the pinned DuckDB. Fails when bench/gate.ts says ours is worse.
+      - name: Bench gate against the baseline
         run: bun run bench --gate
 
       - name: Upload the bench results

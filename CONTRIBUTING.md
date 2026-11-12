@@ -23,7 +23,7 @@ Building the shim (`bun run build:native`, `cargo test`) needs the Rust toolchai
 | `bun run check`            | Biome lint and format, then `bun check` type checking                                          |
 | `bun run test:api`         | the API suite (`tests/api/`) passes                                                            |
 | `bun run test:bindings`    | the bindings suite (`tests/bindings/`) passes                                                  |
-| `bun run parity`           | results and error text match the real `@duckdb/node-api` side by side                          |
+| `bun run parity`           | results and error text match the `@duckdb/node-api` reference side by side                     |
 | `bun run fuzz`             | generated values of every type, and random binding calls, match the real packages side by side |
 | `bun run test:concurrency` | concurrent calls of every kind and Workers stay correct and settle                             |
 | `bun run soak`             | a long service-like load keeps memory, handles and the event loop steady                       |
