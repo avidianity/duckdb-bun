@@ -208,6 +208,13 @@ A query that runs out of memory (duckdb-node-neo #3060) rejects with DuckDB's `O
 CI fails any change whose bench runs show ours more than 10% slower or 10% heavier than the official package at 99% confidence; [`bench/README.md`](bench/README.md) describes the scenarios and the gate.
 Each CI run uploads its full tables as the `bench-<platform>` artifact.
 
+## Known issues
+
+- Terminating a Bun `Worker` with `worker.terminate()` while that Worker runs a query crashes the process with SIGSEGV.
+  Bun runs no exit handler in a terminated Worker, so the binding never learns that the Worker's JavaScript is gone, and the finished query calls back into it.
+  The official `@duckdb/node-api` crashes on the same sequence under Bun 1.4.4, on the first termination.
+  Until a fix ships, let a Worker's queries settle, or close its connections, before terminating it.
+
 ## Develop
 
 ```sh
