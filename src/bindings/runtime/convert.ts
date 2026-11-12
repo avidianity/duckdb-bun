@@ -64,6 +64,12 @@ export function int64FromNumber(value: unknown): bigint {
   return BigInt(Math.trunc(number));
 }
 
+/** node-addon-api's Function cast, as the official binding makes before it stores a callback. */
+export function expectFunction<T>(value: T): T {
+  if (typeof value !== "function") throw new Error("A function was expected");
+  return value;
+}
+
 // --- bounds -------------------------------------------------------------------------------
 
 export function throwIndexOutOfRange(index: number | bigint, count: number | bigint, what: string): never {
