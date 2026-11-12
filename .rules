@@ -98,7 +98,8 @@ A flaky test, one whose result changes across runs of the same commit, is a bug 
 
 ## Project notes
 
-- DuckDB is pinned in `src/version.ts` (`DUCKDB_VERSION`); the package version is `<duckdb>-r.<n>`, the scheme `@duckdb/node-api` uses.
+- DuckDB is pinned in `src/version.ts` (`DUCKDB_VERSION`); the package has its own stable semantic version, independent of DuckDB's, as the README's Versions section and ADR 0004 describe.
+  Never publish a prerelease suffix such as `-r.<n>`.
 - `scripts/fetch-lib.ts` downloads libduckdb into `packages/duckdb-bun-<platform>/` and `duckdb.h` into `vendor/`.
   The platform packages are Bun workspaces, so development and the published package load libduckdb the same way.
 - `native/` holds the shim, a Rust cdylib built per platform by `bun run build:native` and shipped in the platform packages (ADR 0003, contract in `native/ABI.md`).
