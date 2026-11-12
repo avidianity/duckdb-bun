@@ -26,6 +26,7 @@ import { availableParallelism, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { type DuckDBConnection, DuckDBInstance, type DuckDBPreparedStatement, diagnostics } from "../src/neo.ts";
+import { settleHandles } from "../tests/heavy/settle-handles.ts";
 import { EventLoopProbe, poolThreads, quantile, Random, seedFrom, threadNames } from "../tests/heavy/workload.ts";
 
 /**
@@ -375,10 +376,7 @@ async function main(): Promise<void> {
       await Bun.sleep(250);
       poolAtEnd = poolThreads();
     }
-    for (let i = 0; i < 50 && !Bun.deepEquals(diagnostics().liveHandles, baseline); i++) {
-      Bun.gc(true);
-      await Bun.sleep(20);
-    }
+    const excess = await settleHandles(baseline);
     const handlesAtEnd = diagnostics().liveHandles;
 
     const secondHalf = samples.filter((s) => s.t >= (minutes * 60) / 2);
@@ -406,8 +404,8 @@ async function main(): Promise<void> {
         detail: `${inFlightAfterLoad} in flight`,
       },
       {
-        name: "live handles back to the baseline after closing and collecting",
-        pass: Bun.deepEquals(handlesAtEnd, baseline),
+        name: "live handles back to the baseline after closing and collecting, one extra per kind allowed",
+        pass: excess.length === 0,
         detail: `baseline ${JSON.stringify(baseline)}, at the end ${JSON.stringify(handlesAtEnd)}`,
       },
       {

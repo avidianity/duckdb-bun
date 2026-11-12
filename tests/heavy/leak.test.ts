@@ -4,6 +4,7 @@
 
 import { expect, test } from "bun:test";
 import { DuckDBInstance, diagnostics } from "../../src/neo.ts";
+import { settleHandles } from "./settle-handles.ts";
 
 const WARM_UP = 200;
 const QUERIES = 2000;
@@ -46,16 +47,7 @@ test(
     statement.destroySync();
     connection.closeSync();
     instance.closeSync();
-    // Collected handles free their pointers from the FinalizationRegistry, which runs after a GC.
-    // JavaScriptCore scans the stack conservatively, and a stale stack slot can keep an object alive.
-    // On the linux-arm64 runner one result outlived 20 collections. A leak of one handle per query
-    // would leave 2000 or more, so allowing one extra per kind still catches it.
-    const settled = () => Object.entries(diagnostics().liveHandles).every(([kind, n]) => n <= (baseline[kind] ?? 0));
-    for (let i = 0; i < 20 && !settled(); i++) {
-      settle();
-      await Bun.sleep(10);
-    }
-    const excess = Object.entries(diagnostics().liveHandles).filter(([kind, n]) => n > (baseline[kind] ?? 0) + 1);
+    const excess = await settleHandles(baseline, 20);
     expect(excess).toEqual([]);
   },
   5 * 60 * 1000,

@@ -30,6 +30,7 @@ import {
   diagnostics,
   INTEGER,
 } from "../../src/neo.ts";
+import { settleHandles } from "./settle-handles.ts";
 import { EventLoopProbe, numberFrom, poolThreads, quantile, Random, seedFrom } from "./workload.ts";
 
 const SEED = seedFrom("STRESS_SEED");
@@ -546,11 +547,7 @@ test(
       poolAtEnd = poolThreads();
     }
 
-    // Collected handles free their pointers from the FinalizationRegistry, which runs after a GC.
-    for (let i = 0; i < 50 && !Bun.deepEquals(diagnostics().liveHandles, baseline); i++) {
-      Bun.gc(true);
-      await Bun.sleep(20);
-    }
+    const excess = await settleHandles(baseline);
 
     const end = diagnostics();
     const iterations = lanes.map((l) => `${l.name} ${l.iterations}`).join(", ");
@@ -567,7 +564,7 @@ test(
     for (const l of lanes) expect(`${l.name} ${l.iterations > 0 ? "ran" : "never ran"}`).toBe(`${l.name} ran`);
     expect(end.callbacks.posted - callbacksBefore).toBeGreaterThan(0);
     expect(end.jobs.inFlight).toBe(0);
-    expect(end.liveHandles).toEqual(baseline);
+    expect(excess).toEqual([]);
     expect(quantile(gaps, 0.99)).toBeLessThan(P99_GAP_MS);
     expect(Math.max(...gaps)).toBeLessThan(MAX_GAP_MS);
     if (poolAtEnd !== null) expect(poolAtEnd).toBe(0);
