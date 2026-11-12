@@ -19,9 +19,9 @@ Read these when you are about to take the action that triggers them, not before:
 
 | Before you                                            | Read                                     |
 | ----------------------------------------------------- | ---------------------------------------- |
-| Bump DuckDB, re-vendor `duckdb-node-neo`, add a platform | `MAINTENANCE.md`                       |
+| Bump DuckDB, port new C API surface, add a platform   | `MAINTENANCE.md`                         |
 | Contradict or change a recorded decision              | the matching file in `docs/adr/`         |
-| Change the vendored upstream code                     | `vendor/node-api/PROVENANCE.md`          |
+| Change the forked API layer or its suites             | `src/api/PROVENANCE.md`                  |
 
 ADRs are not pre-reading: list `docs/adr/` and open only the files whose slug matches the task.
 Discover runnable commands from `package.json` and hook commands from `lefthook.yml`.
@@ -45,10 +45,12 @@ When a repository document contradicts the current docs, report it and correct t
 
 - Runtime is Bun only, pinned in `package.json` `engines` and `packageManager`, `@types/bun`, and every CI workflow; change all of them together.
   Never start `npm`, `npx`, `pnpm`, `yarn`, or `node`, except `npm publish` in the release workflow, which npm trusted publishing requires.
-- The public contract is `@duckdb/node-api` at the version in `devDependencies`.
-  `vendor/node-api/src` is upstream code used unmodified except for the import rewrite `scripts/vendor-rewrite-bindings.ts` makes; fix behavior in `src/bindings/`, never in vendored files.
-- `src/bindings/` reimplements the `@duckdb/node-bindings` contract in `vendor/node-api/node-bindings.d.ts`.
-  The official C++ binding at the vendored tag is the reference for every function's semantics, error text, and handle lifetime.
+- The public contract is the `@duckdb/node-api` API.
+  `@duckdb/node-api` is a development dependency only, the reference that parity, fuzz and the bench compare against when it is built on the pinned DuckDB; it never blocks an upgrade or a release (ADR 0009).
+- `src/api/` and its suites in `tests/api/` and `tests/bindings/` are ours, forked from duckdb-node-neo (ADR 0009); fix behavior where it lives, in `src/api/` or `src/bindings/`, and keep the DuckDB Foundation notice at the top of each derived file.
+- `src/bindings/` implements the bindings contract in `src/bindings/node-bindings.d.ts`.
+  The official C++ binding at the fork tag in `src/api/PROVENANCE.md` is the reference for the semantics, error text, and handle lifetime of the functions it has.
+- DuckDB upgrades follow DuckDB core releases alone; port new C API surface ourselves, never wait for duckdb-node-neo.
 - Error objects match the N-API binding: a plain `Error` with DuckDB's exact message.
   Every `catch` binds its error; unexpected errors are rethrown or wrapped with `{ cause: original }`.
 - Never block the JS thread for the length of a query.
@@ -63,20 +65,27 @@ When a repository document contradicts the current docs, report it and correct t
 
 - Every behavior change ships with an automated test in the same change.
 - Bug fixes start by reproducing the failure the way a user of the package meets it, through the public `@duckdb/node-api` surface, and include a regression test.
-- The bar for parity is the vendored official suites: `bun run test:official` (the `@duckdb/node-api` suite) and `bun run test:bindings` (the `@duckdb/node-bindings` suite).
-  Do not edit a vendored test to make it pass.
-- `bun run parity` compares results against the real `@duckdb/node-api` side by side; add a query there for every new type or behavior.
+- The bar for parity is our forked suites: `bun run test:api` and `bun run test:bindings`.
+  Never weaken a test to make it pass; change a test only when the behavior it checks changes on purpose.
+- `bun run parity` compares results against the `@duckdb/node-api` reference side by side; add a query there for every new type or behavior.
+  Parity skips while npm has no `@duckdb/node-api` built on the pinned DuckDB, so coverage must not depend on it.
 - Automated tests perform no non-loopback network I/O, except tests that install DuckDB extensions, which skip when `DUCKDB_BUN_OFFLINE=1`.
 - Run heavy suites (the crash reproduction, the stress tests, the bench) one at a time.
 
 Classify every failure before attempting a fix:
 
 - **Introduced**: absent before this change and reachable from it. In scope.
-- **Pre-existing**: present before this change. Record and report it, never repair it inline.
-- **Environmental**: infrastructure-shaped, such as a missing libduckdb download or no network. Record and report it.
+- **Pre-existing**: present before this change. Fix it.
+- **Environmental**: infrastructure-shaped, such as a missing libduckdb download or no network. Fix it.
+
+All CI must pass.
+When a check fails, fix it, even when the cause is a dependency: Bun, libduckdb, a GitHub Action, an npm package, or the runner image.
+Fix it on our side: a workaround in our code, a pin, a patch in our build, or a test that covers the case.
+Do not wait for upstream, and never disable or skip a check or mark it as allowed to fail.
 
 An attempt is one edit made with intent to fix, followed by a re-run.
-Stop after two failed attempts on one root cause; record it, report it, and continue the task without waiting for an answer.
+Stop after two failed attempts on one root cause.
+Then, or when no fix on our side is possible, report the failing check, the run URL, the decisive error line, and why it cannot be fixed here, and continue the task without waiting for an answer.
 A flaky test, one whose result changes across runs of the same commit, is a bug to fix, never a test to retry.
 
 ## Mandatory: git
