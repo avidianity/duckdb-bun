@@ -157,6 +157,9 @@ jobs:
       - name: Issue 3060 reproduction
         run: bun run test:issue-3060
 
+      - name: Worker terminate test
+        run: bun run test:worker-terminate
+
       - name: Remaining tests
         run: bun run test:unit
 
