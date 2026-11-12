@@ -64,7 +64,8 @@ const owners = new WeakMap<ArrayBuffer, Handle>();
  */
 export function nativeCopy(pointer: Pointer | number | null, length: number, owner: Handle | undefined): Buffer {
   if (!pointer || length === 0) return Buffer.alloc(0);
-  const copy = Buffer.from(new Uint8Array(toArrayBuffer(pointer as Pointer, 0, length)));
+  // One copy: slice copies the native bytes into a new ArrayBuffer, and Buffer.from wraps it as is.
+  const copy = Buffer.from(toArrayBuffer(pointer as Pointer, 0, length).slice(0));
   if (owner !== undefined) owners.set(copy.buffer as ArrayBuffer, owner);
   return copy;
 }
