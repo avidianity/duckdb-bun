@@ -1,6 +1,6 @@
 // Logical type functions of the @duckdb/node-bindings contract. Semantics, error
 // text and index checks follow the official binding
-// (bindings/src/duckdb_node_bindings.cpp at the vendored tag).
+// (bindings/src/duckdb_node_bindings.cpp at the fork tag).
 import { type Pointer, ptr } from "bun:ffi";
 import { type LogicalType, Type } from "../generated/contract.ts";
 import { checkIndexInRange, expectArray, expectString, uint32FromNumber } from "../runtime/convert.ts";

@@ -1,0 +1,100 @@
+// Derived from duckdb-node-neo v2.0.0-r.1 (https://github.com/duckdb/duckdb-node-neo).
+// Copyright 2018-2025 Stichting DuckDB Foundation. MIT License; src/api/LICENSE holds the notice.
+
+import duckdb from "../../src/bindings/index.ts";
+import { expect, suite, test } from "../vitest-shim.ts";
+import { data } from "./utils/expectedVectors";
+import { expectResult } from "./utils/expectResult";
+
+suite("config", () => {
+  test("config_count", () => {
+    expect(duckdb.config_count()).toBe(377);
+  });
+  test("get_config_flag", () => {
+    expect(duckdb.get_config_flag(0).name).toBe("access_mode");
+    expect(duckdb.get_config_flag(duckdb.config_count() - 1).name).toBe("whoami_started_at");
+  });
+  test("get_config_flag out of bounds", () => {
+    expect(() => duckdb.get_config_flag(-1)).toThrowError(/^Config option not found$/);
+  });
+  test("create, set, and destroy", () => {
+    const config = duckdb.create_config();
+    expect(config).toBeTruthy();
+    duckdb.set_config(config, "custom_user_agent", "my_user_agent");
+  });
+  test("default duckdb_api without explicit config", async () => {
+    const db = await duckdb.open();
+    try {
+      const connection = await duckdb.connect(db);
+      try {
+        const result = await duckdb.query(connection, `select current_setting('duckdb_api') as duckdb_api`);
+        await expectResult(result, {
+          chunkCount: 1,
+          rowCount: 1,
+          columns: [
+            {
+              name: "duckdb_api",
+              logicalType: { typeId: duckdb.Type.VARCHAR },
+            },
+          ],
+          chunks: [{ rowCount: 1, vectors: [data(16, [true], ["node-neo-bindings"])] }],
+        });
+      } finally {
+        duckdb.disconnect_sync(connection);
+      }
+    } finally {
+      duckdb.close_sync(db);
+    }
+  });
+  test("default duckdb_api with explicit config", async () => {
+    const config = duckdb.create_config();
+    const db = await duckdb.open(undefined, config);
+    try {
+      const connection = await duckdb.connect(db);
+      try {
+        const result = await duckdb.query(connection, `select current_setting('duckdb_api') as duckdb_api`);
+        await expectResult(result, {
+          chunkCount: 1,
+          rowCount: 1,
+          columns: [
+            {
+              name: "duckdb_api",
+              logicalType: { typeId: duckdb.Type.VARCHAR },
+            },
+          ],
+          chunks: [{ rowCount: 1, vectors: [data(16, [true], ["node-neo-bindings"])] }],
+        });
+      } finally {
+        duckdb.disconnect_sync(connection);
+      }
+    } finally {
+      duckdb.close_sync(db);
+    }
+  });
+  test("overriding duckdb_api", async () => {
+    const config = duckdb.create_config();
+    duckdb.set_config(config, "duckdb_api", "custom-duckdb-api");
+    const db = await duckdb.open(undefined, config);
+    try {
+      const connection = await duckdb.connect(db);
+      try {
+        const result = await duckdb.query(connection, `select current_setting('duckdb_api') as duckdb_api`);
+        await expectResult(result, {
+          chunkCount: 1,
+          rowCount: 1,
+          columns: [
+            {
+              name: "duckdb_api",
+              logicalType: { typeId: duckdb.Type.VARCHAR },
+            },
+          ],
+          chunks: [{ rowCount: 1, vectors: [data(16, [true], ["custom-duckdb-api"])] }],
+        });
+      } finally {
+        duckdb.disconnect_sync(connection);
+      }
+    } finally {
+      duckdb.close_sync(db);
+    }
+  });
+});

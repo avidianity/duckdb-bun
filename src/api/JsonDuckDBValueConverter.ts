@@ -1,0 +1,73 @@
+// Derived from duckdb-node-neo v2.0.0-r.1 (https://github.com/duckdb/duckdb-node-neo).
+// Copyright 2018-2025 Stichting DuckDB Foundation. MIT License; src/api/LICENSE holds the notice.
+
+import { createDuckDBValueConverter } from "./createDuckDBValueConverter";
+import { DuckDBTypeId } from "./DuckDBTypeId";
+import type { DuckDBValueConverterFor } from "./DuckDBValueConverter";
+import {
+  arrayFromArrayValue,
+  arrayFromListValue,
+  booleanFromValue,
+  fromVariantValue,
+  jsonNumberFromValue,
+  jsonObjectFromIntervalValue,
+  nullConverter,
+  numberFromValue,
+  objectArrayFromMapValue,
+  objectFromUnionValue,
+  objectOrArrayFromStructValue,
+  stringFromValue,
+  unsupportedConverter,
+} from "./DuckDBValueConverters";
+import type { Json } from "./Json";
+import type { JsonTypeForTypeId } from "./JsonTypeForTypeId";
+
+const JsonConvertersByTypeId: {
+  [Id in DuckDBTypeId]: DuckDBValueConverterFor<JsonTypeForTypeId[Id], Json>;
+} = {
+  [DuckDBTypeId.INVALID]: unsupportedConverter,
+  [DuckDBTypeId.BOOLEAN]: booleanFromValue,
+  [DuckDBTypeId.TINYINT]: numberFromValue,
+  [DuckDBTypeId.SMALLINT]: numberFromValue,
+  [DuckDBTypeId.INTEGER]: numberFromValue,
+  [DuckDBTypeId.BIGINT]: stringFromValue,
+  [DuckDBTypeId.UTINYINT]: numberFromValue,
+  [DuckDBTypeId.USMALLINT]: numberFromValue,
+  [DuckDBTypeId.UINTEGER]: numberFromValue,
+  [DuckDBTypeId.UBIGINT]: stringFromValue,
+  [DuckDBTypeId.FLOAT]: jsonNumberFromValue,
+  [DuckDBTypeId.DOUBLE]: jsonNumberFromValue,
+  [DuckDBTypeId.TIMESTAMP]: stringFromValue,
+  [DuckDBTypeId.DATE]: stringFromValue,
+  [DuckDBTypeId.TIME]: stringFromValue,
+  [DuckDBTypeId.INTERVAL]: jsonObjectFromIntervalValue,
+  [DuckDBTypeId.HUGEINT]: stringFromValue,
+  [DuckDBTypeId.UHUGEINT]: stringFromValue,
+  [DuckDBTypeId.VARCHAR]: stringFromValue,
+  [DuckDBTypeId.BLOB]: stringFromValue,
+  [DuckDBTypeId.DECIMAL]: stringFromValue,
+  [DuckDBTypeId.TIMESTAMP_S]: stringFromValue,
+  [DuckDBTypeId.TIMESTAMP_MS]: stringFromValue,
+  [DuckDBTypeId.TIMESTAMP_NS]: stringFromValue,
+  [DuckDBTypeId.ENUM]: stringFromValue,
+  [DuckDBTypeId.LIST]: arrayFromListValue,
+  [DuckDBTypeId.STRUCT]: objectOrArrayFromStructValue,
+  [DuckDBTypeId.MAP]: objectArrayFromMapValue,
+  [DuckDBTypeId.ARRAY]: arrayFromArrayValue,
+  [DuckDBTypeId.UUID]: stringFromValue,
+  [DuckDBTypeId.UNION]: objectFromUnionValue,
+  [DuckDBTypeId.BIT]: stringFromValue,
+  [DuckDBTypeId.TIME_TZ]: stringFromValue,
+  [DuckDBTypeId.TIMESTAMP_TZ]: stringFromValue,
+  [DuckDBTypeId.ANY]: unsupportedConverter,
+  [DuckDBTypeId.BIGNUM]: stringFromValue,
+  [DuckDBTypeId.SQLNULL]: nullConverter,
+  [DuckDBTypeId.STRING_LITERAL]: unsupportedConverter,
+  [DuckDBTypeId.INTEGER_LITERAL]: unsupportedConverter,
+  [DuckDBTypeId.TIME_NS]: stringFromValue,
+  [DuckDBTypeId.GEOMETRY]: stringFromValue,
+  [DuckDBTypeId.VARIANT]: fromVariantValue,
+  [DuckDBTypeId.TIMESTAMP_TZ_NS]: stringFromValue,
+};
+
+export const JsonDuckDBValueConverter = createDuckDBValueConverter<Json>(JsonConvertersByTypeId);

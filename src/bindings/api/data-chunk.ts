@@ -1,6 +1,6 @@
 // Data chunk functions of the @duckdb/node-bindings contract. Semantics and
 // error text follow the official binding (bindings/src/duckdb_node_bindings.cpp
-// at the vendored tag).
+// at the fork tag).
 import type { Pointer } from "bun:ffi";
 import type { DataChunk, LogicalType, Vector } from "../generated/contract.ts";
 import { expectArray, throwIndexOutOfRange, uint32FromNumber } from "../runtime/convert.ts";

@@ -1,0 +1,67 @@
+// Derived from duckdb-node-neo v2.0.0-r.1 (https://github.com/duckdb/duckdb-node-neo).
+// Copyright 2018-2025 Stichting DuckDB Foundation. MIT License; src/api/LICENSE holds the notice.
+
+import duckdb from "../../bindings/index.ts";
+import { DuckDBIntegerType } from "../DuckDBType";
+import { DuckDBValidity } from "./DuckDBValidity";
+import { DuckDBVector } from "./DuckDBVector";
+import { vectorData } from "./dataAccessors";
+
+export class DuckDBIntegerVector extends DuckDBVector<number> {
+  private readonly items: Int32Array;
+  private readonly validity: DuckDBValidity;
+  private readonly vector: duckdb.Vector;
+  constructor(items: Int32Array, validity: DuckDBValidity, vector: duckdb.Vector) {
+    super();
+    this.items = items;
+    this.validity = validity;
+    this.vector = vector;
+  }
+  static fromRawVector(vector: duckdb.Vector, itemCount: number): DuckDBIntegerVector {
+    const data = vectorData(vector, itemCount * Int32Array.BYTES_PER_ELEMENT);
+    const items = new Int32Array(data.buffer, data.byteOffset, itemCount);
+    const validity = DuckDBValidity.fromVector(vector, itemCount);
+    return new DuckDBIntegerVector(items, validity, vector);
+  }
+  public override get type(): DuckDBIntegerType {
+    return DuckDBIntegerType.instance;
+  }
+  public override get itemCount(): number {
+    return this.items.length;
+  }
+  public override getItem(itemIndex: number): number | null {
+    return this.validity.itemValid(itemIndex) ? this.items[itemIndex] : null;
+  }
+  public setItem(itemIndex: number, value: number | null) {
+    if (value != null) {
+      // Checked inline for bulk-write throughput; see dataAccessors.ts.
+      if (!Number.isInteger(value)) {
+        throw new Error(`number is not an integer`);
+      }
+      if (value < -2147483648 || value > 2147483647) {
+        throw new Error(`number out of int32 range`);
+      }
+      this.items[itemIndex] = value;
+      this.validity.setItemValid(itemIndex, true);
+    } else {
+      this.validity.setItemValid(itemIndex, false);
+    }
+  }
+  public flush() {
+    duckdb.copy_data_to_vector(
+      this.vector,
+      0,
+      this.items.buffer as ArrayBuffer,
+      this.items.byteOffset,
+      this.items.byteLength,
+    );
+    this.validity.flush(this.vector);
+  }
+  public override slice(offset: number, length: number): DuckDBIntegerVector {
+    return new DuckDBIntegerVector(
+      this.items.slice(offset, offset + length),
+      this.validity.slice(offset, length),
+      this.vector,
+    );
+  }
+}

@@ -1,6 +1,6 @@
 // The query, prepared statement, bind, pending and result families of the new
 // bindings (src/bindings/api/query.ts), through the contract entry points the
-// vendored suites cannot reach until the value and chunk families land.
+// API and bindings suites cannot reach until the value and chunk families land.
 
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import * as dc from "../../src/bindings/api/data-chunk.ts";

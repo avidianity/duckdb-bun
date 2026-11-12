@@ -1,0 +1,16 @@
+// Derived from duckdb-node-neo v2.0.0-r.1 (https://github.com/duckdb/duckdb-node-neo).
+// Copyright 2018-2025 Stichting DuckDB Foundation. MIT License; src/api/LICENSE holds the notice.
+
+import duckdb from "../bindings/index.ts";
+
+export class DuckDBClientContext {
+  private readonly client_context: duckdb.ClientContext;
+
+  constructor(client_context: duckdb.ClientContext) {
+    this.client_context = client_context;
+  }
+
+  public get connectionId(): number {
+    return duckdb.client_context_get_connection_id(this.client_context);
+  }
+}

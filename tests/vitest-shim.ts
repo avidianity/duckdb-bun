@@ -1,6 +1,6 @@
-// Stand-in for `vitest` so the vendored official suites (vendor/node-api/test and
-// vendor/node-bindings/test) run unmodified under bun:test. tests/preload.ts
-// rewrites their `vitest` import to this file at load time.
+// Stand-in for `vitest`, so the API and bindings suites (tests/api and
+// tests/bindings), derived from the duckdb-node-neo Vitest suites, run under
+// bun:test with their test code unchanged. They import this file in place of `vitest`.
 //
 // Exports exactly what those suites import from `vitest`. The runner primitives
 // come from bun:test; vitest's `suite` is its alias of `describe`, which bun:test

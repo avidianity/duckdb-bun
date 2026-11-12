@@ -6,7 +6,7 @@
 ![Bun 1.4.4](https://img.shields.io/badge/Bun-1.4.4-black)
 
 A Bun-native, drop-in reimplementation of [`@duckdb/node-api`](https://www.npmjs.com/package/@duckdb/node-api) over the libduckdb C API through [`bun:ffi`](https://bun.com/docs/runtime/ffi), with no N-API addon.
-It runs the official `@duckdb/node-api` TypeScript layer unmodified over its own bindings, so it has the same API and returns the same value objects.
+Its TypeScript API layer is forked from the official `@duckdb/node-api` and runs over its own bindings, so it has the same API and returns the same value objects.
 It loads libduckdb as a plain shared library, so `bun build --compile` produces one self-contained executable, which the official addon cannot do.
 
 ```ts
@@ -178,7 +178,7 @@ Include the report when you open an issue.
 
 ## How it works
 
-- The official `@duckdb/node-api` code is vendored in `vendor/node-api/src` and runs unmodified, except that its `@duckdb/node-bindings` import points at `src/bindings/`.
+- `src/api/` is the API layer, forked from the official `@duckdb/node-api` and maintained here ([ADR 0009](docs/adr/0009-the-api-layer-is-ours.md)); it calls `src/bindings/`.
 - `src/bindings/` reimplements the `@duckdb/node-bindings` contract over the libduckdb C API with `bun:ffi`.
   Its FFI tables are generated from DuckDB's C API specification (`bun run gen:ffi`).
 - `native/` is a small Rust library, the shim.
@@ -232,8 +232,8 @@ Each CI run uploads its full tables as the `bench-<platform>` artifact.
 bun install
 bun run fetch-lib       # libduckdb for the host platform, into packages/duckdb-bun-<platform>/
 bun run build:native    # the Rust shim, next to it
-bun run test:official   # the vendored @duckdb/node-api suite
-bun run test:bindings   # the vendored @duckdb/node-bindings suite
+bun run test:api        # the API suite, tests/api/
+bun run test:bindings   # the bindings suite, tests/bindings/
 bun run parity          # side-by-side results against the real @duckdb/node-api
 bun run fuzz            # generated values and binding calls against the real packages (tests/fuzz/config.ts)
 bun run test:unit       # everything else
@@ -284,4 +284,4 @@ If you do not need `bun build --compile`, another driver may fit:
 ## License
 
 MIT.
-The vendored `@duckdb/node-api` code is MIT, from DuckDB Labs: see [`vendor/node-api/LICENSE`](vendor/node-api/LICENSE).
+The API layer and its suites derive from duckdb-node-neo, MIT, Stichting DuckDB Foundation: see [`src/api/LICENSE`](src/api/LICENSE) and [`src/api/PROVENANCE.md`](src/api/PROVENANCE.md).

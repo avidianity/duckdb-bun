@@ -135,7 +135,7 @@ JavaScript reads the outcome with the accessors and then frees the job.
 | `dbs_job_execute_pending` | `pending` | `out0` `duckdb_result *` |
 | `dbs_job_fetch_chunk` | `result: *mut duckdb_result` | `out0` data chunk or 0 |
 
-Error rules match the official C++ binding's workers (`bindings/src/promise_workers.h` at the vendored tag): the job takes DuckDB's error text (`duckdb_open_ext`'s error out string, `duckdb_result_error`, `duckdb_prepare_error`, `duckdb_extract_statements_error` is left to JavaScript), and on failure destroys whatever partial handle the C call returned, so JavaScript never sees it.
+Error rules match the official C++ binding's workers (`bindings/src/promise_workers.h` at the fork tag): the job takes DuckDB's error text (`duckdb_open_ext`'s error out string, `duckdb_result_error`, `duckdb_prepare_error`, `duckdb_extract_statements_error` is left to JavaScript), and on failure destroys whatever partial handle the C call returned, so JavaScript never sees it.
 The fallback messages are the official ones, such as "Failed to query" and "Failed to prepare".
 A null connection or database fails with the official message, such as "Failed to query: connection disconnected" and "Failed to connect: instance closed".
 When `config` is null, `open` and `get_or_create_from_cache` create a config with `duckdb_api` set to `node-neo-bindings`, as the official workers do, and destroy it after the call.

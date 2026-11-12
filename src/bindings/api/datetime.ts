@@ -1,6 +1,6 @@
 // Date, time, timestamp, hugeint and decimal helpers of the @duckdb/node-bindings
 // contract. Each one converts its argument as the official binding does
-// (bindings/src/duckdb_node_bindings.cpp and conversion_helpers.h at the vendored
+// (bindings/src/duckdb_node_bindings.cpp and conversion_helpers.h at the fork
 // tag), then calls the shim's by-value wrapper of the C function.
 import type {
   Date_,

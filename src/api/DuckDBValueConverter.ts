@@ -1,0 +1,26 @@
+// Derived from duckdb-node-neo v2.0.0-r.1 (https://github.com/duckdb/duckdb-node-neo).
+// Copyright 2018-2025 Stichting DuckDB Foundation. MIT License; src/api/LICENSE holds the notice.
+
+import type { DuckDBType } from "./DuckDBType";
+import type { DuckDBValue } from "./values";
+
+export type DuckDBValueConverter<T> = (
+  value: DuckDBValue,
+  type: DuckDBType,
+  converter: DuckDBValueConverter<T>,
+) => T | null;
+
+/**
+ * A converter for a single DuckDB type id, whose output type is narrower than
+ * the output type of the top-level converter it recurses through.
+ *
+ * `DuckDBValueConverter<T>` ties both the return type and the recursion hook
+ * to the same `T`. In a per-type-id converter map, only the return type varies
+ * by id: the `converter` argument is always the map's top-level converter, so
+ * `Nested` stays fixed while `Out` narrows.
+ */
+export type DuckDBValueConverterFor<Out, Nested> = (
+  value: DuckDBValue,
+  type: DuckDBType,
+  converter: DuckDBValueConverter<Nested>,
+) => Out | null;

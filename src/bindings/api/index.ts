@@ -1,5 +1,5 @@
 // Every function, enum, constant and type of the @duckdb/node-bindings contract
-// (vendor/node-api/node-bindings.d.ts), gathered for src/bindings/index.ts.
+// (src/bindings/node-bindings.d.ts), gathered for src/bindings/index.ts.
 export * from "../generated/contract.ts";
 export * from "./appender.ts";
 export * from "./data-chunk.ts";

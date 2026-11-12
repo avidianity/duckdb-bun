@@ -1,6 +1,6 @@
 // Scalar function functions of the @duckdb/node-bindings contract. Semantics
 // and error text follow the official binding (bindings/src/duckdb_node_bindings.cpp
-// and scalar_function_helpers.h at the vendored tag).
+// and scalar_function_helpers.h at the fork tag).
 //
 // The callbacks, extra info, bind data and state are JavaScript values; DuckDB
 // holds only ids (native/ABI.md, "Function callbacks"). A function's callbacks

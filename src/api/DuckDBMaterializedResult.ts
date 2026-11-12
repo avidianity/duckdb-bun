@@ -1,0 +1,42 @@
+// Derived from duckdb-node-neo v2.0.0-r.1 (https://github.com/duckdb/duckdb-node-neo).
+// Copyright 2018-2025 Stichting DuckDB Foundation. MIT License; src/api/LICENSE holds the notice.
+
+import duckdb from "../bindings/index.ts";
+import { DuckDBDataChunk } from "./DuckDBDataChunk";
+import { DuckDBResult } from "./DuckDBResult";
+import type { StatementType } from "./enums";
+
+export class DuckDBMaterializedResult extends DuckDBResult {
+  private closedCounts: { rowCount: number; chunkCount: number } | undefined;
+  constructor(result: duckdb.Result, preparedStatementType?: StatementType) {
+    super(result, preparedStatementType);
+  }
+  /**
+   * Same as `DuckDBResult.closeSync`; the row and chunk counts also stay
+   * available. Getting a chunk throws.
+   */
+  public override closeSync() {
+    if (!this.closedCounts) {
+      this.closedCounts = {
+        rowCount: this.rowCount,
+        chunkCount: this.chunkCount,
+      };
+    }
+    super.closeSync();
+  }
+  public get rowCount(): number {
+    if (this.closedCounts) {
+      return this.closedCounts.rowCount;
+    }
+    return duckdb.row_count(this.result);
+  }
+  public get chunkCount(): number {
+    if (this.closedCounts) {
+      return this.closedCounts.chunkCount;
+    }
+    return duckdb.result_chunk_count(this.result);
+  }
+  public getChunk(chunkIndex: number): DuckDBDataChunk {
+    return new DuckDBDataChunk(duckdb.result_get_chunk(this.result, chunkIndex));
+  }
+}

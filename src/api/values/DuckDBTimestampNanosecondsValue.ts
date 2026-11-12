@@ -1,0 +1,31 @@
+// Derived from duckdb-node-neo v2.0.0-r.1 (https://github.com/duckdb/duckdb-node-neo).
+// Copyright 2018-2025 Stichting DuckDB Foundation. MIT License; src/api/LICENSE holds the notice.
+
+import duckdb, { type TimestampNanoseconds } from "../../bindings/index.ts";
+import { getDuckDBTimestampStringFromNanoseconds } from "../conversion/dateTimeStringConversion";
+
+export class DuckDBTimestampNanosecondsValue implements TimestampNanoseconds {
+  public readonly nanos: bigint;
+
+  public constructor(nanos: bigint) {
+    this.nanos = nanos;
+  }
+
+  public get isFinite(): boolean {
+    return duckdb.is_finite_timestamp_ns(this);
+  }
+
+  public toString(): string {
+    return getDuckDBTimestampStringFromNanoseconds(this.nanos);
+  }
+
+  public static readonly Epoch = new DuckDBTimestampNanosecondsValue(0n);
+  public static readonly Max = new DuckDBTimestampNanosecondsValue(2n ** 63n - 2n);
+  public static readonly Min = new DuckDBTimestampNanosecondsValue(-9223286400000000000n);
+  public static readonly PosInf = new DuckDBTimestampNanosecondsValue(2n ** 63n - 1n);
+  public static readonly NegInf = new DuckDBTimestampNanosecondsValue(-(2n ** 63n - 1n));
+}
+
+export function timestampNanosValue(nanos: bigint): DuckDBTimestampNanosecondsValue {
+  return new DuckDBTimestampNanosecondsValue(nanos);
+}

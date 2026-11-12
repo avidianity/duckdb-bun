@@ -29,7 +29,7 @@ const PROCESS_OFFSET_MINUTES = -new Date().getTimezoneOffset();
 
 const APIS: Record<Impl, Api> = {
   official: officialApi,
-  // Ours re-exports the vendored upstream sources, so it has the official shape;
+  // Ours exports src/api, derived from the official sources, so it has the official shape;
   // scenarios are typed against the published declarations, the public contract.
   ours: oursApi as unknown as Api,
 };
@@ -192,7 +192,7 @@ async function runInProcess(impl: Impl, scenario: Scenario): Promise<Outcome> {
   const shared = sharedDir(impl);
   const replace: Replace = (text) => text.replaceAll(tmp, "<tmp>").replaceAll(shared, "<shared>");
   try {
-    // The vendored official suite sets this static to -330 for its own tests. In a process that runs
+    // The API suite (tests/api) sets this static to -330 for its own tests. In a process that runs
     // it before parity, as `bun run coverage` does, our module would keep that offset while the
     // official module has its own copy; both format TIMESTAMPTZ in the process time zone here.
     APIS[impl].DuckDBTimestampTZValue.timezoneOffsetInMinutes = PROCESS_OFFSET_MINUTES;

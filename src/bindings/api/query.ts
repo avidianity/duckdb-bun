@@ -1,7 +1,7 @@
 // Query, prepared statement, bind, pending result, extracted statement and
 // result functions of the @duckdb/node-bindings contract. Semantics and error
 // text follow the official binding (bindings/src/duckdb_node_bindings.cpp,
-// promise_workers.h and conversion_helpers.h at the vendored tag).
+// promise_workers.h and conversion_helpers.h at the fork tag).
 import type { Pointer } from "bun:ffi";
 import type {
   Connection,
