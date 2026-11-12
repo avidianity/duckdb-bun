@@ -1,10 +1,8 @@
 // Generates the FFI layer from DuckDB's C API spec (vendor/duckdb-api-spec/v1),
 // the YAML that duckdb.h itself is generated from:
 //
-//   src/bindings/generated/capi.ts  the bun:ffi signature of every C function,
-//                                   the functions that check the C++ exception
-//                                   flag after each call, and the C layout of
-//                                   every struct.
+//   src/bindings/generated/capi.ts  the bun:ffi signature of every C function
+//                                   and the C layout of every struct.
 //   native/cpp/capi.cpp             a C++ wrapper per C function that catches a
 //                                   C++ exception (native/cpp/boundary.hpp), with
 //                                   by-value structs passed through pointers,
@@ -158,19 +156,10 @@ function ffiType(type: string, indirection: number): string {
 
 const direct: string[] = [];
 const wrapped: string[] = [];
-/** TypeScript checking wrappers, for the direct and the by-value table. */
-const guardDirect: string[] = [];
-const guardWrapped: string[] = [];
 /** C++ wrapper definitions, and their names in table order: direct ones first, then by-value ones. */
 const cpp: string[] = [];
 const cppDirect: string[] = [];
 const cppWrapped: string[] = [];
-
-/** A TypeScript wrapper that calls `name` and throws a pending C++ exception. */
-function guard(name: string, arity: number): string {
-  const args = Array.from({ length: arity }, (_, i) => `a${i}`).join(", ");
-  return `    ${name}: (${args}) => {\n      const r = raw.${name}(${args});\n      if (failed[0] !== 0) raise();\n      return r;\n    },`;
-}
 
 for (const [name, fn] of [...functions].sort(([a], [b]) => a.localeCompare(b))) {
   const params = Object.entries(fn.parameters ?? {});
@@ -185,7 +174,6 @@ for (const [name, fn] of [...functions].sort(([a], [b]) => a.localeCompare(b))) 
   if (!returnsStruct && byValue.length === 0) {
     const args = params.map(([, p]) => JSON.stringify(ffiType(p.type, p.indirection ?? 0)));
     direct.push(`  duckdb_${name}: { args: [${args.join(", ")}], returns: ${JSON.stringify(returnFfi)} },`);
-    guardDirect.push(guard(fn_, params.length));
     const cppParams = params.map((_, i) => `DBS_ARG(${fn_}, ${i}) a${i}`);
     const callArgs = params.map((_, i) => `a${i}`).join(", ");
     cppDirect.push(`dbs_cxx_${name}`);
@@ -216,7 +204,6 @@ for (const [name, fn] of [...functions].sort(([a], [b]) => a.localeCompare(b))) 
     `  dbs_${name}: { args: [${args.join(", ")}], returns: ${JSON.stringify(returnsStruct ? "void" : returnFfi)} },`,
   );
 
-  guardWrapped.push(guard(`dbs_${name}`, args.length));
   // By-value struct parameters arrive as pointers to const, and a by-value struct
   // return is written through a trailing out pointer.
   const cppParams = params.map(([, p], i) =>
@@ -262,8 +249,6 @@ await Bun.write(
   [
     `// ${header}`,
     "",
-    'import type { ConvertFns, FFIFunction } from "bun:ffi";',
-    "",
     "/**",
     " * Every libduckdb C function bun:ffi can call directly. The shim calls each through a",
     " * C++ wrapper that catches a C++ exception (native/cpp/boundary.hpp); the first",
@@ -280,30 +265,6 @@ await Bun.write(
     "export const byValue = {",
     ...wrapped,
     "} as const;",
-    "",
-    "/** The functions bun:ffi makes of `T`, as plain functions. */",
-    "type Plain<T extends Record<string, FFIFunction>> = {",
-    "  [K in keyof T]: (...args: Parameters<ConvertFns<T>[K]>) => ReturnType<ConvertFns<T>[K]>;",
-    "};",
-    "type Capi = Plain<typeof capi>;",
-    "type ByValue = Plain<typeof byValue>;",
-    "",
-    "/**",
-    " * Wraps each function so it throws, through `raise`, when the call set the calling",
-    " * thread's C++ exception flag, which `failed` views.",
-    " */",
-    "export function guardCapi(raw: ConvertFns<typeof capi>, failed: Int32Array, raise: () => never): Capi {",
-    "  return {",
-    ...guardDirect,
-    "  };",
-    "}",
-    "",
-    "/** As guardCapi, for the by-value wrappers. */",
-    "export function guardByValue(raw: ConvertFns<typeof byValue>, failed: Int32Array, raise: () => never): ByValue {",
-    "  return {",
-    ...guardWrapped,
-    "  };",
-    "}",
     "",
     "/** The C layout of each spec struct on the shipped LP64 targets. */",
     "export const layouts = {",

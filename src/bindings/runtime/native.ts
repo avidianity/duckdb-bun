@@ -7,7 +7,7 @@
 import { CString, dlopen, type FFIFunction, FFIType, linkSymbols, type Pointer, toArrayBuffer } from "bun:ffi";
 import packageJson from "../../../package.json" with { type: "json" };
 import { nativePaths } from "../../library.ts";
-import { byValue, capi, guardByValue, guardCapi } from "../generated/capi.ts";
+import { byValue, capi } from "../generated/capi.ts";
 import { exceptionMessage } from "./exception.ts";
 import { debug, flags } from "./flags.ts";
 
@@ -99,8 +99,26 @@ function raise(): never {
   throw new Error(exceptionMessage(what));
 }
 
-export const duckdb = guardCapi(rawCapi, exceptionFlag, raise);
-export const shim = { ...guardByValue(rawByValue, exceptionFlag, raise), ...shimLibrary };
+/**
+ * `raw` with each function wrapped to throw, through `raise`, when the call set the
+ * calling thread's exception flag. One shared wrapper costs about a nanosecond a
+ * call over one generated per function, against about 20 for the call itself.
+ */
+function guarded<T extends Record<string, unknown>>(raw: T): T {
+  const out: Record<string, unknown> = {};
+  for (const [name, fn] of Object.entries(raw)) {
+    const call = fn as (...args: unknown[]) => unknown;
+    out[name] = (...args: unknown[]) => {
+      const result = call(...args);
+      if (exceptionFlag[0] !== 0) raise();
+      return result;
+    };
+  }
+  return out as T;
+}
+
+export const duckdb = guarded(rawCapi);
+export const shim = { ...guarded(rawByValue), ...shimLibrary };
 export const libraryPath = paths.libPath;
 export const shimPath = paths.shimPath;
 
