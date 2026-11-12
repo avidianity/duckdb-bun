@@ -35,7 +35,8 @@ pub const KIND_TABLE_LOCAL_INIT: u32 = 6;
 /// Table function main.
 pub const KIND_TABLE_MAIN: u32 = 7;
 
-const NOT_INITIALIZED: &CStr = c"duckdb-bun: a function callback ran before dbs_init";
+const NOT_INITIALIZED: &CStr =
+    c"duckdb-bun: a function callback ran before dbs_init or after its JS thread closed";
 const NO_SYNC_DISPATCHER: &CStr =
     c"duckdb-bun: a function callback ran on the JS thread before dbs_set_sync_call";
 const NO_FUNCTION_ID: &CStr = c"duckdb-bun: the function has no callback id";
@@ -78,9 +79,10 @@ impl Drop for DataId {
         if self.0 == 0 {
             return;
         }
-        if let Some(runtime) = runtime::get() {
-            (runtime.on_release)(self.0);
-        }
+        // A closed context's objects are gone with its JS thread, so its releases are dropped.
+        runtime::post_to(self.0 >> runtime::CONTEXT_SHIFT, |context| {
+            (context.on_release)(self.0);
+        });
     }
 }
 
@@ -184,10 +186,6 @@ fn dispatch(
     input: *mut c_void,
     output: *mut c_void,
 ) {
-    let Some(runtime) = runtime::get() else {
-        set_error(kind, info, NOT_INITIALIZED);
-        return;
-    };
     if function_id == 0 {
         set_error(kind, info, NO_FUNCTION_ID);
         return;
@@ -202,8 +200,12 @@ fn dispatch(
     };
     let call_ptr = ptr::from_mut(&mut call);
 
-    if thread::current().id() == runtime.js_thread {
-        match runtime::sync_call() {
+    let Some(context) = runtime::context_of_id(function_id) else {
+        set_error(kind, info, NOT_INITIALIZED);
+        return;
+    };
+    if thread::current().id() == context.js_thread {
+        match context.on_call_sync {
             Some(on_call_sync) => {
                 counters::add(counters::CALLS_INLINE, 1);
                 on_call_sync(call_ptr);
@@ -214,8 +216,12 @@ fn dispatch(
     }
 
     let signal = Arc::clone(&call.signal);
+    let context_id = function_id >> runtime::CONTEXT_SHIFT;
+    if !runtime::post_to(context_id, |context| (context.on_call)(call_ptr)) {
+        set_error(kind, info, NOT_INITIALIZED);
+        return;
+    }
     counters::add(counters::CALLS_POSTED, 1);
-    (runtime.on_call)(call_ptr);
     let mut done = signal.done.lock().unwrap_or_else(PoisonError::into_inner);
     while !*done {
         done = signal.cv.wait(done).unwrap_or_else(PoisonError::into_inner);

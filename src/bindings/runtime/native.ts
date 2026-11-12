@@ -11,6 +11,7 @@ import { debug, flags } from "./flags.ts";
 const shimAbi = {
   dbs_init: { args: ["ptr", "ptr", "ptr"], returns: "i32" },
   dbs_set_sync_call: { args: ["ptr"], returns: "void" },
+  dbs_context_close: { args: [], returns: "void" },
   dbs_counters: { args: [], returns: "ptr" },
   dbs_version: { args: [], returns: "cstring" },
 

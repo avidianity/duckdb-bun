@@ -58,13 +58,12 @@ fn query(connection: ffi::duckdb_connection, sql: &str) -> Result<i64, String> {
 
 #[test]
 fn js_thread_calls_run_inline() {
+    let context = runtime::dbs_init(Some(on_complete), Some(on_call), Some(on_release));
+    assert_eq!(context, 1);
+    // A second init from the same thread is refused; the first callbacks stay.
     assert_eq!(
         runtime::dbs_init(Some(on_complete), Some(on_call), Some(on_release)),
-        0
-    );
-    assert_eq!(
-        runtime::dbs_init(Some(on_complete), Some(on_call), Some(on_release)),
-        1
+        -2
     );
 
     // SAFETY: handles are created, used on this thread, and destroyed once.
@@ -87,7 +86,12 @@ fn js_thread_calls_run_inline() {
         ffi::duckdb_scalar_function_add_parameter(function, bigint);
         ffi::duckdb_scalar_function_set_return_type(function, bigint);
         ffi::duckdb_destroy_logical_type(&mut bigint);
-        callbacks::dbs_scalar_function_set_callbacks(function, 7, false, false);
+        callbacks::dbs_scalar_function_set_callbacks(
+            function,
+            ((context as u64) << runtime::CONTEXT_SHIFT) | 7,
+            false,
+            false,
+        );
         assert_eq!(
             ffi::duckdb_register_scalar_function(connection, function),
             ffi::DuckDBSuccess

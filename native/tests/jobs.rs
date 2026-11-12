@@ -206,11 +206,15 @@ fn handle(call: &Call) {
     unsafe {
         match call.kind {
             callbacks::KIND_SCALAR_BIND => {
-                callbacks::dbs_set_bind_data(call.info.cast(), call.kind, PLUS_ONE_BIND_DATA);
+                callbacks::dbs_set_bind_data(
+                    call.info.cast(),
+                    call.kind,
+                    common::sibling(call.function_id, PLUS_ONE_BIND_DATA),
+                );
             }
             callbacks::KIND_SCALAR_MAIN => {
                 let increment = callbacks::dbs_get_bind_data(call.info, call.kind) as i64
-                    - PLUS_ONE_BIND_DATA as i64
+                    - common::sibling(call.function_id, PLUS_ONE_BIND_DATA) as i64
                     + 1;
                 let input = call.input as ffi::duckdb_data_chunk;
                 let rows = ffi::duckdb_data_chunk_get_size(input) as usize;
@@ -228,14 +232,24 @@ fn handle(call: &Call) {
                     ffi::duckdb_create_logical_type(ffi::DUCKDB_TYPE_DUCKDB_TYPE_BIGINT);
                 ffi::duckdb_bind_add_result_column(call.info.cast(), c"i".as_ptr(), bigint);
                 ffi::duckdb_destroy_logical_type(&mut bigint);
-                callbacks::dbs_set_bind_data(call.info.cast(), call.kind, SEQ_BIND_DATA);
+                callbacks::dbs_set_bind_data(
+                    call.info.cast(),
+                    call.kind,
+                    common::sibling(call.function_id, SEQ_BIND_DATA),
+                );
             }
             callbacks::KIND_TABLE_INIT => {
                 SEQ_EMITTED.store(0, Ordering::Relaxed);
-                callbacks::dbs_set_init_data(call.info.cast(), SEQ_INIT_DATA);
+                callbacks::dbs_set_init_data(
+                    call.info.cast(),
+                    common::sibling(call.function_id, SEQ_INIT_DATA),
+                );
             }
             callbacks::KIND_TABLE_LOCAL_INIT => {
-                callbacks::dbs_set_init_data(call.info.cast(), SEQ_LOCAL_INIT_DATA);
+                callbacks::dbs_set_init_data(
+                    call.info.cast(),
+                    common::sibling(call.function_id, SEQ_LOCAL_INIT_DATA),
+                );
             }
             callbacks::KIND_TABLE_MAIN => {
                 let info = call.info as ffi::duckdb_function_info;
@@ -244,7 +258,12 @@ fn handle(call: &Call) {
                     callbacks::dbs_get_init_data(info),
                     callbacks::dbs_get_local_init_data(info),
                 );
-                if ids != (SEQ_BIND_DATA, SEQ_INIT_DATA, SEQ_LOCAL_INIT_DATA) {
+                let expected = (
+                    common::sibling(call.function_id, SEQ_BIND_DATA),
+                    common::sibling(call.function_id, SEQ_INIT_DATA),
+                    common::sibling(call.function_id, SEQ_LOCAL_INIT_DATA),
+                );
+                if ids != expected {
                     let message = CString::new(format!("unexpected ids {ids:?}")).unwrap();
                     ffi::duckdb_function_set_error(info, message.as_ptr());
                     return;
@@ -290,7 +309,12 @@ fn scalar_function_runs_through_posted_path() {
         ffi::duckdb_scalar_function_add_parameter(function, bigint);
         ffi::duckdb_scalar_function_set_return_type(function, bigint);
         ffi::duckdb_destroy_logical_type(&mut bigint);
-        callbacks::dbs_scalar_function_set_callbacks(function, PLUS_ONE_ID, true, false);
+        callbacks::dbs_scalar_function_set_callbacks(
+            function,
+            common::id(PLUS_ONE_ID),
+            true,
+            false,
+        );
         assert_eq!(
             ffi::duckdb_register_scalar_function(db.connection, function),
             ffi::DuckDBSuccess
@@ -310,10 +334,10 @@ fn scalar_function_runs_through_posted_path() {
         counters::get(counters::CALLS_COMPLETED),
         counters::get(counters::CALLS_POSTED)
     );
-    assert_eq!(release_count(PLUS_ONE_BIND_DATA), 1);
+    assert_eq!(release_count(common::id(PLUS_ONE_BIND_DATA)), 1);
 
     drop(db);
-    assert_eq!(release_count(PLUS_ONE_ID), 1);
+    assert_eq!(release_count(common::id(PLUS_ONE_ID)), 1);
 }
 
 #[test]
@@ -326,7 +350,7 @@ fn table_function_runs_through_posted_path() {
     unsafe {
         let mut function = ffi::duckdb_create_table_function();
         ffi::duckdb_table_function_set_name(function, c"seq_rows".as_ptr());
-        callbacks::dbs_table_function_set_callbacks(function, SEQ_ID, true, true, true);
+        callbacks::dbs_table_function_set_callbacks(function, common::id(SEQ_ID), true, true, true);
         assert_eq!(
             ffi::duckdb_register_table_function(db.connection, function),
             ffi::DuckDBSuccess
@@ -346,29 +370,29 @@ fn table_function_runs_through_posted_path() {
     }
     free_result(result);
     for id in [SEQ_BIND_DATA, SEQ_INIT_DATA, SEQ_LOCAL_INIT_DATA] {
-        assert_eq!(release_count(id), 1, "id {id}");
+        assert_eq!(release_count(common::id(id)), 1, "id {id}");
     }
     drop(db);
-    assert_eq!(release_count(SEQ_ID), 1);
+    assert_eq!(release_count(common::id(SEQ_ID)), 1);
 }
 
 #[test]
 fn copied_bind_data_releases_once() {
     let _serial = serial();
     common::init();
-    const ID: u64 = 301;
+    let id = common::id(301);
     let original =
-        Box::into_raw(Box::new(std::sync::Arc::new(callbacks::DataId(ID)))).cast::<c_void>();
+        Box::into_raw(Box::new(std::sync::Arc::new(callbacks::DataId(id)))).cast::<c_void>();
     // SAFETY: `original` is a live shared box; each box is destroyed once.
     unsafe {
         let copy = callbacks::copy_shared(original);
         assert_ne!(copy, original);
-        assert_eq!(callbacks::read_shared(copy), ID);
+        assert_eq!(callbacks::read_shared(copy), id);
         callbacks::destroy_shared(original);
-        assert_eq!(release_count(ID), 0);
+        assert_eq!(release_count(id), 0);
         callbacks::destroy_shared(copy);
     }
-    assert_eq!(release_count(ID), 1);
+    assert_eq!(release_count(id), 1);
 }
 
 #[test]

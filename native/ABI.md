@@ -20,10 +20,17 @@ This file is the contract between `native/` and `src/bindings/`; change both sid
 
 | Export | Signature | Meaning |
 | --- | --- | --- |
-| `dbs_init` | `(on_complete: extern "C" fn(*mut Job), on_call: extern "C" fn(*mut Call), on_release: extern "C" fn(u64)) -> i32` | Records the calling thread as the JS thread and stores three callbacks: `on_complete` and `on_release` are thread-safe JSCallbacks, `on_call` is the thread-safe dispatcher for function callbacks. Returns 0, 1 when the shim was already initialized (the first callbacks stay), or 2 when a callback is null. Call once. |
-| `dbs_set_sync_call` | `(on_call_sync: extern "C" fn(*mut Call))` | The non-thread-safe dispatcher, used when DuckDB calls a function callback on the JS thread itself. Null clears it. |
+| `dbs_init` | `(on_complete: extern "C" fn(*mut Job), on_call: extern "C" fn(*mut Call), on_release: extern "C" fn(u64)) -> i32` | Registers the calling thread as a JS thread, a context, with three callbacks: `on_complete` and `on_release` are thread-safe JSCallbacks, `on_call` is the thread-safe dispatcher for function callbacks. Returns the context id, 1 to 4095. Returns -1 when a callback is null, -2 when the calling thread already has an open context, and -3 when 4095 contexts were registered. Each JS thread that loads the bindings, the main thread and every Worker, calls it once. |
+| `dbs_set_sync_call` | `(on_call_sync: extern "C" fn(*mut Call))` | The calling context's non-thread-safe dispatcher, used when DuckDB calls a function callback on that JS thread itself. Null clears it. A thread without a context changes nothing. |
+| `dbs_context_close` | `()` | Closes the calling thread's context before the JS thread goes away, as a Worker does on exit. Later completions, callbacks and releases for it are dropped, never called. A closed context id is never reused. |
 | `dbs_counters` | `() -> *const u64` | Pointer to the static counter block below, read by JavaScript through a view. |
 | `dbs_version` | `() -> *const c_char` | The shim's crate version, static. |
+
+A context keeps each Worker's callbacks apart, as the official binding's per-environment thread-safe functions do:
+
+- A job completes to the context of the thread that started it.
+- JavaScript allocates every function, bind data, init data and state id as `context * 2^40 + local`, so ids stay exact as JS numbers. A function callback and an id release go to the context in bits 40 and up.
+- A post to a closed context is dropped. A dropped job is freed by the shim. A dropped function callback reports an error on `info`.
 
 Counter block, `u64` each, updated with atomics (relaxed is enough).
 A job thread counts its job as completed and itself as no longer running before it calls `on_complete`, so the counters are settled when JavaScript sees the completion.
@@ -42,7 +49,7 @@ A job thread counts its job as completed and itself as no longer running before 
 ## Jobs: blocking calls on native threads
 
 Each job export copies its inputs, starts one `std::thread` named `duckdb-bun:<op>` with an 8 MiB stack and an alternate signal stack, runs the C call, stores the outcome in the job, and calls `on_complete(job)`.
-It returns the job pointer, or null when the thread could not start or `dbs_init` has not been called (JavaScript then rejects with "Failed to start a native thread").
+It returns the job pointer, or null when the thread could not start or the calling thread has no context (JavaScript then rejects with "Failed to start a native thread").
 JavaScript reads the outcome with the accessors and then frees the job.
 
 | Export | Inputs | Outputs |
@@ -107,7 +114,7 @@ Ids are allocated by JavaScript and never 0; 0 means none.
 Scalar function bind data registers `duckdb_scalar_function_set_bind_data_copy`, as the official binding does: the id sits behind a shared reference count, each copy shares it, and the release fires when the last copy is destroyed.
 Table function bind data has no copy callback, and table init data, local init data and scalar state are each owned by one box.
 
-If a function callback runs before `dbs_init`, or on the JS thread before `dbs_set_sync_call`, the shim reports an error on `info` through the C API's set-error function instead of calling JavaScript.
+If a function callback's id names no open context, or it runs on the JS thread before `dbs_set_sync_call`, the shim reports an error on `info` through the C API's set-error function instead of calling JavaScript.
 
 ## Diagnostics: ring buffer and crash report
 

@@ -98,10 +98,9 @@ type Outcome = Result<(u64, u64), CString>;
 /// Starts `work` on a new native thread and returns the job, or null when the
 /// shim is not initialized or the thread could not start.
 fn spawn(op: Op, handle: u64, work: impl FnOnce() -> Outcome + Send + 'static) -> *mut Job {
-    let Some(runtime) = runtime::get() else {
+    let Some((context, _)) = runtime::current() else {
         return null_mut();
     };
-    let on_complete = runtime.on_complete;
     let job = Box::into_raw(Box::<Job>::default());
     // A raw pointer is not Send; the address crosses to the thread instead.
     let job_addr = job as usize;
@@ -135,7 +134,12 @@ fn spawn(op: Op, handle: u64, work: impl FnOnce() -> Outcome + Send + 'static) -
             diag::record(op.code, state, handle, 0, &[]);
             counters::add(counters::JOBS_COMPLETED, 1);
             counters::thread_finished();
-            on_complete(job);
+            let posted = runtime::post_to(context, |context| (context.on_complete)(job));
+            if !posted {
+                // The JS thread that started the job is gone; nothing will read or free it.
+                // SAFETY: no JavaScript holds the job, so this thread owns it.
+                drop(unsafe { Box::from_raw(job) });
+            }
         });
     match spawned {
         Ok(_) => job,

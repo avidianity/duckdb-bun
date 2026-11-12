@@ -104,11 +104,16 @@ extern "C" fn on_call(call: *mut Call) {
         .expect("dispatcher thread alive");
 }
 
-/// Starts the dispatcher thread and calls `dbs_init` from a separate fake JS
-/// thread, so every DuckDB thread the tests use takes the posted path.
+thread_local! {
+    static CONTEXT: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+/// Starts the dispatcher thread once, and registers the calling test thread as
+/// a JS context with `dbs_init`. Jobs start from the test thread and complete to
+/// that context; every DuckDB thread the tests use takes the posted path.
 pub fn init() {
-    static INIT: OnceLock<()> = OnceLock::new();
-    INIT.get_or_init(|| {
+    static DISPATCHER: OnceLock<()> = OnceLock::new();
+    DISPATCHER.get_or_init(|| {
         let (sender, receiver) = mpsc::channel::<usize>();
         DISPATCH.set(Mutex::new(sender)).expect("first init");
         thread::Builder::new()
@@ -126,12 +131,24 @@ pub fn init() {
                 }
             })
             .expect("spawn dispatcher");
-        let status =
-            thread::spawn(|| runtime::dbs_init(Some(on_complete), Some(on_call), Some(on_release)))
-                .join()
-                .expect("init thread");
-        assert_eq!(status, 0);
     });
+    CONTEXT.with(|context| {
+        if context.get() == 0 {
+            let id = runtime::dbs_init(Some(on_complete), Some(on_call), Some(on_release));
+            assert!(id > 0, "dbs_init returned {id}");
+            context.set(id as u64);
+        }
+    });
+}
+
+/// The id JavaScript would allocate for `local` in this test thread's context.
+pub fn id(local: u64) -> u64 {
+    CONTEXT.with(|context| (context.get() << runtime::CONTEXT_SHIFT) | local)
+}
+
+/// The id for `local` in the same context as `of`, for code on the dispatcher thread.
+pub fn sibling(of: u64, local: u64) -> u64 {
+    ((of >> runtime::CONTEXT_SHIFT) << runtime::CONTEXT_SHIFT) | local
 }
 
 /// Waits for `job` to complete and returns it.

@@ -131,9 +131,13 @@ const handlers = new Map<number, CallHandler>();
 const released = new Map<number, () => void>();
 let nextId = 1;
 
+/** Ids carry this thread's shim context above bit 40 (2^40), so DuckDB threads call back into the right Worker. */
+const CONTEXT_SCALE = 2 ** 40;
+let contextBase = 0;
+
 /** Allocates a nonzero id for a function callback set, or for bind, init or state data. */
 export function allocateId(): number {
-  return nextId++;
+  return contextBase + nextId++;
 }
 
 export function setCallHandler(id: number, handler: CallHandler): void {
@@ -187,5 +191,10 @@ const onReleaseCallback = new JSCallback(
   { args: ["u64"], returns: "void", threadsafe: true },
 );
 
-shim.dbs_init(onComplete.ptr, onCall.ptr, onReleaseCallback.ptr);
+// One shim context per JS thread: this one, or a Worker's (native/ABI.md, "Lifecycle").
+const context = shim.dbs_init(onComplete.ptr, onCall.ptr, onReleaseCallback.ptr);
+if (context < 1) throw new Error(`duckdb-bun: the native shim refused this thread (dbs_init returned ${context})`);
+contextBase = context * CONTEXT_SCALE;
 shim.dbs_set_sync_call(onCallSync.ptr);
+// A Worker's callbacks die with it, so the shim drops whatever arrives for it afterwards.
+process.on("exit", () => shim.dbs_context_close());
