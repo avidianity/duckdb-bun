@@ -175,6 +175,7 @@ bun run test:official   # the vendored @duckdb/node-api suite
 bun run test:bindings   # the vendored @duckdb/node-bindings suite
 bun run parity          # side-by-side results against the real @duckdb/node-api
 bun run test:unit       # everything else
+bun run bench           # benchmarks against the real @duckdb/node-api (bench/README.md)
 bun run check           # Biome and the type check
 ```
 

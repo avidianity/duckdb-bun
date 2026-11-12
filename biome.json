@@ -26,6 +26,6 @@
     }
   },
   "files": {
-    "includes": ["**", "!**/vendor/**", "!**/*.so", "!**/*.dylib", "!**/*.dll"]
+    "includes": ["**", "!**/vendor/**", "!bench/results/**", "!**/*.so", "!**/*.dylib", "!**/*.dll"]
   }
 }

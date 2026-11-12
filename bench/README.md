@@ -1,0 +1,77 @@
+# Benchmarks
+
+The bench compares duckdb-bun ("ours", loaded from `src/neo.ts`, the public entry) with the official `@duckdb/node-api` ("official", the version in `devDependencies`).
+Both run under the same Bun, on the same machine, through the same public `@duckdb/node-api` calls.
+Bun loads the official N-API addon, so no Node is involved.
+
+## Run
+
+```sh
+bun run bench
+```
+
+It needs libduckdb and the shim for the host platform (`bun run fetch-lib` and `bun run build:native`, see the main README).
+It makes no network requests: inputs are generated locally, and extension autoinstall and autoload are off.
+A full run takes a few minutes; run it on an otherwise idle machine, and never at the same time as another heavy suite.
+
+Options, all optional:
+
+```sh
+bun run bench --scenario read-all,prepared   # only these scenarios
+bun run bench --impl ours                    # only one implementation
+bun run bench --runs 3                       # measured runs per scenario, overriding each scenario's default
+bun run bench --rows 100000                  # rows in the generated files and tables (default 1000000)
+bun run bench --lag-rows 600000000           # rows the event-loop lag query hashes (default 600000000)
+```
+
+`--rows 10000 --lag-rows 10000000 --runs 3` gives a smoke run that finishes in under a minute.
+
+## Scenarios
+
+| Scenario         | What one run does                                                                                       | Runs |
+| ---------------- | ------------------------------------------------------------------------------------------------------- | ---- |
+| `ingest-json`    | `CREATE OR REPLACE TABLE ... AS SELECT * FROM read_json_auto(...)` over a newline-delimited JSON file   | 5    |
+| `ingest-csv`     | The same over a CSV file with the same rows, through `read_csv`                                         | 5    |
+| `parquet-write`  | `COPY` a table of mixed types to a `.parquet` file                                                      | 5    |
+| `read-all`       | `runAndReadAll("SELECT * FROM mixed")`, then `getRowObjects()`                                          | 5    |
+| `prepared`       | `prepare` once, then `bindInteger` and `runAndReadAll` 10,000 times, each returning one row             | 5    |
+| `event-loop-lag` | `SELECT sum(hash(i)) FROM range(N) t(i)` while a 10 ms `setInterval` records the gaps between its ticks | 3    |
+
+The mixed table has 1M rows of INTEGER, VARCHAR, DOUBLE, TIMESTAMP, DECIMAL(18,2) and INTEGER[] columns.
+The bench writes the JSON and CSV inputs with plain JavaScript before any child starts, so neither implementation pays for generating them.
+All scenarios except `event-loop-lag` do one unmeasured warm-up run first.
+After the measured runs, each scenario checks its result (row counts, the prepared statement's returned id), and a wrong result is reported as an error.
+
+## How it measures
+
+The parent, `bench/main.ts`, starts one child process (`bench/runner.ts`) per implementation and scenario, one at a time.
+So RSS of one implementation or scenario never mixes with another.
+The child opens an in-memory database with DuckDB's default thread count, runs the scenario, and writes its raw numbers as JSON for the parent.
+A child that crashes, hangs for more than 15 minutes, or throws is reported with its error text, and the bench moves on.
+
+## Read the tables
+
+Each scenario prints one Markdown table with one row per implementation.
+
+- **Median, Min, Max (ms)**: wall time of one measured run, from before the first call to after the last awaited result.
+  Compare medians; a wide gap between min and max means the machine was noisy.
+- **Peak RSS (MiB)**: the highest `process.memoryUsage.rss()` a 10 ms timer in the child saw, also sampled before and after every run.
+  The timer cannot fire while the JavaScript thread is blocked, so a peak reached inside a synchronous call can be missed.
+- **Max RSS (MiB)**: the operating system's high-water mark for the child (`process.resourceUsage().maxRSS`), which catches what the timer misses.
+  Both numbers cover the whole child: start-up, set-up such as creating the 1M-row table, and every run.
+- **runAndReadAll, getRowObjects (ms)** in `read-all`: the median of each half of a run, the query with materialization, then the conversion to JavaScript objects.
+- **Per call (us)** in `prepared`: the median run time divided by 10,000.
+- **Max gap, p99 gap (ms)** in `event-loop-lag`: the gaps between consecutive ticks of the 10 ms interval while the query runs, the largest over all runs, and the median of the per-run 99th percentiles.
+  A gap near 10 ms means the query ran off the JavaScript thread and the event loop stayed free.
+  A gap near the query's length means the query blocked the event loop.
+- **Ticks** in `event-loop-lag`: interval ticks recorded during one query; with a free event loop it is about the query's length divided by 10 ms.
+- **Error**: the error text when the scenario failed or its result was wrong; the other cells then cover only the runs that finished.
+
+Pick `--lag-rows` so the lag query takes about 5 seconds on the machine; the default takes 5 to 7 seconds on an Apple M5 with 10 cores.
+
+## Results
+
+Each run also writes `bench/results/<date>-<platform>.json`, for example `bench/results/2026-11-12-darwin-arm64.json`.
+It holds the machine, the Bun and package versions, the options, and for each scenario and implementation the summary plus the raw per-run numbers.
+A second run on the same day and platform overwrites the file.
+Git ignores `bench/results/`; attach the file to an issue or a pull request to share it.

@@ -11,7 +11,7 @@ pre-commit:
     # The same paths `bun run lint:ci` checks in CI.
     - name: biome
       glob:
-        - "{src,tests,scripts,examples}/**/*"
+        - "{src,tests,scripts,examples,bench}/**/*"
         - "commitlint.config.ts"
       run: bun --bun biome check --no-errors-on-unmatched --files-ignore-unknown=true --colors=off {staged_files}
 

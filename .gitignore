@@ -22,3 +22,6 @@ dd-neo
 
 # Claude Code worktrees and local state
 /.claude/
+
+# Benchmark output, written by `bun run bench`
+/bench/results/
