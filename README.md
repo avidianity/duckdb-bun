@@ -190,22 +190,26 @@ The design decisions are recorded in [`docs/adr/`](docs/adr/).
 
 ## Performance
 
-On par with the official `@duckdb/node-api`: no scenario in the bench is faster or slower beyond the runner's own noise.
 Both packages run the same DuckDB, so query time is DuckDB's; the bindings differ only in the calls around it.
-The gain is `bun build --compile` support, not speed.
+On the Linux CI runner, ours reads results and runs prepared statements faster than the official `@duckdb/node-api`, and is on par or lighter elsewhere.
+The macOS CI runner is noisy and gives mixed results; see below.
 
-Latest CI numbers, Linux x64 (GitHub runner, 4 vCPU AMD EPYC), Bun 1.4.4, DuckDB 2.0.0, median of 10 runs in ABBA order:
+Linux x64 (GitHub runner, 4 vCPU Intel Xeon Platinum 8573C), Bun 1.4.4, DuckDB 2.0.0, median of 10 runs in ABBA order, [CI run 43148152278](https://github.com/avidianity/duckdb-bun/actions/runs/43148152278):
 
-| Scenario | Official (ms) | Ours (ms) | Ours vs official |
+| Scenario | Official | Ours | Ours vs official |
 | --- | --- | --- | --- |
-| `ingest-json`, 1M rows | 189.5 | 189.8 | +0.1% |
-| `ingest-csv`, 1M rows | 141.9 | 142.4 | +0.4% |
-| `parquet-write`, 1M rows | 203.0 | 189.0 | -6.9% |
-| `read-all`, 1M rows to objects | 846.4 | 829.9 | -1.9% |
-| `prepared`, 10,000 bind and run | 6272.9 | 6227.0 | -0.7% |
-| `event-loop-lag`, largest timer gap | 10.6 | 10.7 | on par |
+| `ingest-json`, 1M rows | 220.4 ms | 216.3 ms | on par |
+| `ingest-csv`, 1M rows | 176.6 ms | 170.9 ms | on par; 11% less peak memory (297 vs 334 MiB) |
+| `parquet-write`, 1M rows | 157.7 ms | 124.8 ms | on par; 10% less peak memory (302 vs 334 MiB) |
+| `read-all`, 1M rows to objects | 1039.2 ms | 882.0 ms | 15% faster; 7% more peak memory (1041 vs 969 MiB) |
+| `prepared`, 10,000 bind and run | 580 us per call | 534 us per call | 8% faster |
+| `event-loop-lag`, largest timer gap | 10.7 ms | 10.7 ms | on par |
 
-Peak memory per run is within 4% in every scenario.
+A row claims a difference only where a one-sided Mann-Whitney U test over the 10 runs of each package gives p < 0.01; "on par" means it does not.
+The `parquet-write` time looks 21% faster but gives p = 0.044, so it is not claimed.
+On the macOS runner (3 vCPU, virtualized) runs of one scenario spread by up to 60%.
+In the same CI run there, ours was slower on `ingest-json` (264 vs 205 ms, p = 0.0086) and used more peak memory on `read-all` (821 vs 658 MiB, p = 0.0057), both still inside the gate's 10% limit at 99% confidence.
+On an Apple M5 Mac, both scenarios were on par in time, and `read-all` used 17% more peak memory without reaching p < 0.01.
 A query that runs out of memory (duckdb-node-neo #3060) rejects with DuckDB's `Out of Memory Error` and leaves the process alive in both packages, on Linux in `oven/bun:1.4.4-slim` and on macOS.
 CI fails any change whose bench runs show ours more than 10% slower or 10% heavier than the official package at 99% confidence; [`bench/README.md`](bench/README.md) describes the scenarios and the gate.
 Each CI run uploads its full tables as the `bench-<platform>` artifact.

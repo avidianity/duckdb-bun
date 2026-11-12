@@ -48,7 +48,7 @@ test("a loop of small queries holds under two limits of unreachable results", as
     (await statement.runAndReadAll()).getRows();
     most = Math.max(most, diagnostics().liveHandles.result ?? 0);
   }
-  // With the requests about 335 were live at most on an Apple M-series Mac; without them, 922.
+  // With the requests about 335 were live at most on an Apple M5 Mac; without them, 922.
   expect(most).toBeLessThan(2 * MIN_PRESSURE_LIMIT);
   statement.destroySync();
   connection.closeSync();

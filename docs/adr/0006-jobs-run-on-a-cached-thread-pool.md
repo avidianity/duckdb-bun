@@ -29,5 +29,6 @@ A job that panics does not end its thread.
 
 ## Consequences
 
-The same `prepared` probe on an Apple M-series Mac went from 195 us per call for ours and 130 us for official to on par, 139 to 166 us for ours against 147 to 195 us for official across runs.
+The same `prepared` probe on an Apple M5 Mac went from 195 us per call for ours and 130 us for official to on par, 139 to 166 us for ours against 147 to 195 us for official across runs.
 A crash report taken while a pool thread is idle names it `duckdb-bun:pool`.
+On the Linux CI runner (run 43148152278), `prepared` went from 49% slower than the official package to 8% faster, 534 against 580 us per call.
