@@ -110,7 +110,7 @@ The release workflow publishes through npm trusted publishing: npm trusts an OID
 Trusted publishing also attaches a provenance statement to each version.
 The workflow uses `npm publish` because trusted publishing needs the npm CLI; it is the only place the project runs npm or Node.
 
-Configure each of the three packages once, on npmjs.com, under the package's settings, in the Trusted Publisher section:
+Configure each of the four packages once, on npmjs.com, under the package's settings, in the Trusted Publisher section:
 
 - Publisher: GitHub Actions.
 - Organization or user: `avidianity`.
@@ -127,11 +127,11 @@ To publish the first version of a new package:
 1. Push the tag `v<version>`, and run the release workflow without its publish job: `gh workflow run release.yml -f tag=v<version> -f publish=false`.
 2. Log in to npm so that `bun pm whoami` prints your account, through `~/.npmrc` or a short-lived granular access token in `NPM_CONFIG_TOKEN`.
 3. Run `bun run first-publish` (`--dry-run` first, to see the checks without publishing).
-   It downloads both platform packages from the green run into a worktree at the tag, packs the three tarballs, and checks their files, versions, `repository.url`, library architectures and the linux-x64 shim's glibc floor.
+   It downloads every platform package from the green run into a worktree at the tag, packs the four tarballs, and checks their files, versions, `repository.url`, library architectures and the glibc floor of every Linux library.
    After you type `publish`, it runs `bun publish --access public --tag latest` for each package not yet on npm, platform packages first.
    npm asks for two-factor authentication in the terminal or the browser.
 4. Revoke the token if you made one, and configure the trusted publisher of each package as above.
-5. Within 2 days, release the next patch version through the release workflow, which validates the three configurations.
+5. Within 2 days, release the next patch version through the release workflow, which validates the four configurations.
 
 That first version has no provenance statement, because `bun publish` cannot generate one.
 
@@ -143,7 +143,7 @@ That first version has no provenance statement, because `bun publish` cannot gen
 4. Add a row to the platform table in `README.md` and to the table in [Packages and versions](#packages-and-versions).
    `tests/platform-packages.test.ts` fails until steps 1 to 4 agree.
 5. Add the platform to the CI test matrix, add a build job to the release workflow and to the `needs` of its publish job, and publish the package before the main package.
-   `scripts/first-publish.ts` reads the platforms from `TARGETS`; teach its `architectures()` the new CPU if it is not there yet.
+   `scripts/first-publish.ts` reads the platforms from `TARGETS`; add the new CPU to `scripts/native-file.ts` if it is not there yet.
 6. Record the change in an ADR, because the published package layout is hard to reverse.
 7. Publish the package's first version by hand, as [Publishing to npm](#publishing-to-npm) describes, and configure its trusted publisher.
    The script skips the packages already on npm.

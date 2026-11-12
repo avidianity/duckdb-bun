@@ -1,4 +1,4 @@
-// Publishes the first version of the three packages by hand, because npm accepts a trusted publisher
+// Publishes the first version of each package by hand, because npm accepts a trusted publisher
 // only for a package that already exists (MAINTENANCE.md, "Publishing to npm"). Every later version
 // goes out through the release workflow.
 //
@@ -6,10 +6,10 @@
 //
 // It publishes what a green release workflow run built and tested, never a local build:
 //
-//  1. Finds the Release run that built the tag `v<version>` with publish off, and checks both build jobs passed.
-//  2. Checks the tag out into a temporary worktree and downloads both platform packages into it.
-//  3. Runs `check-version --tag --publish`, packs the three tarballs, and checks each one: its file list,
-//     its package.json, the CPU architecture of every native library, and the glibc the linux-x64 shim needs.
+//  1. Finds the Release run that built the tag `v<version>` with publish off, and checks every build job passed.
+//  2. Checks the tag out into a temporary worktree and downloads every platform package into it.
+//  3. Runs `check-version --tag --publish`, packs every tarball, and checks each one: its file list,
+//     its package.json, the CPU architecture of every native library, and the glibc each Linux library needs.
 //  4. Shows the npm account and what it will publish, and asks for confirmation unless --yes.
 //  5. Runs `bun publish <tarball> --access public --tag latest`, platform packages first. npm asks for
 //     two-factor authentication in the terminal or the browser; the script never sees it.
@@ -24,6 +24,7 @@ import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { $ } from "bun";
 import { TARGETS } from "./fetch-lib.ts";
+import { architectures, newestGlibcMinor } from "./native-file.ts";
 
 const REPO = "avidianity/duckdb-bun";
 const REPOSITORY_URL = "git+https://github.com/avidianity/duckdb-bun.git";
@@ -32,7 +33,7 @@ const ENVIRONMENT = "npm";
 const DIST_TAG = "latest";
 const REGISTRY = "https://registry.npmjs.org";
 const SHIM = "libduckdb_bun_shim";
-// The linux-x64 shim is built in rust:1.99.1-bookworm (docs/adr/0003); the README promises glibc 2.36.
+// The Linux shims are built in rust:1.99.1-bookworm (docs/adr/0003, 0005); the README promises glibc 2.36.
 const MAX_GLIBC_MINOR = 36;
 
 const { values } = parseArgs({
@@ -143,34 +144,6 @@ async function extract(tarball: string, entry: string, into: string): Promise<st
   return join(into, "package", entry);
 }
 
-const MACHO_CPU: Record<number, string> = { 16777223: "x64", 16777228: "arm64" };
-
-/**
- * The CPU architectures in a shared library's header: ELF, thin Mach-O, or a universal Mach-O such as
- * DuckDB's macOS release, which holds both arm64 and x64.
- */
-function architectures(bytes: Uint8Array): string[] {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  if (view.getUint32(0, false) === 0x7f454c46) {
-    if (bytes[4] !== 2) return ["ELF32"];
-    const machine = view.getUint16(18, true);
-    return [machine === 62 ? "x64" : `ELF machine ${machine}`];
-  }
-  const cpu = (type: number) => MACHO_CPU[type] ?? `Mach-O cputype ${type}`;
-  if (view.getUint32(0, true) === 0xfeedfacf) return [cpu(view.getUint32(4, true))];
-  if (view.getUint32(0, false) === 0xcafebabe) {
-    const count = view.getUint32(4, false);
-    return Array.from({ length: count }, (_, index) => cpu(view.getUint32(8 + index * 20, false)));
-  }
-  return ["unknown"];
-}
-
-/** The newest GLIBC_2.<n> symbol version an ELF file refers to. */
-function newestGlibcMinor(bytes: Uint8Array): number {
-  const text = new TextDecoder("latin1").decode(bytes);
-  return Math.max(0, ...[...text.matchAll(/GLIBC_2\.(\d+)/g)].map((m) => Number(m[1])));
-}
-
 async function checkTarball(pkg: Pkg, version: string, scratch: string): Promise<void> {
   const entries = await tarEntries(pkg.tarball);
   const manifest = JSON.parse(await Bun.file(await extract(pkg.tarball, "package.json", scratch)).text()) as Manifest;
@@ -197,10 +170,10 @@ async function checkTarball(pkg: Pkg, version: string, scratch: string): Promise
       const found = architectures(bytes);
       if (!found.includes(arch as string)) fail(`${pkg.name}/${lib} is ${found.join(" + ")}, expected ${arch}`);
       console.log(`  ${pkg.name}/${lib}: ${found.join(" + ")}, ${(bytes.byteLength / 1024 / 1024).toFixed(1)} MiB`);
-      if (lib === shim && pkg.platform.startsWith("linux")) {
+      if (pkg.platform.startsWith("linux")) {
         const minor = newestGlibcMinor(bytes);
-        if (minor > MAX_GLIBC_MINOR) fail(`${pkg.name}/${shim} needs glibc 2.${minor}, above 2.${MAX_GLIBC_MINOR}`);
-        console.log(`  ${pkg.name}/${shim}: needs glibc 2.${minor}`);
+        if (minor > MAX_GLIBC_MINOR) fail(`${pkg.name}/${lib} needs glibc 2.${minor}, above 2.${MAX_GLIBC_MINOR}`);
+        console.log(`  ${pkg.name}/${lib}: needs glibc 2.${minor}`);
       }
     }
     return;
