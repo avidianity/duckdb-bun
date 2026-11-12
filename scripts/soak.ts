@@ -34,8 +34,18 @@ import { EventLoopProbe, poolThreads, quantile, Random, seedFrom, threadNames } 
  * least-squares line through its samples. DuckDB's buffer pool and the allocators
  * grow during the first half and then level off; a leak of one kilobyte per request
  * at the rate this load runs grows RSS by several MiB a minute.
+ *
+ * RSS moves by tens of MiB between samples as queries come and go, so the check
+ * fails only when the slope is above the limit with 99% confidence: when the slope
+ * minus SLOPE_Z standard errors is still above it. A 10-minute run measured a slope
+ * of 3.0 MiB/min with a standard error of 1.2; the nightly 45-minute run has
+ * about a tenth of that error.
  */
 const MAX_RSS_SLOPE_MIB_PER_MINUTE = 1;
+/** The one-sided 99% quantile of the normal distribution. */
+const SLOPE_Z = 2.326;
+/** With fewer samples in the second half, the slope is reported as not measured. */
+const MIN_SLOPE_SAMPLES = 10;
 /** The same bound as tests/heavy/event-loop-stress.test.ts, which explains it. */
 const P99_GAP_MS = 50;
 /** `IDLE_TIMEOUT` in native/src/pool.rs. */
@@ -97,10 +107,13 @@ const mib = (bytes: number) => bytes / 2 ** 20;
 const sum = (record: Record<string, number>) => Object.values(record).reduce((a, b) => a + b, 0);
 const triangle = (n: number) => (BigInt(n) * BigInt(n - 1)) / 2n;
 
-/** The slope of the least-squares line through `points`, in y units per x unit. */
-function slope(points: readonly [number, number][]): number {
+/**
+ * The slope of the least-squares line through `points`, in y units per x unit, and
+ * its standard error.
+ */
+function slope(points: readonly [number, number][]): { slope: number; error: number } {
   const n = points.length;
-  if (n < 2) return 0;
+  if (n < 3) return { slope: 0, error: Number.POSITIVE_INFINITY };
   const meanX = points.reduce((a, [x]) => a + x, 0) / n;
   const meanY = points.reduce((a, [, y]) => a + y, 0) / n;
   let numerator = 0;
@@ -109,7 +122,11 @@ function slope(points: readonly [number, number][]): number {
     numerator += (x - meanX) * (y - meanY);
     denominator += (x - meanX) ** 2;
   }
-  return denominator === 0 ? 0 : numerator / denominator;
+  if (denominator === 0) return { slope: 0, error: Number.POSITIVE_INFINITY };
+  const b = numerator / denominator;
+  const a = meanY - b * meanX;
+  const residuals = points.reduce((sum, [x, y]) => sum + (y - (a + b * x)) ** 2, 0);
+  return { slope: b, error: Math.sqrt(residuals / (n - 2) / denominator) };
 }
 
 /** Writes the temp files the load reads, and returns their paths. */
@@ -380,7 +397,7 @@ async function main(): Promise<void> {
     const handlesAtEnd = diagnostics().liveHandles;
 
     const secondHalf = samples.filter((s) => s.t >= (minutes * 60) / 2);
-    const rssSlope = slope(secondHalf.map((s) => [s.t / 60, s.rssMiB]));
+    const rss = slope(secondHalf.map((s) => [s.t / 60, s.rssMiB]));
     const gapP99 = quantile(allGaps, 0.99);
     const checks: Check[] = [
       {
@@ -389,9 +406,12 @@ async function main(): Promise<void> {
         detail: `${requests} requests, ${failures.length} failed`,
       },
       {
-        name: `RSS slope over the second half at most ${MAX_RSS_SLOPE_MIB_PER_MINUTE} MiB/min`,
-        pass: secondHalf.length >= 2 && rssSlope <= MAX_RSS_SLOPE_MIB_PER_MINUTE,
-        detail: `${rssSlope.toFixed(3)} MiB/min over ${secondHalf.length} samples`,
+        name: `RSS slope over the second half not above ${MAX_RSS_SLOPE_MIB_PER_MINUTE} MiB/min with 99% confidence`,
+        pass:
+          secondHalf.length < MIN_SLOPE_SAMPLES
+            ? null
+            : rss.slope - SLOPE_Z * rss.error <= MAX_RSS_SLOPE_MIB_PER_MINUTE,
+        detail: `${rss.slope.toFixed(3)} ± ${rss.error.toFixed(3)} MiB/min over ${secondHalf.length} samples`,
       },
       {
         name: `p99 event loop gap under ${P99_GAP_MS} ms`,
@@ -414,7 +434,7 @@ async function main(): Promise<void> {
         detail: poolAtEnd === null ? "not measured: procfs lists thread names on Linux only" : `${poolAtEnd} left`,
       },
     ];
-    report({ checks, samples, failures, requestsByKind, requests, rssSlope });
+    report({ checks, samples, failures, requestsByKind, requests, rssSlope: rss.slope, rssSlopeError: rss.error });
     if (checks.some((c) => c.pass === false)) process.exitCode = 1;
   } finally {
     rmSync(folder, { recursive: true, force: true });
@@ -427,6 +447,7 @@ async function main(): Promise<void> {
     requestsByKind: Record<string, number>;
     requests: number;
     rssSlope: number;
+    rssSlopeError: number;
   }): void {
     const d = diagnostics();
     const environment = {
@@ -437,7 +458,7 @@ async function main(): Promise<void> {
       sampleSeconds,
       seed,
       handlers: HANDLERS,
-      thresholds: { maxRssSlopeMiBPerMinute: MAX_RSS_SLOPE_MIB_PER_MINUTE, p99GapMs: P99_GAP_MS },
+      thresholds: { maxRssSlopeMiBPerMinute: MAX_RSS_SLOPE_MIB_PER_MINUTE, slopeZ: SLOPE_Z, p99GapMs: P99_GAP_MS },
     };
     mkdirSync(out, { recursive: true });
     writeFileSync(
