@@ -90,3 +90,12 @@ test("extracted statements prepare one by one", async () => {
   expect(bad.statement_count).toBe(0);
   expect(q.extract_statements_error(bad.extracted_statements)).toMatch(/^Parser Error: syntax error/);
 });
+
+test("a struct bind checks the statement before the value, as the official binding does", () => {
+  const notAStatement = connection as never;
+  const invalid = new Error("Invalid prepared statement argument");
+  expect(() => q.bind_date(notAStatement, 1, { days: 2 ** 40 })).toThrow(invalid);
+  expect(() => q.bind_hugeint(notAStatement, 1, 2n ** 200n)).toThrow(invalid);
+  expect(() => q.bind_decimal(notAStatement, 1, { width: 4, scale: 1, value: "x" as never })).toThrow(invalid);
+  expect(() => q.bind_interval(notAStatement, 1, null as never)).toThrow(invalid);
+});

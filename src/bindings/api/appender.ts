@@ -153,14 +153,19 @@ function appendInteger(
 }
 
 /** Appends a by-value struct through the shim's pointer wrapper. */
+/**
+ * Appends a struct the C API takes by value. `value` converts the argument only
+ * after the appender is checked, so a bad appender is reported first, as the
+ * official binding reads its arguments in order.
+ */
 function appendStruct(
   appender: Appender,
   layout: LayoutName,
-  value: unknown,
+  value: () => unknown,
   append: (ptr: Pointer | null, value: Uint8Array) => number,
 ): void {
   const ptr = unwrap(appender, "appender");
-  check(ptr, append(ptr, encode(layout, value)));
+  check(ptr, append(ptr, encode(layout, value())));
 }
 
 export function append_int8(appender: Appender, int8: number): void {
@@ -218,19 +223,39 @@ export function append_double(appender: Appender, double: number): void {
 }
 
 export function append_date(appender: Appender, date: Date_): void {
-  appendStruct(appender, "date", dateFromObject(date), (p, v) => shim.dbs_append_date(p, v));
+  appendStruct(
+    appender,
+    "date",
+    () => dateFromObject(date),
+    (p, v) => shim.dbs_append_date(p, v),
+  );
 }
 
 export function append_time(appender: Appender, time: Time): void {
-  appendStruct(appender, "time", timeFromObject(time), (p, v) => shim.dbs_append_time(p, v));
+  appendStruct(
+    appender,
+    "time",
+    () => timeFromObject(time),
+    (p, v) => shim.dbs_append_time(p, v),
+  );
 }
 
 export function append_timestamp(appender: Appender, timestamp: Timestamp): void {
-  appendStruct(appender, "timestamp", timestampFromObject(timestamp), (p, v) => shim.dbs_append_timestamp(p, v));
+  appendStruct(
+    appender,
+    "timestamp",
+    () => timestampFromObject(timestamp),
+    (p, v) => shim.dbs_append_timestamp(p, v),
+  );
 }
 
 export function append_interval(appender: Appender, interval: Interval): void {
-  appendStruct(appender, "interval", intervalFromObject(interval), (p, v) => shim.dbs_append_interval(p, v));
+  appendStruct(
+    appender,
+    "interval",
+    () => intervalFromObject(interval),
+    (p, v) => shim.dbs_append_interval(p, v),
+  );
 }
 
 export function append_varchar(appender: Appender, varchar: string): void {

@@ -195,18 +195,23 @@ function bindOrThrow(ptr: Pointer | null, typeName: string, failed: number): voi
   throw new Error(error === null ? `Failed to bind ${typeName}` : `Failed to bind ${typeName}: ${error}`);
 }
 
-/** Binds a struct the C API takes by value, through the shim's by-pointer wrapper. */
+/**
+ * Binds a struct the C API takes by value, through the shim's by-pointer wrapper.
+ * `value` converts the argument only after the statement and the index are
+ * checked, so those are reported first, as the official binding reads its
+ * arguments in order.
+ */
 function bindStruct(
   prepared_statement: PreparedStatement,
   index: number,
   typeName: string,
   layout: LayoutName,
-  value: unknown,
+  value: () => unknown,
   bind: (ptr: Pointer | null, index: number, value: Uint8Array) => number,
 ): void {
   const ptr = unwrap(prepared_statement, "prepared statement");
   const i = u32(index);
-  bindOrThrow(ptr, typeName, bind(ptr, i, encode(layout, value)));
+  bindOrThrow(ptr, typeName, bind(ptr, i, encode(layout, value())));
 }
 
 function bindInteger(
@@ -263,18 +268,36 @@ export function bind_int64(prepared_statement: PreparedStatement, index: number,
 }
 
 export function bind_hugeint(prepared_statement: PreparedStatement, index: number, hugeint: bigint): void {
-  const value = hugeintFromBigInt(hugeint);
-  bindStruct(prepared_statement, index, "hugeint", "hugeint", value, (p, i, v) => shim.dbs_bind_hugeint(p, i, v));
+  bindStruct(
+    prepared_statement,
+    index,
+    "hugeint",
+    "hugeint",
+    () => hugeintFromBigInt(hugeint),
+    (p, i, v) => shim.dbs_bind_hugeint(p, i, v),
+  );
 }
 
 export function bind_uhugeint(prepared_statement: PreparedStatement, index: number, uhugeint: bigint): void {
-  const value = uhugeintFromBigInt(uhugeint);
-  bindStruct(prepared_statement, index, "uhugeint", "uhugeint", value, (p, i, v) => shim.dbs_bind_uhugeint(p, i, v));
+  bindStruct(
+    prepared_statement,
+    index,
+    "uhugeint",
+    "uhugeint",
+    () => uhugeintFromBigInt(uhugeint),
+    (p, i, v) => shim.dbs_bind_uhugeint(p, i, v),
+  );
 }
 
 export function bind_decimal(prepared_statement: PreparedStatement, index: number, decimal: Decimal): void {
-  const value = decimalFromObject(decimal);
-  bindStruct(prepared_statement, index, "decimal", "decimal", value, (p, i, v) => shim.dbs_bind_decimal(p, i, v));
+  bindStruct(
+    prepared_statement,
+    index,
+    "decimal",
+    "decimal",
+    () => decimalFromObject(decimal),
+    (p, i, v) => shim.dbs_bind_decimal(p, i, v),
+  );
 }
 
 export function bind_uint8(prepared_statement: PreparedStatement, index: number, uint8: number): void {
@@ -309,30 +332,58 @@ export function bind_double(prepared_statement: PreparedStatement, index: number
 }
 
 export function bind_date(prepared_statement: PreparedStatement, index: number, date: Date_): void {
-  const value = dateFromObject(date);
-  bindStruct(prepared_statement, index, "date", "date", value, (p, i, v) => shim.dbs_bind_date(p, i, v));
+  bindStruct(
+    prepared_statement,
+    index,
+    "date",
+    "date",
+    () => dateFromObject(date),
+    (p, i, v) => shim.dbs_bind_date(p, i, v),
+  );
 }
 
 export function bind_time(prepared_statement: PreparedStatement, index: number, time: Time): void {
-  const value = timeFromObject(time);
-  bindStruct(prepared_statement, index, "time", "time", value, (p, i, v) => shim.dbs_bind_time(p, i, v));
+  bindStruct(
+    prepared_statement,
+    index,
+    "time",
+    "time",
+    () => timeFromObject(time),
+    (p, i, v) => shim.dbs_bind_time(p, i, v),
+  );
 }
 
 export function bind_timestamp(prepared_statement: PreparedStatement, index: number, timestamp: Timestamp): void {
-  const value = timestampFromObject(timestamp);
-  bindStruct(prepared_statement, index, "timestamp", "timestamp", value, (p, i, v) => shim.dbs_bind_timestamp(p, i, v));
+  bindStruct(
+    prepared_statement,
+    index,
+    "timestamp",
+    "timestamp",
+    () => timestampFromObject(timestamp),
+    (p, i, v) => shim.dbs_bind_timestamp(p, i, v),
+  );
 }
 
 export function bind_timestamp_tz(prepared_statement: PreparedStatement, index: number, timestamp: Timestamp): void {
-  const value = timestampFromObject(timestamp);
-  bindStruct(prepared_statement, index, "timestamp_tz", "timestamp", value, (p, i, v) =>
-    shim.dbs_bind_timestamp_tz(p, i, v),
+  bindStruct(
+    prepared_statement,
+    index,
+    "timestamp_tz",
+    "timestamp",
+    () => timestampFromObject(timestamp),
+    (p, i, v) => shim.dbs_bind_timestamp_tz(p, i, v),
   );
 }
 
 export function bind_interval(prepared_statement: PreparedStatement, index: number, interval: Interval): void {
-  const value = intervalFromObject(interval);
-  bindStruct(prepared_statement, index, "interval", "interval", value, (p, i, v) => shim.dbs_bind_interval(p, i, v));
+  bindStruct(
+    prepared_statement,
+    index,
+    "interval",
+    "interval",
+    () => intervalFromObject(interval),
+    (p, i, v) => shim.dbs_bind_interval(p, i, v),
+  );
 }
 
 export function bind_varchar(prepared_statement: PreparedStatement, index: number, varchar: string): void {

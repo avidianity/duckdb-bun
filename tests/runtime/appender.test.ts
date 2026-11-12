@@ -132,3 +132,12 @@ test("failures throw DuckDB's appender error or the official message", async () 
     new Error("Failed to create appender: connection disconnected"),
   );
 });
+
+test("a struct append checks the appender before the value, as the official binding does", () => {
+  const notAnAppender = connection as never;
+  const invalid = new Error("Invalid appender argument");
+  expect(() => duckdb.append_date(notAnAppender, { days: 2 ** 40 })).toThrow(invalid);
+  expect(() => duckdb.append_time(notAnAppender, null as never)).toThrow(invalid);
+  expect(() => duckdb.append_timestamp(notAnAppender, { micros: 1 } as never)).toThrow(invalid);
+  expect(() => duckdb.append_interval(notAnAppender, 5 as never)).toThrow(invalid);
+});
