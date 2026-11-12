@@ -24,6 +24,9 @@ import * as oursApi from "../../src/neo.ts";
 export type Api = typeof officialApi;
 export type Impl = "official" | "ours";
 
+/** The offset node-api derives from the process time zone when it loads. */
+const PROCESS_OFFSET_MINUTES = -new Date().getTimezoneOffset();
+
 const APIS: Record<Impl, Api> = {
   official: officialApi,
   // Ours re-exports the vendored upstream sources, so it has the official shape;
@@ -169,6 +172,8 @@ function removeSharedDirs(): void {
   sharedDirs.clear();
 }
 
+// Both implementations get paths of the same length: DuckDB cuts the LINE context of an error
+// message at a fixed width, so a longer path would move the cut and the messages would differ.
 function makeDir(prefix: string): string {
   return realpathSync(mkdtempSync(join(tmpdir(), prefix)));
 }
@@ -176,17 +181,21 @@ function makeDir(prefix: string): string {
 function sharedDir(impl: Impl): string {
   let dir = sharedDirs.get(impl);
   if (!dir) {
-    dir = makeDir(`duckdb-bun-parity-${impl}-shared-`);
+    dir = makeDir("duckdb-bun-parity-shared-");
     sharedDirs.set(impl, dir);
   }
   return dir;
 }
 
 async function runInProcess(impl: Impl, scenario: Scenario): Promise<Outcome> {
-  const tmp = makeDir(`duckdb-bun-parity-${impl}-`);
+  const tmp = makeDir("duckdb-bun-parity-");
   const shared = sharedDir(impl);
   const replace: Replace = (text) => text.replaceAll(tmp, "<tmp>").replaceAll(shared, "<shared>");
   try {
+    // The vendored official suite sets this static to -330 for its own tests. In a process that runs
+    // it before parity, as `bun run coverage` does, our module would keep that offset while the
+    // official module has its own copy; both format TIMESTAMPTZ in the process time zone here.
+    APIS[impl].DuckDBTimestampTZValue.timezoneOffsetInMinutes = PROCESS_OFFSET_MINUTES;
     const value = await scenario(APIS[impl], { impl, tmp, shared });
     return { ok: normalize(value, replace) };
   } catch (err) {
