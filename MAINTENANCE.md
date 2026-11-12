@@ -111,6 +111,7 @@ The `Release` workflow (`.github/workflows/release.yml`) then:
 1. Builds the linux-x64 shim on `ubuntu-latest` and the linux-arm64 shim on `ubuntu-24.04-arm`, both in the `rust:1.99.1-bookworm` image, and the darwin-arm64 shim on `macos-latest`, runs every test suite on each, and uploads each platform package directory.
 2. Checks that every version equals the tag and that each platform package holds and lists its native files.
 3. Publishes the three platform packages, then the main package, with the `latest` dist-tag and a provenance statement.
+   After each publish it waits up to 20 minutes for npm to serve the version, because npm accepts a publish before it serves it.
 
 A version that is already on npm is skipped, so a failed run can be re-run.
 To rebuild a tag without a new release, run the workflow by hand with `gh workflow run release.yml -f tag=v1.0.1`.
@@ -141,10 +142,14 @@ To publish the first version of a new package:
    It downloads every platform package from the green run into a worktree at the tag, packs the four tarballs, and checks their files, versions, `repository.url`, library architectures and the glibc floor of every Linux library.
    After you type `publish`, it runs `bun publish --access public --tag latest` for each package not yet on npm, platform packages first.
    npm asks for two-factor authentication in the terminal or the browser.
+   It then waits up to 20 minutes for npm to serve each version (`scripts/npm-registry.ts`).
+   npm answers "Your package is being processed and may take a few minutes to become available", and for 1.0.0 it served the 26 MB `@avidian/duckdb-bun-linux-x64` tarball 7 minutes 15 seconds after accepting it.
 4. Revoke the token if you made one, and configure the trusted publisher of each package as above.
 5. Within 2 days, release the next patch version through the release workflow, which validates the four configurations.
 
 That first version has no provenance statement, because `bun publish` cannot generate one.
+The first publish of `@avidian/duckdb-bun-linux-x64` also made npm publish a `0.0.0-stage` version next to 1.0.0, the placeholder npm documents for [staged publishing](https://docs.npmjs.com/staged-publishing), although nothing was staged.
+The `latest` dist-tag points at 1.0.0, so installs do not resolve to it.
 
 ## Adding a platform
 
