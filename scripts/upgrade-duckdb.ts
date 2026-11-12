@@ -24,6 +24,15 @@ import { join, relative } from "node:path";
 import { parseArgs } from "node:util";
 import { $ } from "bun";
 import { DUCKDB_VERSION } from "../src/version.ts";
+import {
+  type CrateVersion,
+  crateMinor,
+  matchingCrate,
+  nodeApiBase,
+  setNeoTag,
+  setTableRow,
+  syncTestImports,
+} from "./upgrade-plan.ts";
 
 const ROOT = join(import.meta.dir, "..");
 const NEO_REPO = "duckdb/duckdb-node-neo";
@@ -62,23 +71,6 @@ if (!values.duckdb || !values["node-api"]) {
 const duckdb = values.duckdb.replace(/^v/, "");
 const nodeApi = values["node-api"];
 const dryRun = values["dry-run"];
-
-/** The DuckDB version a `<duckdb>-r.<n>` version is built on, or undefined for another shape. */
-function nodeApiBase(version: string): string | undefined {
-  return /^(\d+\.\d+\.\d+)-r\.\d+$/.exec(version)?.[1];
-}
-
-/**
- * The second component of the libduckdb-sys versions for a DuckDB version. duckdb-rs documents the scheme
- * `1.MAJOR_MINOR_PATCH.x` since DuckDB 1.5.0: DuckDB 1.5.0 is 1.10500.x and DuckDB 2.0.0 is 1.20000.x.
- */
-function crateMinor(version: string): number {
-  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version);
-  if (!match) throw new Error(`DuckDB version ${version} is not <major>.<minor>.<patch>`);
-  const [major, minor, patch] = match.slice(1).map(Number) as [number, number, number];
-  if (minor > 99 || patch > 99) throw new Error(`DuckDB ${version} does not fit the libduckdb-sys version scheme`);
-  return major * 10000 + minor * 100 + patch;
-}
 
 async function get(url: string, accept: string): Promise<Response> {
   const headers: Record<string, string> = { Accept: accept, "User-Agent": USER_AGENT };
@@ -206,14 +198,11 @@ try {
 
   const minor = crateMinor(duckdb);
   console.log(`Looking up ${CRATE} 1.${minor}.x on crates.io`);
-  const crates = await getJson<{ versions: { num: string; yanked: boolean }[]; meta: { next_page: string | null } }>(
+  const crates = await getJson<{ versions: CrateVersion[]; meta: { next_page: string | null } }>(
     `https://crates.io/api/v1/crates/${CRATE}/versions?per_page=100`,
   );
   if (crates.meta.next_page !== null) throw new Error(`crates.io lists more than 100 ${CRATE} versions; page them`);
-  const crate = crates.versions
-    .filter((version) => !version.yanked && new RegExp(`^1\\.${minor}\\.\\d+$`).test(version.num))
-    .map((version) => version.num)
-    .sort((a, b) => Bun.semver.order(b, a))[0];
+  const crate = matchingCrate(crates.versions, duckdb);
   if (crate && Bun.semver.order(crate, cratePin) < 0) {
     throw new Error(`${CRATE} ${crate} for DuckDB ${duckdb} is older than the pin ${cratePin}`);
   }
@@ -293,17 +282,7 @@ async function apply({ upstream, sha, bindingsVersion, crate, copies }: Plan): P
     ["`@duckdb/node-bindings` version", `\`${bindingsVersion}\` (DuckDB core v${duckdb})`],
   ];
   let table = await Bun.file(provenance).text();
-  for (const [label, value] of rows) {
-    const lines = table.split("\n");
-    const index = lines.findIndex((line) => line.split("|")[1]?.trim() === label);
-    const cells = lines[index]?.split("|");
-    if (cells?.length !== 4 || cells[2] === undefined) {
-      throw new Error(`vendor/node-api/PROVENANCE.md has no table row "${label}"`);
-    }
-    cells[2] = ` ${value} `.padEnd(cells[2].length);
-    lines[index] = cells.join("|");
-    table = lines.join("\n");
-  }
+  for (const [label, value] of rows) table = setTableRow(table, label, value);
   await Bun.write(provenance, table);
 
   // Each official suite entrypoint imports every top-level test file of its vendored suite.
@@ -312,27 +291,12 @@ async function apply({ upstream, sha, bindingsVersion, crate, copies }: Plan): P
     ["tests/official/bindings.test.ts", "vendor/node-bindings/test"],
   ] as const) {
     const path = join(ROOT, entry);
-    const prefix = `import "../../${dir}/`;
-    const lines = (await Bun.file(path).text()).split("\n");
-    const first = lines.findIndex((line) => line.startsWith(prefix));
-    const last = lines.findLastIndex((line) => line.startsWith(prefix));
-    if (first < 0) throw new Error(`${entry} imports nothing from ${dir}`);
-    const block = lines.slice(first, last + 1);
-    if (!block.every((line) => line.startsWith(prefix) && line.endsWith('.test.ts";'))) {
-      throw new Error(`${entry}: the ${dir} imports are not one block of test file imports`);
-    }
-    const imported = block.map((line) => line.slice(prefix.length, -'";'.length));
     const present = (await readdir(join(ROOT, dir), { withFileTypes: true }))
-      .filter((entry) => entry.isFile() && entry.name.endsWith(".test.ts"))
-      .map((entry) => entry.name);
-    const removed = imported.filter((name) => !present.includes(name));
-    const added = present.filter((name) => !imported.includes(name)).sort();
-    const names = [...imported.filter((name) => present.includes(name)), ...added];
-    lines.splice(first, block.length, ...names.map((name) => `${prefix}${name}";`));
-    let source = lines.join("\n");
-    const header = /(duckdb-node-neo\s+(?:\/\/\s+)?)v\d+\.\d+\.\d+-r\.\d+/;
-    if (!header.test(source)) throw new Error(`${entry}: the header comment names no duckdb-node-neo tag`);
-    source = source.replace(header, `$1${tag}`);
+      .filter((file) => file.isFile() && file.name.endsWith(".test.ts"))
+      .map((file) => file.name);
+    const synced = syncTestImports(await Bun.file(path).text(), `import "../../${dir}/`, present);
+    const { added, removed } = synced;
+    const source = setNeoTag(synced.source, tag);
     await Bun.write(path, source);
     if (added.length > 0) {
       changes.push(`\`${entry}\` now imports the new upstream test files ${added.map((n) => `\`${n}\``).join(", ")}.`);
