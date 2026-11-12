@@ -78,7 +78,7 @@ Pick `--lag-rows` so the lag query takes about 5 seconds on the machine; the def
 `bun run bench --gate` fails, with exit status 1, when ours does worse than official on any scenario:
 
 - Ours is more than 10% slower (`--max-slower`) on both the median run and the fastest run, and the medians differ by more than 5 ms.
-- The run peak RSS is more than 10% higher (`--max-memory`), and higher by more than 16 MiB, which covers the baseline difference between the two packages at start-up.
+- The run peak RSS is more than 10% higher (`--max-memory`) on both the median run and the lowest run, and the medians differ by more than 16 MiB, which covers the baseline difference between the two packages at start-up.
 - In `event-loop-lag`, ours lets the event loop stall for 50 ms or more.
 - Either implementation fails or returns a wrong result.
 
@@ -87,6 +87,8 @@ The noise is the spread between the two ABBA children of one implementation, whi
 A difference inside that spread is no evidence either way, so a fixed limit below it would fail at random.
 The fastest-run condition exists because some scenarios fall into two speed modes: on the Linux runner, `parquet-write` runs took either about 115 ms or about 140 ms for both packages, and the median moved by which mode each child happened to hit.
 A real slowdown moves both the median and the fastest run.
+Memory has the same rule for the same reason: RSS does not fall back after a garbage collection, so pages the allocator kept from one run add to the next run's peak, and on the macOS runner the median `read-all` run peak swung by 17% between two children of the same package.
+The lowest run peak only grows with what a run needs.
 
 Time noise CI measured on 2026-11-12:
 

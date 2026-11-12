@@ -32,6 +32,8 @@ interface Summary {
   maxRssMiB: number;
   /** Median over the measured runs of each run's peak RSS; the gate compares this. */
   runPeakRssMiB?: number;
+  /** The lowest run peak RSS. */
+  minRunPeakRssMiB?: number;
   /** Spread between the medians of this implementation's two ABBA children, in percent. */
   noisePct?: number;
   /** Spread between the peak RSS of those two children, in percent. */
@@ -139,7 +141,10 @@ function summarize(scenario: Scenario, raw: ChildResult): Summary {
     summary.medianMs = median(raw.runsMs);
     summary.minMs = Math.min(...raw.runsMs);
     summary.maxMs = Math.max(...raw.runsMs);
-    if (raw.runPeakRssBytes.length > 0) summary.runPeakRssMiB = median(raw.runPeakRssBytes) / MIB;
+    if (raw.runPeakRssBytes.length > 0) {
+      summary.runPeakRssMiB = median(raw.runPeakRssBytes) / MIB;
+      summary.minRunPeakRssMiB = Math.min(...raw.runPeakRssBytes) / MIB;
+    }
     for (const spec of scenario.metrics) {
       const values = raw.metrics[spec.key] ?? [];
       if (values.length > 0) summary.metrics[spec.key] = aggregate(spec, values);

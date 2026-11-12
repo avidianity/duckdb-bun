@@ -2,7 +2,7 @@
 import { expect, test } from "bun:test";
 import { DEFAULT_LIMITS, judge, noise } from "../bench/gate.ts";
 
-const base = { medianMs: 100, minMs: 90, runPeakRssMiB: 500, metrics: {} };
+const base = { medianMs: 100, minMs: 90, runPeakRssMiB: 500, minRunPeakRssMiB: 450, metrics: {} };
 
 test("ours within the limits passes", () => {
   const ours = { ...base, medianMs: 109, minMs: 98, runPeakRssMiB: 549 };
@@ -18,9 +18,15 @@ test("a slower median with an equal fastest run passes: the runs fell into a slo
   expect(judge("s", base, { ...base, medianMs: 118, minMs: 91 }, DEFAULT_LIMITS).failures).toEqual([]);
 });
 
-test("more than 10% more peak RSS per run fails", () => {
-  const verdict = judge("s", base, { ...base, runPeakRssMiB: 600 }, DEFAULT_LIMITS);
-  expect(verdict.failures).toEqual(["20.0% more peak RSS per run (600 vs 500 MiB), limit 10.0%"]);
+test("more than 10% more peak RSS per run, on the median and the lowest run, fails", () => {
+  const verdict = judge("s", base, { ...base, runPeakRssMiB: 600, minRunPeakRssMiB: 540 }, DEFAULT_LIMITS);
+  expect(verdict.failures).toEqual([
+    "20.0% more peak RSS per run (600 vs 500 MiB), lowest run 20.0% more, limit 10.0%",
+  ]);
+});
+
+test("a higher median run peak with an equal lowest run passes: the allocator kept pages", () => {
+  expect(judge("s", base, { ...base, runPeakRssMiB: 600, minRunPeakRssMiB: 455 }, DEFAULT_LIMITS).failures).toEqual([]);
 });
 
 test("differences under the floors never fail", () => {

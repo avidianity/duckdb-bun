@@ -3,7 +3,9 @@
 // own noise in a scenario is larger than a limit, the noise is the limit for that scenario: a difference
 // inside the spread between two children running the same code is no evidence. A slowdown counts only
 // when both the median and the fastest run show it, so a scenario whose runs fall into two speed modes
-// cannot fail on which mode each implementation happened to hit. bench/README.md explains.
+// cannot fail on which mode each implementation happened to hit. Memory works the same way with the
+// median and the lowest run peak, because pages the allocator kept from an earlier run only add to a
+// later run's peak. bench/README.md explains.
 
 export interface GateLimits {
   /** Largest allowed slowdown of the median run, in percent. */
@@ -32,6 +34,8 @@ export interface GateInput {
   minMs?: number;
   /** Median over the runs of each run's peak RSS. */
   runPeakRssMiB?: number;
+  /** The lowest run peak RSS. */
+  minRunPeakRssMiB?: number;
   metrics: Record<string, number>;
   /** Spread between the medians of the implementation's two children, in percent. */
   noisePct?: number;
@@ -46,8 +50,10 @@ export interface Verdict {
   slowerPct?: number;
   /** The same for the fastest run. */
   minSlowerPct?: number;
-  /** Ours over official run peak RSS, minus 1, in percent; positive is more memory. */
+  /** Ours over official median run peak RSS, minus 1, in percent; positive is more memory. */
   memoryPct?: number;
+  /** The same for the lowest run peak RSS. */
+  minMemoryPct?: number;
   /** The larger of the two implementations' child-to-child spreads of the median, in percent. */
   noisePct?: number;
   /** The same for peak RSS. */
@@ -89,12 +95,17 @@ export function judge(scenario: string, official: GateInput, ours: GateInput, li
 
   if (ours.runPeakRssMiB !== undefined && official.runPeakRssMiB !== undefined) {
     verdict.memoryPct = pct(ours.runPeakRssMiB, official.runPeakRssMiB);
+    verdict.minMemoryPct = pct(
+      ours.minRunPeakRssMiB ?? ours.runPeakRssMiB,
+      official.minRunPeakRssMiB ?? official.runPeakRssMiB,
+    );
     if (
       verdict.memoryPct > verdict.memoryLimitPct &&
+      verdict.minMemoryPct > verdict.memoryLimitPct &&
       ours.runPeakRssMiB - official.runPeakRssMiB > limits.memoryFloorMiB
     ) {
       verdict.failures.push(
-        `${verdict.memoryPct.toFixed(1)}% more peak RSS per run (${ours.runPeakRssMiB.toFixed(0)} vs ${official.runPeakRssMiB.toFixed(0)} MiB), limit ${verdict.memoryLimitPct.toFixed(1)}%`,
+        `${verdict.memoryPct.toFixed(1)}% more peak RSS per run (${ours.runPeakRssMiB.toFixed(0)} vs ${official.runPeakRssMiB.toFixed(0)} MiB), lowest run ${verdict.minMemoryPct.toFixed(1)}% more, limit ${verdict.memoryLimitPct.toFixed(1)}%`,
       );
     }
   }
@@ -126,11 +137,11 @@ export function gateTable(verdicts: Verdict[], limits: GateLimits): string {
   const lines = [
     `### Gate: at most ${limits.maxSlowerPct}% slower and ${limits.maxMemoryPct}% more memory than official, or the noise where larger`,
     "",
-    "| Scenario | Median vs official | Fastest vs official | Time noise | Run peak RSS vs official | RSS noise | Result |",
-    "| --- | --- | --- | --- | --- | --- | --- |",
+    "| Scenario | Median vs official | Fastest vs official | Time noise | Run peak RSS vs official | Lowest run peak vs official | RSS noise | Result |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ...verdicts.map(
       (v) =>
-        `| ${v.scenario} | ${signed(v.slowerPct)} | ${signed(v.minSlowerPct)} | ${percent(v.noisePct)} | ${signed(v.memoryPct)} | ${percent(v.memoryNoisePct)} | ${
+        `| ${v.scenario} | ${signed(v.slowerPct)} | ${signed(v.minSlowerPct)} | ${percent(v.noisePct)} | ${signed(v.memoryPct)} | ${signed(v.minMemoryPct)} | ${percent(v.memoryNoisePct)} | ${
           v.failures.length === 0 ? "pass" : `FAIL: ${v.failures.join("; ").replaceAll("|", "\\|")}`
         } |`,
     ),
