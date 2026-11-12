@@ -239,7 +239,10 @@ export function parityFor(file: string) {
         const run = (impl: Impl) =>
           options.isolate ? runInChild(file, name, impl, timeout) : runInProcess(impl, scenario);
         const official = await run("official");
-        if (options.official) expect(Object.keys(official)).toEqual([options.official]);
+        // On mismatch the diff shows the whole official outcome, which points at the scenario bug.
+        if (options.official && !(options.official in official)) {
+          expect(official).toEqual({ [options.official]: expect.anything() } as Outcome);
+        }
         const ours = await run("ours");
         expect(ours).toEqual(official);
       },
