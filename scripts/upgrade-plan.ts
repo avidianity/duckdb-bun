@@ -90,3 +90,52 @@ export function setNeoTag(source: string, tag: string): string {
   if (!header.test(source)) throw new Error("the header comment names no duckdb-node-neo tag");
   return source.replace(header, `$1${tag}`);
 }
+
+/** The rows of the `## Versions` table in README.md, as trimmed cells without backticks. */
+export function versionRows(readme: string): string[][] {
+  const section = readme.split(/^## /m).find((part) => part.startsWith("Versions"));
+  if (!section) return [];
+  return section
+    .split("\n")
+    .filter((line) => /^\|\s*\d/.test(line))
+    .map((line) =>
+      line
+        .split("|")
+        .slice(1, -1)
+        .map((cell) => cell.trim().replaceAll("`", "")),
+    );
+}
+
+/**
+ * The package version that releases a DuckDB upgrade (ADR 0004): the version the Versions table already gives
+ * that DuckDB, so a second run keeps it, or else the next minor version after `current`.
+ */
+export function upgradeVersion(current: string, rows: string[][], duckdb: string): string {
+  const listed = rows.find((row) => row[1] === duckdb)?.[0];
+  if (listed) return listed;
+  const match = /^(\d+)\.(\d+)\.\d+$/.exec(current);
+  if (!match) throw new Error(`package version ${current} is not <major>.<minor>.<patch>`);
+  return `${match[1]}.${Number(match[2]) + 1}.0`;
+}
+
+/** README.md naming the release in its opening sentence and in a Versions row, added after the last row or replaced. */
+export function setReadmeRelease(readme: string, version: string, duckdb: string, nodeApi: string): string {
+  const sentence = /^Version \d+\.\d+\.\d+ bundles DuckDB v\d+\.\d+\.\d+ and matches `@duckdb\/node-api` [^;\s]+;/m;
+  if (!sentence.test(readme)) throw new Error("README.md has no sentence that names the bundled versions");
+  const lines = readme
+    .replace(sentence, `Version ${version} bundles DuckDB v${duckdb} and matches \`@duckdb/node-api\` ${nodeApi};`)
+    .split("\n");
+  const heading = lines.indexOf("## Versions");
+  if (heading < 0) throw new Error("README.md has no Versions section");
+  const end = lines.findIndex((line, index) => index > heading && line.startsWith("## "));
+  const rows = lines
+    .map((line, index) => ({ line, index }))
+    .filter(({ line, index }) => index > heading && (end < 0 || index < end) && /^\|\s*\d/.test(line));
+  const last = rows.at(-1);
+  if (!last) throw new Error("README.md has no rows in its Versions table");
+  const row = `| ${version} | ${duckdb} | ${nodeApi} |`;
+  const same = rows.find(({ line }) => line.split("|")[1]?.trim() === version);
+  if (same) lines[same.index] = row;
+  else lines.splice(last.index + 1, 0, row);
+  return lines.join("\n");
+}

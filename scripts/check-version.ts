@@ -14,7 +14,7 @@ import { extname, join } from "node:path";
 import { parseArgs } from "node:util";
 import { DUCKDB_VERSION, DUCKDB_VERSION_TAG } from "../src/version.ts";
 import { TARGETS } from "./fetch-lib.ts";
-import { upgradeTarget } from "./upgrade-plan.ts";
+import { upgradeTarget, versionRows } from "./upgrade-plan.ts";
 
 const ROOT = join(import.meta.dir, "..");
 const NODE_API = "@duckdb/node-api";
@@ -62,21 +62,6 @@ const STABLE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
  * The README's "Versions" table, which maps each package version to the DuckDB it bundles and the
  * `@duckdb/node-api` it matches, as rows of [package, duckdb, nodeApi].
  */
-async function versionTable(): Promise<string[][]> {
-  const readme = await Bun.file(join(ROOT, "README.md")).text();
-  const section = readme.split(/^## /m).find((part) => part.startsWith("Versions"));
-  if (!section) return [];
-  return section
-    .split("\n")
-    .filter((line) => /^\|\s*\d/.test(line))
-    .map((line) =>
-      line
-        .split("|")
-        .slice(1, -1)
-        .map((cell) => cell.trim().replaceAll("`", "")),
-    );
-}
-
 /** The native files a platform package ships: libduckdb and the shim built from native/. */
 function nativeFiles(platform: string): string[] {
   const target = TARGETS[platform];
@@ -150,7 +135,7 @@ if (!STABLE.test(root.version ?? "")) {
     `package.json version ${root.version} is not a stable x.y.z version; the packages never publish a prerelease.`,
   );
 }
-const row = (await versionTable()).find(([version]) => version === root.version);
+const row = versionRows(await Bun.file(join(ROOT, "README.md")).text()).find(([version]) => version === root.version);
 if (row?.[1] !== DUCKDB_VERSION || row?.[2] !== nodeApiPin) {
   problems.push(
     `README.md "Versions" has no row "| ${root.version} | ${DUCKDB_VERSION} | ${nodeApiPin} |" for this package version.`,

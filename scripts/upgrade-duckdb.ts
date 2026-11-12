@@ -30,8 +30,11 @@ import {
   matchingCrate,
   nodeApiBase,
   setNeoTag,
+  setReadmeRelease,
   setTableRow,
   syncTestImports,
+  upgradeVersion,
+  versionRows,
 } from "./upgrade-plan.ts";
 
 const ROOT = join(import.meta.dir, "..");
@@ -130,6 +133,7 @@ if (Bun.semver.order(duckdb, DUCKDB_VERSION) < 0) {
 }
 
 const rootPackage = (await Bun.file(join(ROOT, "package.json")).json()) as {
+  version: string;
   devDependencies?: Record<string, string>;
 };
 const nodeApiPin = rootPackage.devDependencies?.[NODE_API];
@@ -137,6 +141,12 @@ if (!nodeApiPin) throw new Error(`package.json has no ${NODE_API} devDependency`
 if (Bun.semver.order(nodeApi, nodeApiPin) < 0) {
   throw new Error(`${NODE_API} ${nodeApi} is older than the pin ${nodeApiPin}; this script only upgrades`);
 }
+// A DuckDB upgrade is a minor release (ADR 0004); a second run for the same DuckDB keeps the version it chose.
+const release = upgradeVersion(
+  rootPackage.version,
+  versionRows(await Bun.file(join(ROOT, "README.md")).text()),
+  duckdb,
+);
 
 const CARGO_TOML = join(ROOT, "native", "Cargo.toml");
 const CRATE_PIN = /^(libduckdb-sys = \{ version = "=)([^"]+)(")/m;
@@ -220,7 +230,7 @@ Steps:
   4. bun run scripts/vendor-rewrite-bindings.ts, update vendor/node-api/PROVENANCE.md and tests/official/*.test.ts
   5. bun run fetch-lib all, vendor:api-spec, gen:ffi, gen:contract
   6. ${crate ? `pin ${CRATE} =${crate} in native/Cargo.toml and cargo update native/Cargo.lock` : `leave ${CRATE}`}
-  7. update the version sentence in README.md`);
+  7. release as version ${release}: set it in every package.json and add its row to the README.md Versions table`);
   if (!dryRun) await apply({ upstream, sha, bindingsVersion, crate, copies });
 } finally {
   await rm(work, { recursive: true, force: true });
@@ -334,20 +344,27 @@ async function apply({ upstream, sha, bindingsVersion, crate, copies }: Plan): P
     );
   }
 
-  // ---- 6. README.md ----
+  // ---- 6. The package version ----
 
-  step("README.md");
-  const readme = join(ROOT, "README.md");
-  const sentence = /It targets DuckDB v\d+\.\d+\.\d+ and `@duckdb\/node-api` \d+\.\d+\.\d+-r\.\d+\./;
-  const readmeText = await Bun.file(readme).text();
-  if (sentence.test(readmeText)) {
-    await Bun.write(
-      readme,
-      readmeText.replace(sentence, `It targets DuckDB v${duckdb} and \`${NODE_API}\` ${nodeApi}.`),
-    );
-  } else {
-    followUps.push("`README.md` no longer has the sentence that names the targeted versions; update it by hand.");
+  step(`Package version ${release}`);
+  const platforms = (await readdir(join(ROOT, "packages"))).filter((name) => name.startsWith("duckdb-bun-"));
+  for (const path of ["package.json", ...platforms.map((name) => join("packages", name, "package.json"))]) {
+    await replaceOnce(join(ROOT, path), /^ {2}"version": "[^"]+",$/m, `  "version": "${release}",`);
   }
+  const rootManifest = join(ROOT, "package.json");
+  let manifest = await Bun.file(rootManifest).text();
+  for (const name of platforms) {
+    const dependency = new RegExp(`("@avidian/${name}": )"[^"]+"`);
+    if (!dependency.test(manifest)) throw new Error(`package.json has no optional dependency on @avidian/${name}`);
+    manifest = manifest.replace(dependency, `$1"${release}"`);
+  }
+  await Bun.write(rootManifest, manifest);
+  const readme = join(ROOT, "README.md");
+  await Bun.write(readme, setReadmeRelease(await Bun.file(readme).text(), release, duckdb, nodeApi));
+  await $`bun install`.cwd(ROOT);
+  changes.push(
+    `The package version is ${release}, a minor release for the DuckDB upgrade (ADR 0004), in every \`package.json\`, \`bun.lock\` and the \`README.md\` Versions table.`,
+  );
 
   // ---- Summary ----
 
@@ -366,9 +383,6 @@ async function apply({ upstream, sha, bindingsVersion, crate, copies }: Plan): P
         " with the official C++ binding at the new tag as the reference.",
     );
   }
-  followUps.push(
-    "Choose the package version at release time (MAINTENANCE.md, Releasing); this change leaves every package version alone.",
-  );
 
   const summary = [
     `Upgrades DuckDB from v${DUCKDB_VERSION} to v${duckdb} and \`${NODE_API}\` from ${nodeApiPin} to ${nodeApi}.`,
@@ -382,7 +396,7 @@ async function apply({ upstream, sha, bindingsVersion, crate, copies }: Plan): P
     "",
     "## Left for a human",
     "",
-    ...followUps.map((followUp) => `- ${followUp}`),
+    ...(followUps.length > 0 ? followUps.map((followUp) => `- ${followUp}`) : ["Nothing beyond a green CI run."]),
     "",
   ].join("\n");
   console.log(`\n${summary}`);

@@ -6,9 +6,12 @@ import {
   matchingCrate,
   nodeApiBase,
   setNeoTag,
+  setReadmeRelease,
   setTableRow,
   syncTestImports,
   upgradeTarget,
+  upgradeVersion,
+  versionRows,
 } from "../scripts/upgrade-plan.ts";
 
 describe("upgradeTarget", () => {
@@ -125,4 +128,59 @@ test("setNeoTag replaces the tag in a header comment, also across a wrapped line
     "// suite (duckdb-node-neo\n// v2.0.1-r.1, vendor)",
   );
   expect(() => setNeoTag("// no tag", "v2.0.1-r.1")).toThrow("names no duckdb-node-neo tag");
+});
+
+describe("the release version of an upgrade", () => {
+  const readme = [
+    "# duckdb-bun",
+    "",
+    "Version 1.0.2 bundles DuckDB v2.0.0 and matches `@duckdb/node-api` 2.0.0-r.1; [Versions](#versions) maps every release.",
+    "",
+    "## Versions",
+    "",
+    "| `@avidian/duckdb-bun` | DuckDB | `@duckdb/node-api` it matches |",
+    "| --- | --- | --- |",
+    "| 1.0.0 | 2.0.0 | 2.0.0-r.1 |",
+    "| 1.0.2 | 2.0.0 | 2.0.0-r.1 |",
+    "",
+    "## Install",
+    "",
+  ].join("\n");
+
+  test("reads the Versions rows", () => {
+    expect(versionRows(readme)).toEqual([
+      ["1.0.0", "2.0.0", "2.0.0-r.1"],
+      ["1.0.2", "2.0.0", "2.0.0-r.1"],
+    ]);
+  });
+
+  test("is the next minor version, or the one a second run already chose", () => {
+    expect(upgradeVersion("1.0.2", versionRows(readme), "2.0.1")).toBe("1.1.0");
+    const upgraded = setReadmeRelease(readme, "1.1.0", "2.0.1", "2.0.1-r.1");
+    expect(upgradeVersion("1.1.0", versionRows(upgraded), "2.0.1")).toBe("1.1.0");
+    expect(() => upgradeVersion("1.0.2-r.1", [], "2.0.1")).toThrow("is not <major>.<minor>.<patch>");
+  });
+
+  test("names the release in the opening sentence and a new last row", () => {
+    const upgraded = setReadmeRelease(readme, "1.1.0", "2.0.1", "2.0.1-r.1");
+    expect(upgraded).toContain(
+      "Version 1.1.0 bundles DuckDB v2.0.1 and matches `@duckdb/node-api` 2.0.1-r.1; [Versions]",
+    );
+    expect(versionRows(upgraded).at(-1)).toEqual(["1.1.0", "2.0.1", "2.0.1-r.1"]);
+    expect(upgraded).toContain("| 1.1.0 | 2.0.1 | 2.0.1-r.1 |\n\n## Install");
+    expect(setReadmeRelease(upgraded, "1.1.0", "2.0.1", "2.0.1-r.2")).toBe(
+      upgraded.replace("2.0.1-r.1;", "2.0.1-r.2;").replace("| 2.0.1-r.1 |", "| 2.0.1-r.2 |"),
+    );
+  });
+
+  test("matches the real README", async () => {
+    const real = await Bun.file(new URL("../README.md", import.meta.url)).text();
+    const rows = versionRows(real);
+    const version = upgradeVersion(rows.at(-1)?.[0] ?? "", rows, "99.0.0");
+    expect(versionRows(setReadmeRelease(real, version, "99.0.0", "99.0.0-r.1")).at(-1)).toEqual([
+      version,
+      "99.0.0",
+      "99.0.0-r.1",
+    ]);
+  });
 });

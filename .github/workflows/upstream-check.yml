@@ -180,7 +180,7 @@ jobs:
           base_sha="$(git rev-parse HEAD)"
           echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
           git switch --create "$BRANCH"
-          git add -- src tests vendor native/Cargo.toml native/Cargo.lock native/src package.json bun.lock README.md
+          git add -- src tests vendor native/Cargo.toml native/Cargo.lock native/src package.json packages/*/package.json bun.lock README.md
           if [ -n "$(git status --porcelain --untracked-files=all | grep -v '^[MADR] ' || true)" ]; then
             echo "The upgrade changed paths outside the expected set:"
             git status --short
