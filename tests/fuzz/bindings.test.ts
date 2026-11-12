@@ -14,13 +14,14 @@
 // vector_reference_value, create_vector); and everything that takes a callback,
 // which tests/fuzz/values.test.ts and the official suites cover.
 //
-// Known crash, skipped: many libduckdb C API functions throw a C++ exception on
-// bad input, such as to_date() with month 0, to_timestamp() past the timestamp
-// range, and get_bignum() or get_blob() on a value that does not cast. Bun's
-// N-API turns the exception into "A native exception was thrown" for the
-// official binding; one that crosses bun:ffi aborts our process ("panic: A C++
-// exception occurred"). Until ours has a native exception boundary, a call that throws
-// that in the official binding is not made on ours, and both count as equal.
+// C++ exceptions: many libduckdb C API functions throw a C++ exception on bad
+// input, such as to_date() with month 0, to_timestamp() past the timestamp range,
+// and get_bignum() or get_blob() on a value that does not cast. Bun's N-API turns
+// the exception into "A native exception was thrown" for the official binding;
+// ours catches it in the shim (native/cpp/boundary.hpp) and throws DuckDB's
+// message, such as "Conversion Error: Date out of range: 2025-0-1". Where the
+// official binding reports a native exception, ours must throw an Error with a
+// DuckDB message, and both count as equal.
 //
 // Allowed differences, from the runtimes rather than the code:
 // - Given null or undefined where it reads an object or a handle, the official
@@ -558,20 +559,17 @@ const OURS_NULL_ARGUMENT = /^(An object was expected|Invalid [a-z ]+ argument)$/
 
 type Outcome = { ok: unknown } | { error: { class: string; message: string } };
 
-/** What Bun's N-API reports for a C++ exception; see the known crash at the top of the file. */
+/** What Bun's N-API reports for a C++ exception; see "C++ exceptions" at the top of the file. */
 const NATIVE_EXCEPTION = "A native exception was thrown";
+/** DuckDB's message for an error: its type's display name, if any, then "Error: ". */
+const DUCKDB_MESSAGE = /^([A-Za-z][A-Za-z -]*[A-Za-z] )?Error: /;
 
-/** Runs `sequence` on `impl`, except the calls at `skip`, which take the outcome given there. */
-async function run(impl: Impl, sequence: Call[], skip = new Map<number, Outcome>()): Promise<Outcome[]> {
+/** Runs `sequence` on `impl`. */
+async function run(impl: Impl, sequence: Call[]): Promise<Outcome[]> {
   const duckdb = IMPLS[impl];
   const world = newWorld(duckdb, await sequenceConnection(impl));
   const outcomes: Outcome[] = [];
   for (const [step, [[name, , returns], recipes]] of sequence.entries()) {
-    const skipped = skip.get(step);
-    if (skipped) {
-      outcomes.push(skipped);
-      continue;
-    }
     trace(`${impl}, call ${step}: ${name}`, sequence);
     const args = recipes.map((recipe) => resolve(world, recipe));
     try {
@@ -591,6 +589,16 @@ async function run(impl: Impl, sequence: Call[], skip = new Map<number, Outcome>
 function reconcile(sequence: Call[], official: Outcome[], ours: Outcome[]): void {
   for (let i = 0; i < Math.min(official.length, ours.length); i++) {
     const [a, b] = [official[i], ours[i]];
+    if (
+      "error" in a &&
+      "error" in b &&
+      a.error.message === NATIVE_EXCEPTION &&
+      b.error.class === "Error" &&
+      DUCKDB_MESSAGE.test(b.error.message)
+    ) {
+      official[i] = ours[i] = { error: { class: "allowed", message: "a C++ exception" } };
+      tally.nativeExceptions += 1;
+    }
     if (sequence[i][0][0] === "get_bignum" && "ok" in a && "ok" in b) {
       official[i] = ours[i] = { ok: "<not compared>" };
     }
@@ -607,7 +615,7 @@ function reconcile(sequence: Call[], official: Outcome[], ours: Outcome[]): void
   }
 }
 
-const tally = { calls: 0, ok: 0, skipped: 0 };
+const tally = { calls: 0, ok: 0, nativeExceptions: 0 };
 
 describe("raw binding parity, fuzzed", () => {
   test(
@@ -615,18 +623,12 @@ describe("raw binding parity, fuzzed", () => {
     async () => {
       tally.calls = 0;
       tally.ok = 0;
-      tally.skipped = 0;
+      tally.nativeExceptions = 0;
       await check(
         "random call sequences give the same results and errors",
         fc.asyncProperty(sequenceArb, async (sequence) => {
           const officialOutcomes = await run("official", sequence);
-          const crashing = new Map(
-            officialOutcomes.flatMap((outcome, step) =>
-              "error" in outcome && outcome.error.message === NATIVE_EXCEPTION ? [[step, outcome] as const] : [],
-            ),
-          );
-          tally.skipped += crashing.size;
-          const oursOutcomes = await run("ours", sequence, crashing);
+          const oursOutcomes = await run("ours", sequence);
           reconcile(sequence, officialOutcomes, oursOutcomes);
           tally.calls += sequence.length;
           tally.ok += officialOutcomes.filter((outcome) => "ok" in outcome).length;
@@ -637,7 +639,7 @@ describe("raw binding parity, fuzzed", () => {
         5,
       );
       console.log(
-        `raw bindings: ${tally.calls} calls, ${tally.ok} without an error, ${tally.skipped} skipped as known crashes`,
+        `raw bindings: ${tally.calls} calls, ${tally.ok} without an error, ${tally.nativeExceptions} C++ exceptions caught`,
       );
       // Errors are compared like results, so the test also requires enough calls to succeed.
       expect(tally.ok).toBeGreaterThanOrEqual(Math.floor(tally.calls * 0.3));

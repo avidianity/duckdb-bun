@@ -1,7 +1,7 @@
 // Vendors DuckDB's machine-readable C API spec (api_spec/v1 in duckdb/duckdb) at
 // the pinned DuckDB version into vendor/duckdb-api-spec/. duckdb.h is generated
 // from these YAML files upstream; scripts/gen-ffi.ts generates our FFI symbol
-// table, struct layouts and the Rust by-value wrappers from them.
+// table, struct layouts and the C++ wrappers from them.
 //
 //   bun run scripts/vendor-api-spec.ts
 import { rm } from "node:fs/promises";

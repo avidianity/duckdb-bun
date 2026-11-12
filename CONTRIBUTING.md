@@ -13,6 +13,7 @@ bun test
 ```
 
 Bun is pinned in `package.json` (`engines` and `packageManager`); use that version.
+Building the shim (`bun run build:native`, `cargo test`) needs the Rust toolchain pinned in `rust-toolchain.toml` and a C++17 compiler, which compiles the C++ exception boundary in `native/cpp/`.
 `bun install` installs the Git hooks through lefthook.
 
 ## Checks
@@ -73,6 +74,7 @@ CI runs it on linux-x64 and uploads `coverage/` as the `coverage-linux-x64` arti
 The floors live in `FLOORS` in `scripts/coverage.ts`.
 Each floor is at least 90% of lines and 90% of functions, and a floor only moves up.
 No file is excluded from a report to meet a floor: every source file under `src/` and `native/src/` counts, and a file that no suite loads fails the check.
+The C++ in `native/cpp/` is not in either report: `capi.cpp` is generated, one identical wrapper per C function, and `native/tests/boundary.rs` and `tests/runtime/exception.test.ts` test the boundary.
 Code that only a crashing process runs is measured too: in coverage builds the crash handler writes the profile before the process dies (`native/ABI.md`, "Diagnostics").
 
 It needs the `llvm-tools` component of the pinned Rust toolchain (`rustup component add llvm-tools`) and `cargo-llvm-cov` at the version the `coverage` job in `.github/workflows/ci.yml` installs.

@@ -10,6 +10,8 @@
 //!   `DYLD_LIBRARY_PATH` or `LD_LIBRARY_PATH`.
 //! - `cfg(coverage)` is declared, so the coverage-only code in src/diag.rs passes the
 //!   `unexpected_cfgs` lint.
+//! - The C++ exception boundary in `cpp/` (docs/adr/0003) is compiled into a static
+//!   library, with every warning an error, against the vendored `duckdb.h`.
 
 use std::env;
 use std::path::PathBuf;
@@ -20,6 +22,21 @@ fn main() {
     // `cargo llvm-cov` builds with `--cfg coverage`; src/diag.rs uses it to write the coverage
     // profile of a crashing process (`bun run coverage`).
     println!("cargo::rustc-check-cfg=cfg(coverage)");
+
+    // cc emits the rerun-if-changed lines for the sources it compiles; the header
+    // and duckdb.h are listed here.
+    println!("cargo::rerun-if-changed=cpp/boundary.hpp");
+    println!("cargo::rerun-if-changed=../vendor/duckdb.h");
+    cc::Build::new()
+        .cpp(true)
+        .std("c++17")
+        .include("../vendor")
+        .file("cpp/boundary.cpp")
+        .file("cpp/capi.cpp")
+        .warnings(true)
+        .extra_warnings(true)
+        .warnings_into_errors(true)
+        .compile("duckdb_bun_capi");
 
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();

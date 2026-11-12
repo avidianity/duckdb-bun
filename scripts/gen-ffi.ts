@@ -1,12 +1,15 @@
 // Generates the FFI layer from DuckDB's C API spec (vendor/duckdb-api-spec/v1),
 // the YAML that duckdb.h itself is generated from:
 //
-//   src/bindings/generated/capi.ts  the bun:ffi dlopen table of every C function,
-//                                   the table of the shim's by-value wrappers,
-//                                   and the C layout of every struct.
-//   native/src/by_value.rs          the Rust wrappers for the C functions that
-//                                   take or return a struct by value, which
-//                                   bun:ffi cannot call (see native/ABI.md).
+//   src/bindings/generated/capi.ts  the bun:ffi signature of every C function,
+//                                   the functions that check the C++ exception
+//                                   flag after each call, and the C layout of
+//                                   every struct.
+//   native/cpp/capi.cpp             a C++ wrapper per C function that catches a
+//                                   C++ exception (native/cpp/boundary.hpp), with
+//                                   by-value structs passed through pointers,
+//                                   which bun:ffi cannot pass (native/ABI.md),
+//                                   and the table of their addresses.
 //
 //   bun run gen:ffi
 
@@ -16,7 +19,7 @@ import { Glob } from "bun";
 const ROOT = join(import.meta.dir, "..");
 const SPEC = join(ROOT, "vendor", "duckdb-api-spec", "v1");
 const TS_OUT = join(ROOT, "src", "bindings", "generated", "capi.ts");
-const RS_OUT = join(ROOT, "native", "src", "by_value.rs");
+const CPP_OUT = join(ROOT, "native", "cpp", "capi.cpp");
 
 interface Param {
   type: string;
@@ -153,25 +156,21 @@ function ffiType(type: string, indirection: number): string {
   throw new Error(`No FFI type for ${type}`);
 }
 
-function rustType(type: string, indirection: number, isConst: boolean): string {
-  const t = resolve(type);
-  let base: string;
-  if (t === "opaque" || t === "void") base = "c_void";
-  else if (SCALARS[t]) base = SCALARS[t].rust;
-  else if (t === "duckdb_string_t") base = "duckdb_string_t";
-  else if (t === "sel_t") base = "sel_t";
-  else base = `duckdb_${type === "type" ? "type" : t}`;
-  if (indirection === 0) return base;
-  // Bindgen spells `const T *` as `*const T` and `T *` as `*mut T`; the const
-  // qualifier the spec records applies to the innermost pointee.
-  let out = `${isConst ? "*const" : "*mut"} ${base}`;
-  for (let i = 1; i < indirection; i++) out = `*mut ${out}`;
-  return out;
-}
-
 const direct: string[] = [];
 const wrapped: string[] = [];
-const rust: string[] = [];
+/** TypeScript checking wrappers, for the direct and the by-value table. */
+const guardDirect: string[] = [];
+const guardWrapped: string[] = [];
+/** C++ wrapper definitions, and their names in table order: direct ones first, then by-value ones. */
+const cpp: string[] = [];
+const cppDirect: string[] = [];
+const cppWrapped: string[] = [];
+
+/** A TypeScript wrapper that calls `name` and throws a pending C++ exception. */
+function guard(name: string, arity: number): string {
+  const args = Array.from({ length: arity }, (_, i) => `a${i}`).join(", ");
+  return `    ${name}: (${args}) => {\n      const r = raw.${name}(${args});\n      if (failed[0] !== 0) raise();\n      return r;\n    },`;
+}
 
 for (const [name, fn] of [...functions].sort(([a], [b]) => a.localeCompare(b))) {
   const params = Object.entries(fn.parameters ?? {});
@@ -182,9 +181,26 @@ for (const [name, fn] of [...functions].sort(([a], [b]) => a.localeCompare(b))) 
       ? "void"
       : ffiType(fn.return_type, fn.return_pointer ?? 0);
 
+  const fn_ = `duckdb_${name}`;
   if (!returnsStruct && byValue.length === 0) {
     const args = params.map(([, p]) => JSON.stringify(ffiType(p.type, p.indirection ?? 0)));
     direct.push(`  duckdb_${name}: { args: [${args.join(", ")}], returns: ${JSON.stringify(returnFfi)} },`);
+    guardDirect.push(guard(fn_, params.length));
+    const cppParams = params.map((_, i) => `DBS_ARG(${fn_}, ${i}) a${i}`);
+    const callArgs = params.map((_, i) => `a${i}`).join(", ");
+    cppDirect.push(`dbs_cxx_${name}`);
+    cpp.push(
+      [
+        `DBS_RET(${fn_}) dbs_cxx_${name}(${cppParams.join(", ")}) noexcept {`,
+        `  try {`,
+        `    return ${fn_}(${callArgs});`,
+        `  } catch (...) {`,
+        `    ::dbs::record_exception();`,
+        `    return DBS_RET(${fn_})();`,
+        `  }`,
+        `}`,
+      ].join("\n"),
+    );
     continue;
   }
 
@@ -200,39 +216,31 @@ for (const [name, fn] of [...functions].sort(([a], [b]) => a.localeCompare(b))) 
     `  dbs_${name}: { args: [${args.join(", ")}], returns: ${JSON.stringify(returnsStruct ? "void" : returnFfi)} },`,
   );
 
-  const rustParams = params.map(([pname, p]) => {
-    const ind = p.indirection ?? 0;
-    if (ind === 0 && isStruct(resolve(p.type))) return `${pname}: *const ${rustType(p.type, 0, false)}`;
-    return `${pname}: ${rustType(p.type, ind, p.const ?? false)}`;
-  });
-  const retType = returnsStruct ? rustType(fn.return_type, 0, false) : null;
-  if (retType) rustParams.push(`out: *mut ${retType}`);
-  const rustReturn =
-    returnsStruct || (fn.return_type === "opaque" && (fn.return_pointer ?? 0) === 0)
-      ? ""
-      : ` -> ${rustType(fn.return_type, fn.return_pointer ?? 0, fn.return_const ?? false)}`;
-  const callArgs = params.map(([pname, p]) =>
-    (p.indirection ?? 0) === 0 && isStruct(resolve(p.type)) ? `${pname}.read()` : pname,
+  guardWrapped.push(guard(`dbs_${name}`, args.length));
+  // By-value struct parameters arrive as pointers to const, and a by-value struct
+  // return is written through a trailing out pointer.
+  const cppParams = params.map(([, p], i) =>
+    (p.indirection ?? 0) === 0 && isStruct(resolve(p.type))
+      ? `const DBS_ARG(${fn_}, ${i}) *a${i}`
+      : `DBS_ARG(${fn_}, ${i}) a${i}`,
   );
-  const call = `duckdb_${name}(${callArgs.join(", ")})`;
-  const structParams = byValue.map(([pname]) => `\`${pname}\``);
-  const safety = [
-    ...structParams.map((p) => `${p} points to a valid, initialized value`),
-    ...(retType ? ["`out` points to writable memory for the result"] : []),
-    "the other arguments satisfy the contract of the wrapped C function",
-  ];
-  rust.push(
+  if (returnsStruct) cppParams.push(`DBS_RET(${fn_}) *out`);
+  const callArgs = params
+    .map(([, p], i) => ((p.indirection ?? 0) === 0 && isStruct(resolve(p.type)) ? `*a${i}` : `a${i}`))
+    .join(", ");
+  cppWrapped.push(`dbs_cxx_${name}`);
+  cpp.push(
     [
-      `/// Wraps \`duckdb_${name}\`, passing by-value structs through pointers.`,
-      "///",
-      "/// # Safety",
-      "///",
-      `/// The caller guarantees that ${safety.join(", and ")}.`,
-      "#[unsafe(no_mangle)]",
-      `pub unsafe extern "C" fn dbs_${name}(${rustParams.join(", ")})${rustReturn} {`,
-      `    // SAFETY: the caller upholds this function's contract, documented above.`,
-      retType ? `    unsafe { out.write(${call}) }` : `    unsafe { ${call} }`,
-      "}",
+      returnsStruct
+        ? `void dbs_cxx_${name}(${cppParams.join(", ")}) noexcept {`
+        : `DBS_RET(${fn_}) dbs_cxx_${name}(${cppParams.join(", ")}) noexcept {`,
+      `  try {`,
+      returnsStruct ? `    *out = ${fn_}(${callArgs});` : `    return ${fn_}(${callArgs});`,
+      `  } catch (...) {`,
+      `    ::dbs::record_exception();`,
+      returnsStruct ? `    *out = DBS_RET(${fn_})();` : `    return DBS_RET(${fn_})();`,
+      `  }`,
+      `}`,
     ].join("\n"),
   );
 }
@@ -254,15 +262,48 @@ await Bun.write(
   [
     `// ${header}`,
     "",
-    "/** Every libduckdb C function bun:ffi can call directly, as a dlopen table. */",
+    'import type { ConvertFns, FFIFunction } from "bun:ffi";',
+    "",
+    "/**",
+    " * Every libduckdb C function bun:ffi can call directly. The shim calls each through a",
+    " * C++ wrapper that catches a C++ exception (native/cpp/boundary.hpp); the first",
+    " * entries of its address table (native/ABI.md) are these, in this order.",
+    " */",
     "export const capi = {",
     ...direct,
     "} as const;",
     "",
-    "/** The shim's wrappers for C functions that take or return a struct by value (native/ABI.md). */",
+    "/**",
+    " * The shim's wrappers for C functions that take or return a struct by value",
+    " * (native/ABI.md), after the `capi` entries in the address table, in this order.",
+    " */",
     "export const byValue = {",
     ...wrapped,
     "} as const;",
+    "",
+    "/** The functions bun:ffi makes of `T`, as plain functions. */",
+    "type Plain<T extends Record<string, FFIFunction>> = {",
+    "  [K in keyof T]: (...args: Parameters<ConvertFns<T>[K]>) => ReturnType<ConvertFns<T>[K]>;",
+    "};",
+    "type Capi = Plain<typeof capi>;",
+    "type ByValue = Plain<typeof byValue>;",
+    "",
+    "/**",
+    " * Wraps each function so it throws, through `raise`, when the call set the calling",
+    " * thread's C++ exception flag, which `failed` views.",
+    " */",
+    "export function guardCapi(raw: ConvertFns<typeof capi>, failed: Int32Array, raise: () => never): Capi {",
+    "  return {",
+    ...guardDirect,
+    "  };",
+    "}",
+    "",
+    "/** As guardCapi, for the by-value wrappers. */",
+    "export function guardByValue(raw: ConvertFns<typeof byValue>, failed: Int32Array, raise: () => never): ByValue {",
+    "  return {",
+    ...guardWrapped,
+    "  };",
+    "}",
     "",
     "/** The C layout of each spec struct on the shipped LP64 targets. */",
     "export const layouts = {",
@@ -271,22 +312,36 @@ await Bun.write(
     "",
   ].join("\n"),
 );
+const table = [...cppDirect, ...cppWrapped];
 await Bun.write(
-  RS_OUT,
+  CPP_OUT,
   [
     `// ${header}`,
-    "//! By-value wrappers: one `dbs_<name>` per C function that takes or returns a",
-    "//! struct by value, which bun:ffi cannot call directly (see native/ABI.md).",
+    "// One wrapper per libduckdb C function JavaScript calls, each catching a C++",
+    "// exception (boundary.hpp), and the table of their addresses that",
+    "// dbs_capi_table() hands to the binding (native/ABI.md).",
     "",
-    "use libduckdb_sys::*;",
-    ...["c_char", "c_void"]
-      .filter((t) => rust.some((line) => new RegExp(`\\b${t}\\b`).test(line)))
-      .map((t) => `use std::ffi::${t};`),
+    '#include "boundary.hpp"',
     "",
-    rust.join("\n\n"),
+    // The deprecated functions stay callable, as the contract keeps them.
+    '#pragma GCC diagnostic ignored "-Wdeprecated-declarations"',
+    "",
+    'extern "C" {',
+    "",
+    cpp.join("\n\n"),
+    "",
+    "/** The wrappers' addresses: those of src/bindings/generated/capi.ts `capi`, then `byValue`, in order. */",
+    "const void *const *dbs_cxx_capi_table(std::size_t *count) noexcept {",
+    "  static const void *const table[] = {",
+    ...table.map((n) => `      reinterpret_cast<const void *>(&${n}),`),
+    "  };",
+    `  *count = ${table.length};`,
+    "  return table;",
+    "}",
+    "",
+    '}  // extern "C"',
     "",
   ].join("\n"),
 );
-await Bun.$`rustfmt --edition 2024 ${RS_OUT}`;
 await Bun.$`${join(ROOT, "node_modules", ".bin", "biome")} check --write ${TS_OUT}`.quiet();
-console.log(`capi: ${direct.length} direct, ${wrapped.length} wrapped, ${layouts.size} struct layouts`);
+console.log(`capi: ${direct.length} direct, ${wrapped.length} by value, ${layouts.size} struct layouts`);

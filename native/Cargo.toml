@@ -22,3 +22,7 @@ doctest = false
 libduckdb-sys = { version = "=1.20000.1", default-features = false, features = ["capi-v1"] }
 # Signals, sigaltstack and backtrace for the crash handler (src/diag.rs).
 libc = "=0.2.191"
+
+[build-dependencies]
+# Compiles the C++ exception boundary (cpp/, docs/adr/0003): Rust cannot catch a C++ exception.
+cc = "=1.10.0"

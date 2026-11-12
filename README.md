@@ -181,7 +181,8 @@ Include the report when you open an issue.
 - `src/bindings/` reimplements the `@duckdb/node-bindings` contract over the libduckdb C API with `bun:ffi`.
   Its FFI tables are generated from DuckDB's C API specification (`bun run gen:ffi`).
 - `native/` is a small Rust library, the shim.
-  It wraps the C functions that take or return structs by value, which `bun:ffi` cannot call.
+  Every C API call from JavaScript goes through a generated C++ wrapper in it that turns a C++ exception from libduckdb into a JavaScript `Error` with DuckDB's message, where it would otherwise abort the process.
+  The same wrappers pass the structs that C functions take or return by value, which `bun:ffi` cannot pass.
   It runs every blocking call (open, connect, query, prepare, execute, fetch) on a native thread, so the JS thread never waits for a query.
   It installs the crash handler.
 - Every native pointer is owned by a handle object, freed by a `FinalizationRegistry` or by an explicit close, and never while a native call is using it.
@@ -222,10 +223,6 @@ Each CI run uploads its full tables as the `bench-<platform>` artifact.
   Until a fix ships, let a Worker's queries settle, or close its connections, before terminating it.
 - One process can load the package in at most 4094 Workers over its whole life, because each JS thread takes a context id that is never reused (`native/ABI.md`, `dbs_init`).
   A Worker past that limit throws when it loads the package.
-- A libduckdb C API call that throws a C++ exception on bad input aborts the process, because `bun:ffi` has no exception boundary.
-  `DuckDBDateValue.fromParts({ year: 2025, month: 0, day: 1 })` is one: the official `@duckdb/node-api` throws `Error: A native exception was thrown` under Bun, and ours crashes.
-  The other known calls are `DuckDBTimestampValue.fromParts` and `DuckDBTimestampTZValue.fromParts` with an invalid date, and the raw bindings' `get_blob` and `get_bignum` on a value that does not cast.
-  Until a fix ships, pass only valid parts to these constructors.
 
 ## Develop
 
