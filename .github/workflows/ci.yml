@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The upstream-check workflow dispatches CI on the upgrade branches it pushes: a pull request opened with
+  # GITHUB_TOKEN starts its pull_request run only after approval, but workflow_dispatch always creates a run.
+  workflow_dispatch:
 
 permissions:
   contents: read

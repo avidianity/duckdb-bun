@@ -6,6 +6,7 @@ import * as db from "../../src/bindings/api/database.ts";
 import * as q from "../../src/bindings/api/query.ts";
 import { diagnostics } from "../../src/bindings/runtime/diagnostics.ts";
 import { type CallContext, redactSql } from "../../src/bindings/runtime/trace.ts";
+import { DUCKDB_VERSION_TAG } from "../../src/version.ts";
 
 test("redactSql hides every literal of a statement that can carry credentials", () => {
   expect(redactSql("CREATE SECRET s (TYPE s3, KEY_ID 'AKIA', SECRET 'it''s')")).toBe(
@@ -70,7 +71,7 @@ test("diagnostics() counts native calls and the handles not yet freed", async ()
   expect(after.liveHandles).toEqual(before.liveHandles);
   expect(after.jobs.inFlight).toBe(0);
   expect(after.nativeThreads.running).toBe(0);
-  expect(after.versions.duckdb).toBe("v2.0.0");
+  expect(after.versions.duckdb).toBe(DUCKDB_VERSION_TAG);
   expect(after.crashHandler).toBe("installed");
   expect(after.tracingChannel).toBe("duckdb-bun:call");
 });
